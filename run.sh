@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.7.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.9.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -19,7 +19,7 @@ LEDGER_PATH="/tmp/infinite-loop-state.json"
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.7.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.9.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
@@ -195,16 +195,16 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop Daemon v14.7.0                ║"
+  echo "║  Infinite Loop Daemon v14.9.0                ║"
   echo "║  run.sh — one command to start               ║"
   echo "║                                                ║"
   echo "║  What's new ⚡                                ║"
+  echo "║  • --examples: categorized usage patterns     ║"
   echo "║  • Shell tab-completion for all 80+ flags     ║"
   echo "║  • --list-flags and --list-groups quick ref    ║"
   echo "║  • --quiet mode: compact output               ║"
   echo "║  • [BEAT] heartbeat during long iterations    ║"
   echo "║  • Actionable [SUGGEST] on errors             ║"
-  echo "║  • Suggests specific flags to adjust           ║"
   echo "╚══════════════════════════════════════════════╝"
   echo ""
   echo "  Config: .env"

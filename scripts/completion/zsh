@@ -44,6 +44,7 @@ bool_flags=(
     '--help[Show full detailed help with all 80+ flags and examples]'
     '--list-flags[Print organized flag listing with help text]'
     '--list-groups[Print group names only (compact overview)]'
+    '--examples[Print categorized real-world usage examples]'
 )
 
 # ---------------------------------------------------------------------------

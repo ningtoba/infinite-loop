@@ -54,6 +54,7 @@ _hermes_loop_completions()
         --help
         --list-flags
         --list-groups
+        --examples
     )
 
     # ---- VALUE (argument-taking) flags ----

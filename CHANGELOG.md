@@ -7,6 +7,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [14.9.0] — 2026-06-26
+
+### Added
+- **`--examples` flag**: Prints categorized real-world usage examples covering 7 categories: Basic Single-Goal Loop, Git-Integrated Evolution, Batch/Goals-File Processing, Notifications & Monitoring, Monitoring & Control, Advanced Patterns, and Help & Diagnostics. Accessible before argparse (no `--goal` required), same as `--list-flags`. Includes shell commands for common operations (stop, pause, status, inspect-ledger, dashboard) and quick-reference diagnostics.
+- **Missing `--goal` error improvement**: Now also points users to `python3 -m hermes_loop --examples` for usage patterns, alongside the existing `--help` reference.
+- **Tab-completion update**: `--examples` added to both bash and zsh completion scripts.
+
+### Changed
+- `cli.py` — new `_list_examples()` function (145 lines) with categorized real-world usage examples. Pre-argparse handler for `--examples` (bypasses `--goal` requirement). Added to standalone_flags set.
+- `scripts/completion/bash` — added `--examples` to bool_flags array.
+- `scripts/completion/zsh` — added `--examples` completion definition.
+- `hermes_loop/config.py` — bumped LAUNCH_LOOP_VERSION from 14.7.0 to 14.9.0.
+- `run.sh` — banner updated to v14.9.0 with --examples listed as new feature.
+- `README.md` — updated v14.9.0 changelog entry in the README, added --examples to the "v14.9.0 Changelog" table in the README.
+
+---
+
 ## [14.8.0] — 2026-06-26
 
 ### Changed

@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.7.0
+# Infinite Loop Daemon — v14.9.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -426,6 +426,16 @@ echo '{"summary": "added feature X", "next_goal": "add feature Y"}' > /tmp/sessi
 echo '{"done": true}' > /tmp/session-loop-state.json
 kill $LOOP_PID
 ```
+
+---
+
+## v14.9.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `--examples` flag | Usability | `cli.py`, `.env.example` | Prints categorized real-world usage examples covering 7 categories. Accessible pre-argparse (no `--goal` required). |
+| Missing goal error | Usability | `cli.py` | Now also shows `See --examples for usage patterns` alongside `--help`. |
+| Tab-completion update | Usability | `completion/{bash,zsh}` | `--examples` added to both completion scripts. |
 
 ---
 

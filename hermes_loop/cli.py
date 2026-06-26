@@ -165,6 +165,7 @@ def _list_flags(show_help=True):
             "--config": "Load configuration from a JSON file",
             "--list-flags": "Print this organized flag listing with help text",
             "--list-groups": "Print group names only (compact overview)",
+            "--examples": "Print categorized real-world usage examples",
             "--version": "Print daemon version and exit",
             "--help": "Show the full detailed help with all 80+ flags and examples",
         },
@@ -185,6 +186,151 @@ def _list_flags(show_help=True):
             print(f"  [{group_name}]  ({len(flags)} flags)")
 
 
+def _list_examples():
+    """Print categorized real-world usage examples. Used by --examples flag."""
+    print(f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — Usage Examples")
+    print("=" * 60)
+    print()
+
+    print("  ── Basic Single-Goal Loop ──────────────────────────────────────────")
+    print()
+    print("    # Run with a single goal — simplest invocation")
+    print('    hermes_loop --goal "Fix all ESLint errors" --run')
+    print()
+    print("    # One-shot preview (no loop started)")
+    print('    hermes_loop --goal "Fix tests" --dry-run')
+    print()
+    print("    # Run to completion (10 iterations then stop)")
+    print('    hermes_loop --goal "Refactor auth" --max-iterations 10 --run')
+    print()
+
+    print("  ── Git-Integrated Evolution ────────────────────────────────────────")
+    print()
+    print("    # Auto-detect, fix, and commit — ideal for linting/formatting")
+    print(
+        '    hermes_loop --goal "Fix lint errors one at a time" --git --git-commit --evolve --run'
+    )
+    print()
+    print("    # Stop once all changes are made")
+    print(
+        '    hermes_loop --goal "Clean up warnings" --git --git-commit --convergence-stop --run'
+    )
+    print()
+    print("    # Store full git diffs in the ledger for review")
+    print(
+        '    hermes_loop --goal "Optimize imports" --git --git-commit --store-git-diff --run'
+    )
+    print()
+
+    print("  ── Batch / Goals-File Processing ───────────────────────────────────")
+    print()
+    print("    # Process a list of goals, one per line")
+    print("    hermes_loop --goals-file goals.txt --run")
+    print()
+    print("    # Batch with 5 parallel workers, stop when done")
+    print(
+        "    hermes_loop --goals-file todos.txt --workers 5 --stop-at-goals-end --run"
+    )
+    print()
+    print("    # Track goals so restarts skip already-finished ones")
+    print("    hermes_loop --goals-file chores.txt --track-goals --run")
+    print()
+
+    print("  ── Notifications & Monitoring ──────────────────────────────────────")
+    print()
+    print("    # Get desktop notifications after each iteration (Linux)")
+    print('    hermes_loop --goal "Fix bugs" --notify-desktop --run')
+    print()
+    print("    # Push to phone via ntfy.sh (self-hosted available)")
+    print('    hermes_loop --goal "Run tests" --notify-ntfy my-alerts --run')
+    print()
+    print("    # Email yourself on errors via shell command")
+    print(
+        '    hermes_loop --goal "Deploy" --on-error-cmd \'mail -s "Loop error" you@x.com\' --run'
+    )
+    print()
+    print("    # Real-time HTML dashboard + JSON status file")
+    print(
+        '    hermes_loop --goal "Refactor" --status-html /tmp/dash.html --status-file /tmp/status.json --run'
+    )
+    print()
+
+    print("  ── Monitoring & Control ────────────────────────────────────────────")
+    print()
+    print("    # Follow iteration progress in real-time")
+    print("    tail -f /tmp/infinite-loop.log")
+    print()
+    print("    # Check the full iteration ledger")
+    print("    bash scripts/inspect-ledger.sh")
+    print("    bash scripts/inspect-ledger.sh --summary   # compact one-liner")
+    print("    bash scripts/inspect-ledger.sh --errors    # errors only")
+    print("    cat /tmp/infinite-loop-state.json | python3 -m json.tool")
+    print()
+    print("    # Control a running daemon")
+    print("    echo 'stop'    > /tmp/infinite-loop-stop")
+    print("    echo 'pause'   > /tmp/infinite-loop-stop")
+    print("    echo 'resume'  > /tmp/infinite-loop-stop")
+    print()
+
+    print("  ── Advanced Patterns ───────────────────────────────────────────────")
+    print()
+    print("    # Library mode (in-process AIAgent, no subprocess)")
+    print('    hermes_loop --goal "Analyze logs" --use-library --run')
+    print()
+    print("    # Multi-worker parallel analysis")
+    print('    hermes_loop --goal "Review all modules" --workers 4 --git --run')
+    print()
+    print("    # File watcher — auto-trigger when files change")
+    print('    hermes_loop --goal "Run on change" --watch-dir src/ --run')
+    print()
+    print("    # Webhook-triggered iteration server")
+    print('    hermes_loop --goal "Trigger me" --webhook-port 9090 --run')
+    print("    # Then POST /webhook to trigger an iteration")
+    print()
+    print("    # Resume a chained session (handoff between iterations)")
+    print(
+        '    hermes_loop --goal "Multi-step refactor" --pass-session-id --resume --run'
+    )
+    print()
+    print("    # Full autonomy: bypass approvals, skip rules, no config")
+    print(
+        '    hermes_loop --goal "Do everything" --yolo --ignore-rules --ignore-user-config --run'
+    )
+    print()
+    print("    # Troubleshooting: safe mode disables all customizations")
+    print('    hermes_loop --goal "Debug setup" --safe-mode --run')
+    print()
+
+    print("  ── Help & Diagnostics ──────────────────────────────────────────────")
+    print()
+    print("    # Quick overview of all flags by category")
+    print("    hermes_loop --list-flags")
+    print()
+    print("    # Compact group overview")
+    print("    hermes_loop --list-groups")
+    print()
+    print("    # Full detailed flag reference")
+    print("    hermes_loop --help")
+    print()
+    print("    # Run self-tests (~40 checks)")
+    print("    hermes_loop --self-test")
+    print()
+    print("    # Health check before running")
+    print("    hermes_loop --preflight")
+    print()
+    print("    # Save current config for reuse")
+    print('    hermes_loop --goal "Config snapshot" --save-config my-loop.json')
+    print('    hermes_loop --goal "Load config" --config my-loop.json --run')
+    print()
+    print("    # Shell tab-completion (one-time setup)")
+    print("    make completion")
+    print()
+    print("    # Quick one-command entrypoint (reads .env)")
+    print("    bash run.sh")
+    print('    bash run.sh --goal "Override" --git --quiet')
+    print()
+
+
 def main():
     # Check --version before argparse to avoid required-arg conflicts
     if "--version" in sys.argv:
@@ -201,6 +347,11 @@ def main():
         _list_flags(show_help=("--list-flags" in sys.argv))
         sys.exit(0)
 
+    # Check --examples before argparse to avoid required --goal conflict
+    if "--examples" in sys.argv:
+        _list_examples()
+        sys.exit(0)
+
     # Friendly error if --goal is missing (before argparse dry error)
     standalone_flags = {
         "--version",
@@ -210,6 +361,7 @@ def main():
         "-h",
         "--list-flags",
         "--list-groups",
+        "--examples",
     }
     arg_set = set(sys.argv[1:])
     has_goal = any(
@@ -229,7 +381,14 @@ def main():
             file=sys.stderr,
         )
         parser.print_usage()
-        print("\nSee 'python3 -m hermes_loop --help' for full options", file=sys.stderr)
+        print(
+            "\nSee 'python3 -m hermes_loop --help' for full options",
+            file=sys.stderr,
+        )
+        print(
+            "See 'python3 -m hermes_loop --examples' for usage patterns",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     parser = argparse.ArgumentParser(
@@ -252,7 +411,8 @@ def main():
             '  python3 -m hermes_loop --goal "Refactor auth" --git --git-commit --evolve --run\n'
             "  python3 -m hermes_loop --goals-file goals.txt --track-goals --workers 5 --run\n"
             "  python3 -m hermes_loop --self-test\n"
-            "  python3 -m hermes_loop --dry-run\n\n"
+            "  python3 -m hermes_loop --dry-run\n"
+            "  python3 -m hermes_loop --examples\n\n"
             "Stop:  echo 'stop' > /tmp/infinite-loop-stop\n"
             "Pause: echo 'pause' > /tmp/infinite-loop-stop\n"
             "Status: cat /tmp/infinite-loop-state.json | python3 -m json.tool"

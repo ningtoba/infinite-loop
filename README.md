@@ -443,6 +443,9 @@ kill $LOOP_PID
 
 | Feature | Type | Files | Description |
 |---------|------|-------|-------------|
+| Structured --help description | Usability | `launch-loop.py` | Replaced wall-of-text with "Features at a glance" grouped by category (Iteration, Parallel, Notify, Sessions, Spawn, Debug, Git, Web), common usage examples, and stop/pause/status commands. Uses RawDescriptionHelpFormatter. |
+| Friendly missing --goal error | Usability | `launch-loop.py` | Clear "ERROR: --goal is required (or use --goals-file for batch mode)" before argparse's default error, with usage hint and --help pointer. |
+| Readable startup banner | Usability | `launch-loop.py` | Replaced 10-line feature dump with compact 3-line pipe-separated summary under Unicode ═ header. |
 | Organized --help output | Usability | `launch-loop.py` | Argument groups (Core, Iteration, Notification, Error Recovery, Archival, Behavior) for readable `--help` |
 | run.sh dry-run bugfix | Bugfix | `run.sh` | `--dry-run` now sets `DRY_RUN=true` and strips `--run` from daemon args to prevent no-op dry-runs |
 

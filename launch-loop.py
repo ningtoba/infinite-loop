@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 VERSION = "14.3.0"
 """
-launch-loop.py — Infinite loop daemon v14.2.0
+launch-loop.py — Infinite loop daemon v14.3.0
 
-v14.2.0 changes:
-  - Makefile — convenience targets (run, dry-run, self-test, lint, status,
-    stop, clean) for faster common operations
-  - CONTRIBUTING.md — onboarding guide for new contributors with setup,
-    workflow, code style, and troubleshooting
-  - Improved run.sh --help — organized sections with quick reference for
-    ledger, status, stop/pause/resume, and dashboard commands
-  - run.sh --self-test and --version support — new CLI passthrough flags
-  - SSE broadcast fix — added missing 'global _sse_clients' declaration in
-    _broadcast_to_sse_clients() to prevent UnboundLocalError crash
-  - Banner and version bumps across all entrypoints to v14.2.0
+v14.3.0 changes:
+  - Organized --help — all 80+ CLI flags grouped into 22 logical sections
+    (Core Task, Toolsets, Iteration Control, Parallelism, Timeouts &
+    Retries, Git Integration, Goals File, Rate Limiting, Convergence
+    Detection, Structured Output, Shutdown, Profile/Model, Webhook/HTTP,
+    Notifications, Logging, Status/Dashboard, Ledger Management, Archiving,
+    File Watcher, Worker, Spawned Session Flags, Startup/Debug)
+  - run.sh --dry-run fix — strip --run from .env when --dry-run is active
 
 v14.1.0 changes:
   - P0: Dashboard XSS Fix — Replaced innerHTML string interpolation with
@@ -6883,8 +6880,8 @@ def main():
                 "multi-level delegate_task() trees. Each iteration spawns a `hermes chat -q` session "
                 "with configurable toolsets, max-turns, and context propagation.\n\n"
                 "Common usage:\n"
-                "  python3 launch-loop.py --goal \"Fix lint errors\" --run\n"
-                "  python3 launch-loop.py --goal \"Refactor auth\" --git --git-commit --evolve --run\n"
+                '  python3 launch-loop.py --goal "Fix lint errors" --run\n'
+                '  python3 launch-loop.py --goal "Refactor auth" --git --git-commit --evolve --run\n'
                 "  python3 launch-loop.py --goals-file goals.txt --track-goals --workers 5 --run\n"
                 "  python3 launch-loop.py --self-test\n"
                 "  python3 launch-loop.py --dry-run\n\n"
@@ -6907,7 +6904,10 @@ def main():
         for i in range(len(sys.argv))
     )
     if not has_goal and not has_goals_file and not arg_set & standalone_flags:
-        parser = _build_arg_parser()
+        parser = argparse.ArgumentParser(
+            description=f"Infinite Loop Daemon v{VERSION}",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
         print(
             "ERROR: --goal is required (or use --goals-file for batch mode)\n",
             file=sys.stderr,
@@ -6943,13 +6943,40 @@ def main():
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
+
+    # ── 1. Core Task ────────────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Core Task", "The primary task definition for the loop"
+    )
+    group.add_argument(
         "--goal", required=True, help="The core task for spawned sessions"
     )
-    parser.add_argument(
+    group.add_argument(
         "--context", default="", help="Initial context (paths, constraints, language)"
     )
-    parser.add_argument(
+    group.add_argument(
+        "--context-file",
+        default="",
+        help="Read context from a file (alternative to --context)",
+    )
+    group.add_argument("--workdir", default="", help="Working directory")
+    group.add_argument(
+        "--prompt-suffix",
+        default="",
+        help="Extra text appended to every spawned prompt",
+    )
+    group.add_argument(
+        "--task-type",
+        default="auto",
+        help="Force a specific task type (research|code-fix|code-build|system-admin|data-processing|content|general). "
+        "Default: auto-detect from --goal.",
+    )
+
+    # ── 2. Toolsets ─────────────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Toolsets", "Control which toolsets are available in spawned sessions"
+    )
+    group.add_argument(
         "--toolsets",
         default=BASE_TOOLSETS,
         help=(
@@ -6957,226 +6984,74 @@ def main():
             f"(default: {BASE_TOOLSETS})"
         ),
     )
-    parser.add_argument("--workdir", default="", help="Working directory")
-    parser.add_argument(
-        "--compact-every", type=int, default=5, help="Compact context every N iters"
+    group.add_argument(
+        "--no-auto-toolsets",
+        action="store_true",
+        help="Disable automatic toolset enrichment based on task type",
     )
-    parser.add_argument(
+    group.add_argument(
+        "--no-failure-learning",
+        action="store_true",
+        help="Disable injection of past failure context into spawned sessions",
+    )
+
+    # ── 3. Iteration Control ───────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Iteration Control",
+        "How many iterations to run, how often to compact, and whether to evolve goals",
+    )
+    group.add_argument(
         "--max-iterations",
         type=int,
         default=0,
         help="Auto-stop after N iterations (0=infinite)",
     )
-    parser.add_argument(
+    group.add_argument(
         "--max-turns",
         type=int,
         default=500,
         help="Max turns per spawned Hermes session (default: 500 — high for deep delegation chains)",
     )
-    parser.add_argument(
-        "--retry-delay", type=int, default=0, help="Backoff delay on error"
+    group.add_argument(
+        "--compact-every", type=int, default=5, help="Compact context every N iters"
     )
-    parser.add_argument(
+    group.add_argument(
+        "--evolve",
+        action="store_true",
+        help="Let iterations propose the next goal (self-directing)",
+    )
+    group.add_argument("--run", action="store_true", help="Start the actual loop")
+
+    # ── 4. Parallelism ──────────────────────────────────────────────────────
+    group = parser.add_argument_group("Parallelism", "Concurrent execution settings")
+    group.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Run N concurrent Hermes sessions per iteration",
+    )
+
+    # ── 5. Timeouts & Retries ───────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Timeouts & Retries",
+        "Session timeouts, retry behavior, and heartbeat-based health monitoring",
+    )
+    group.add_argument(
         "--session-timeout",
         type=int,
         default=HERMES_SESSION_TIMEOUT,
         help=f"Max seconds per Hermes session (default: {HERMES_SESSION_TIMEOUT})",
     )
-    parser.add_argument(
-        "--shutdown-sentinel", default=SENTINEL_PATH_DEFAULT, help="Sentinel file path"
+    group.add_argument(
+        "--retry-delay", type=int, default=0, help="Backoff delay on error"
     )
-    parser.add_argument(
-        "--context-file",
-        default="",
-        help="Read context from a file (alternative to --context)",
-    )
-    parser.add_argument(
-        "--profile",
-        default="",
-        help="Hermes profile for spawned sessions (e.g. 'work')",
-    )
-    parser.add_argument(
-        "--model",
-        default="",
-        help="Model override for spawned sessions (e.g. 'anthropic/claude-sonnet-4')",
-    )
-    parser.add_argument(
-        "--provider",
-        default="",
-        help="Provider override for spawned sessions (e.g. 'openrouter')",
-    )
-    parser.add_argument(
-        "--http-callback",
-        default="",
-        help="HTTP POST URL for iteration JSON (like --notify-cmd but via HTTP)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print what would happen without spawning any sessions",
-    )
-    parser.add_argument(
-        "--keep-iterations",
-        type=int,
-        default=0,
-        help="Auto-shrink ledger to keep only last N iterations (0=keep all). Removes when > 2N.",
-    )
-
-    # Archive flags
-    parser.add_argument(
-        "--archive-dir",
-        default=os.path.expanduser("~/.hermes/infinite-loop-archives"),
-        help="Directory to store archived iteration files (default: ~/.hermes/infinite-loop-archives)",
-    )
-    parser.add_argument(
-        "--archive-retention",
-        type=int,
-        default=30,
-        help="Days to keep archived iterations (0=keep forever, default: 30)",
-    )
-    parser.add_argument(
-        "--archive-max-size",
-        type=int,
-        default=0,
-        help="Max total size of archive directory in MB before oldest files are purged "
-        "(0=unlimited, default: 0). Combined with --archive-retention, the stricter constraint wins.",
-    )
-
-    parser.add_argument("--run", action="store_true", help="Start the actual loop")
-    parser.add_argument(
-        "--self-test",
-        action="store_true",
-        help="Run self-test suite and exit",
-    )
-
-    # v9.1.0 flags
-    parser.add_argument(
+    group.add_argument(
         "--max-retries",
         type=int,
         default=0,
         help="Retry a failed iteration up to N times (0=no retry)",
     )
-    parser.add_argument(
-        "--on-error-cmd",
-        default="",
-        help="Shell command when an iteration fails (JSON on stdin)",
-    )
-    parser.add_argument(
-        "--tag",
-        default="",
-        help="Label/identifier for the run (e.g. 'project:fix-auth')",
-    )
-    parser.add_argument(
-        "--prompt-suffix",
-        default="",
-        help="Extra text appended to every spawned prompt",
-    )
-    parser.add_argument(
-        "--force-reset",
-        action="store_true",
-        help="Clear existing ledger and start fresh",
-    )
-
-    # v11.1.0 flags
-    parser.add_argument(
-        "--no-auto-toolsets",
-        action="store_true",
-        help="Disable automatic toolset enrichment based on task type",
-    )
-    parser.add_argument(
-        "--no-failure-learning",
-        action="store_true",
-        help="Disable injection of past failure context into spawned sessions",
-    )
-    parser.add_argument(
-        "--task-type",
-        default="auto",
-        help="Force a specific task type (research|code-fix|code-build|system-admin|data-processing|content|general). "
-        "Default: auto-detect from --goal.",
-    )
-
-    # v11.2.0 flags — webhook, log file, HTML dashboard, file watcher
-    parser.add_argument(
-        "--webhook-port",
-        type=int,
-        default=0,
-        help="Port for HTTP webhook server (0=disabled). POST /webhook triggers iteration, GET /health, GET /status",
-    )
-    parser.add_argument(
-        "--log-file",
-        default="",
-        help="Path to daemon log file (e.g. /tmp/infinite-loop.log). Adds file logging alongside stdout.",
-    )
-    parser.add_argument(
-        "--log-max-mb",
-        type=int,
-        default=10,
-        help="Max log file size in MB before rotation (default: 10, only used with --log-file)",
-    )
-    parser.add_argument(
-        "--status-html",
-        default="",
-        help="Path to self-contained HTML status dashboard (e.g. /tmp/loop-status.html). Updated after each iteration.",
-    )
-    parser.add_argument(
-        "--watch-dir",
-        default="",
-        help="Watch a directory/file for changes and trigger an iteration when a file is modified. Uses os.stat() polling.",
-    )
-    parser.add_argument(
-        "--watch-poll",
-        type=float,
-        default=5.0,
-        help="File watcher poll interval in seconds (default: 5.0, only used with --watch-dir)",
-    )
-    parser.add_argument(
-        "--worker-url",
-        default="auto",
-        help="Hermes worker URL. 'auto' (default) = start worker internally. "
-        "http://host:port = connect to external worker. "
-        "'' = direct subprocess mode (no worker).",
-    )
-
-    # v11.4.0 flags — cooldown, goals file, stop at goals end
-    parser.add_argument(
-        "--cooldown",
-        type=int,
-        default=0,
-        help="Wait N seconds between iterations for rate-limit awareness (default: 0). "
-        "Useful when many short iterations would hit API rate limits.",
-    )
-    parser.add_argument(
-        "--goals-file",
-        default="",
-        help="Path to file with one goal per line. Each iteration pops the next goal "
-        "from the file. Useful for batch processing (e.g., fix 50 lint errors). "
-        "Lines starting with '#' are ignored as comments.",
-    )
-    parser.add_argument(
-        "--stop-at-goals-end",
-        action="store_true",
-        help="When used with --goals-file, stop the loop when all goals are exhausted "
-        "instead of wrapping around and reusing them.",
-    )
-
-    # v13.1.0 flags — Idempotent Goal Execution
-    parser.add_argument(
-        "--track-goals",
-        action="store_true",
-        default=False,
-        help="When used with --goals-file, track completed goals so crashed/restarted "
-        "runs automatically skip already-finished goals.",
-    )
-    parser.add_argument(
-        "--reset-goals",
-        action="store_true",
-        default=False,
-        help="When used with --track-goals, clear the goals_completed ledger on startup "
-        "and re-process all goals from scratch.",
-    )
-
-    # v14.0.0 flags — Heartbeat-Based Session Self-Healing
-    parser.add_argument(
+    group.add_argument(
         "--heartbeat-timeout",
         type=int,
         default=0,
@@ -7186,67 +7061,77 @@ def main():
         "When a session's heartbeat stops, the daemon kills it and retries.",
     )
 
-    # v11.5.0 flags — structured output, adaptive cooldown, convergence, diff storage
-    parser.add_argument(
-        "--output-schema",
-        default="",
-        help="Inline JSON Schema as JSON string to validate spawned session output. "
-        "Uses stdlib-only validation (required fields, types, enum, length/range checks). "
-        'Example: \'{"type":"object","required":["summary"],"properties":{"summary":{"type":"string"}}}\'',
+    # ── 6. Git Integration ──────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Git Integration", "Automatic git diff capture, commits, and idle detection"
     )
-    parser.add_argument(
-        "--output-schema-file",
-        default="",
-        help="Path to a JSON Schema file for spawned output validation. "
-        "Alternative to --output-schema for complex schemas.",
+    group.add_argument(
+        "--git", action="store_true", help="Capture git diff stats per iteration"
     )
-    parser.add_argument(
-        "--startup-delay",
-        type=float,
-        default=0.0,
-        help="Wait N seconds before the first iteration (default: 0). Useful for debugging.",
-    )
-    parser.add_argument(
-        "--notify-desktop",
+    group.add_argument(
+        "--git-commit",
         action="store_true",
-        help="Send desktop notifications via notify-send on each iteration result (Linux only)",
+        help="Auto-commit changes per iteration (implies --git)",
     )
-    parser.add_argument(
-        "--notify-on-completion",
+    group.add_argument(
+        "--store-git-diff",
         action="store_true",
-        help="Send a summary notification when the daemon finishes",
+        help="Store the actual git diff (not just stats) in the ledger. "
+        "Capped at 10KB per iteration to prevent ledger bloat. "
+        "Useful for reviewing changes without shell access.",
     )
-    parser.add_argument(
-        "--notify-pushbullet",
+    group.add_argument(
+        "--max-idle-iterations",
+        type=int,
+        default=0,
+        help="Stop after N consecutive iterations with no git changes (requires --git)",
+    )
+
+    # ── 7. Goals File (Batch) ───────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Goals File (Batch)",
+        "Batch-process multiple goals from a file with tracking and reset support",
+    )
+    group.add_argument(
+        "--goals-file",
         default="",
-        help="Pushbullet API access token for mobile notifications. "
-        "If set, sends iteration results to your phone. "
-        "Get token at https://www.pushbullet.com/#settings",
+        help="Path to file with one goal per line. Each iteration pops the next goal "
+        "from the file. Useful for batch processing (e.g., fix 50 lint errors). "
+        "Lines starting with '#' are ignored as comments.",
     )
-    parser.add_argument(
-        "--notify-ntfy",
-        default="",
-        help="ntfy topic name for push notifications. "
-        "If set, sends iteration results via ntfy.sh (or your own server with --notify-ntfy-server). "
-        "Example: 'my-loop-alerts'",
+    group.add_argument(
+        "--stop-at-goals-end",
+        action="store_true",
+        help="When used with --goals-file, stop the loop when all goals are exhausted "
+        "instead of wrapping around and reusing them.",
     )
-    parser.add_argument(
-        "--notify-ntfy-server",
-        default="https://ntfy.sh",
-        help="ntfy server URL (default: https://ntfy.sh). "
-        "Use a self-hosted ntfy server URL for private notifications.",
+    group.add_argument(
+        "--track-goals",
+        action="store_true",
+        default=False,
+        help="When used with --goals-file, track completed goals so crashed/restarted "
+        "runs automatically skip already-finished goals.",
     )
-    parser.add_argument(
-        "--save-config",
-        default="",
-        help="Save current configuration to a JSON file and exit. Path to output file.",
+    group.add_argument(
+        "--reset-goals",
+        action="store_true",
+        default=False,
+        help="When used with --track-goals, clear the goals_completed ledger on startup "
+        "and re-process all goals from scratch.",
     )
-    parser.add_argument(
-        "--config",
-        default="",
-        help="Load configuration from a JSON file. Overrides default values, command-line flags take precedence.",
+
+    # ── 8. Rate Limiting ────────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Rate Limiting", "Cooldown between iterations to respect API rate limits"
     )
-    parser.add_argument(
+    group.add_argument(
+        "--cooldown",
+        type=int,
+        default=0,
+        help="Wait N seconds between iterations for rate-limit awareness (default: 0). "
+        "Useful when many short iterations would hit API rate limits.",
+    )
+    group.add_argument(
         "--cooldown-mode",
         default="fixed",
         choices=["fixed", "adaptive"],
@@ -7255,13 +7140,19 @@ def main():
         "Fast iterations get longer cooldowns (rate-limit protection), "
         "long iterations get shorter cooldowns. Default: fixed",
     )
-    parser.add_argument(
+
+    # ── 9. Convergence Detection ────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Convergence Detection",
+        "Auto-stop when iterations produce similar results (stuck detection)",
+    )
+    group.add_argument(
         "--convergence-stop",
         action="store_true",
         help="Auto-stop when N consecutive iterations produce similar summaries "
         "(stuck detection). Uses word-overlap Jaccard similarity.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--convergence-threshold",
         type=float,
         default=DEFAULT_CONVERGENCE_THRESHOLD,
@@ -7269,23 +7160,250 @@ def main():
         "Higher = more permissive (only identical summaries trigger). "
         "Lower = more aggressive (similar but not identical triggers).",
     )
-    parser.add_argument(
+    group.add_argument(
         "--convergence-window",
         type=int,
         default=DEFAULT_CONVERGENCE_WINDOW,
         help=f"Number of recent iterations to compare for convergence (default: {DEFAULT_CONVERGENCE_WINDOW}). "
         "All pairs in the window must exceed the threshold.",
     )
-    parser.add_argument(
-        "--store-git-diff",
-        action="store_true",
-        help="Store the actual git diff (not just stats) in the ledger. "
-        "Capped at 10KB per iteration to prevent ledger bloat. "
-        "Useful for reviewing changes without shell access.",
+
+    # ── 10. Structured Output ───────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Structured Output",
+        "Validate and constrain spawned session output with JSON Schema",
+    )
+    group.add_argument(
+        "--output-schema",
+        default="",
+        help="Inline JSON Schema as JSON string to validate spawned session output. "
+        "Uses stdlib-only validation (required fields, types, enum, length/range checks). "
+        'Example: \'{"type":"object","required":["summary"],"properties":{"summary":{"type":"string"}}}\'',
+    )
+    group.add_argument(
+        "--output-schema-file",
+        default="",
+        help="Path to a JSON Schema file for spawned output validation. "
+        "Alternative to --output-schema for complex schemas.",
+    )
+    group.add_argument(
+        "--max-output-chars",
+        type=int,
+        default=2000,
+        help="Max chars of spawned output to store (0=unlimited)",
     )
 
-    # v11.11.0 flags — AIAgent library mode, session tracking, checkpoints
-    parser.add_argument(
+    # ── 11. Shutdown ────────────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Shutdown", "Sentinel file to stop or pause the loop externally"
+    )
+    group.add_argument(
+        "--shutdown-sentinel", default=SENTINEL_PATH_DEFAULT, help="Sentinel file path"
+    )
+
+    # ── 12. Profile / Model ─────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Profile / Model",
+        "Select which Hermes profile, model, provider, and source to use for spawned sessions",
+    )
+    group.add_argument(
+        "--profile",
+        default="",
+        help="Hermes profile for spawned sessions (e.g. 'work')",
+    )
+    group.add_argument(
+        "--model",
+        default="",
+        help="Model override for spawned sessions (e.g. 'anthropic/claude-sonnet-4')",
+    )
+    group.add_argument(
+        "--provider",
+        default="",
+        help="Provider override for spawned sessions (e.g. 'openrouter')",
+    )
+    group.add_argument(
+        "--spawn-source",
+        default="infinite-loop",
+        help="Source tag for spawned sessions (passed as --source to hermes chat -q). "
+        "Default: 'infinite-loop'. Set to empty string '' for no source tag.",
+    )
+
+    # ── 13. Webhook / HTTP ──────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Webhook / HTTP",
+        "Webhook server, SSE dashboard, and HTTP callback for iteration data",
+    )
+    group.add_argument(
+        "--webhook-port",
+        type=int,
+        default=0,
+        help="Port for HTTP webhook server (0=disabled). POST /webhook triggers iteration, GET /health, GET /status",
+    )
+    group.add_argument(
+        "--http-callback",
+        default="",
+        help="HTTP POST URL for iteration JSON (like --notify-cmd but via HTTP)",
+    )
+
+    # ── 14. Notifications ───────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Notifications",
+        "Desktop, mobile, and shell-command notifications on iteration events",
+    )
+    group.add_argument(
+        "--notify-cmd",
+        default="",
+        help="Shell command to run after each iteration (receives JSON on stdin)",
+    )
+    group.add_argument(
+        "--on-error-cmd",
+        default="",
+        help="Shell command when an iteration fails (JSON on stdin)",
+    )
+    group.add_argument(
+        "--notify-desktop",
+        action="store_true",
+        help="Send desktop notifications via notify-send on each iteration result (Linux only)",
+    )
+    group.add_argument(
+        "--notify-on-completion",
+        action="store_true",
+        help="Send a summary notification when the daemon finishes",
+    )
+    group.add_argument(
+        "--notify-pushbullet",
+        default="",
+        help="Pushbullet API access token for mobile notifications. "
+        "If set, sends iteration results to your phone. "
+        "Get token at https://www.pushbullet.com/#settings",
+    )
+    group.add_argument(
+        "--notify-ntfy",
+        default="",
+        help="ntfy topic name for push notifications. "
+        "If set, sends iteration results via ntfy.sh (or your own server with --notify-ntfy-server). "
+        "Example: 'my-loop-alerts'",
+    )
+    group.add_argument(
+        "--notify-ntfy-server",
+        default="https://ntfy.sh",
+        help="ntfy server URL (default: https://ntfy.sh). "
+        "Use a self-hosted ntfy server URL for private notifications.",
+    )
+
+    # ── 15. Logging ─────────────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Logging", "Daemon log file with automatic rotation"
+    )
+    group.add_argument(
+        "--log-file",
+        default="",
+        help="Path to daemon log file (e.g. /tmp/infinite-loop.log). Adds file logging alongside stdout.",
+    )
+    group.add_argument(
+        "--log-max-mb",
+        type=int,
+        default=10,
+        help="Max log file size in MB before rotation (default: 10, only used with --log-file)",
+    )
+
+    # ── 16. Status & Dashboard ──────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Status & Dashboard", "Real-time status file and self-contained HTML dashboard"
+    )
+    group.add_argument(
+        "--status-html",
+        default="",
+        help="Path to self-contained HTML status dashboard (e.g. /tmp/loop-status.html). Updated after each iteration.",
+    )
+    group.add_argument(
+        "--status-file",
+        default=STATUS_FILE_DEFAULT,
+        help="Path to write one-line JSON status file for external monitoring",
+    )
+
+    # ── 17. Ledger Management ───────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Ledger Management",
+        "Control the persistence and lifecycle of the iteration ledger",
+    )
+    group.add_argument(
+        "--keep-iterations",
+        type=int,
+        default=0,
+        help="Auto-shrink ledger to keep only last N iterations (0=keep all). Removes when > 2N.",
+    )
+    group.add_argument(
+        "--force-reset",
+        action="store_true",
+        help="Clear existing ledger and start fresh",
+    )
+    group.add_argument(
+        "--tag",
+        default="",
+        help="Label/identifier for the run (e.g. 'project:fix-auth')",
+    )
+
+    # ── 18. Archiving ───────────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Archiving",
+        "Archive old iteration files to a separate directory with retention policies",
+    )
+    group.add_argument(
+        "--archive-dir",
+        default=os.path.expanduser("~/.hermes/infinite-loop-archives"),
+        help="Directory to store archived iteration files (default: ~/.hermes/infinite-loop-archives)",
+    )
+    group.add_argument(
+        "--archive-retention",
+        type=int,
+        default=30,
+        help="Days to keep archived iterations (0=keep forever, default: 30)",
+    )
+    group.add_argument(
+        "--archive-max-size",
+        type=int,
+        default=0,
+        help="Max total size of archive directory in MB before oldest files are purged "
+        "(0=unlimited, default: 0). Combined with --archive-retention, the stricter constraint wins.",
+    )
+
+    # ── 19. File Watcher ────────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "File Watcher",
+        "Watch files or directories for changes to trigger new iterations",
+    )
+    group.add_argument(
+        "--watch-dir",
+        default="",
+        help="Watch a directory/file for changes and trigger an iteration when a file is modified. Uses os.stat() polling.",
+    )
+    group.add_argument(
+        "--watch-poll",
+        type=float,
+        default=5.0,
+        help="File watcher poll interval in seconds (default: 5.0, only used with --watch-dir)",
+    )
+
+    # ── 20. Hermes Worker ───────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Hermes Worker",
+        "Embedded or external Hermes worker connection for spawned sessions",
+    )
+    group.add_argument(
+        "--worker-url",
+        default="auto",
+        help="Hermes worker URL. 'auto' (default) = start worker internally. "
+        "http://host:port = connect to external worker. "
+        "'' = direct subprocess mode (no worker).",
+    )
+
+    # ── 21. Spawned Session Flags ───────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Spawned Session Flags",
+        "Flags forwarded to spawned Hermes sessions (chat -q mode)",
+    )
+    group.add_argument(
         "--use-library",
         action="store_true",
         help="Use AIAgent.run_conversation() in-process instead of spawning "
@@ -7293,7 +7411,7 @@ def main():
         "AIAgent library is not importable. Compatible with --workers > 1 "
         "(uses multiprocessing for true parallelism).",
     )
-    parser.add_argument(
+    group.add_argument(
         "--pass-session-id",
         action="store_true",
         help="Pass session ID to spawned sessions. The spawned Hermes session "
@@ -7301,76 +7419,64 @@ def main():
         "daemon extracts it and stores it in the ledger as spawned_session_id. "
         "In library mode, the session_id is obtained directly from AIAgent.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--checkpoints",
         action="store_true",
         help="Enable file checkpoints in spawned sessions. Passes --checkpoints "
         "to the spawned chat -q command (subprocess mode) or sets "
         "checkpoints_enabled=True (library mode). Auto-enabled when --git is set.",
     )
-
-    # v11.12.0 flags — session chaining, skills, ignore-rules
-    parser.add_argument(
+    group.add_argument(
         "--resume",
         action="store_true",
         help="Chain spawned sessions across iterations — each new session inherits "
         "the full conversation history of the previous one via --resume SESSION_ID. "
         "Requires --pass-session-id to populate the session_id in the ledger.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--skills",
         default="",
         help="Skills to preload in spawned Hermes sessions (comma-separated or repeat flag). "
         "For subprocess mode only; ignored in library mode.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--ignore-rules",
         action="store_true",
         help="Start spawned sessions without loading AGENTS.md, memory, or rules "
         "(clean-slate mode). Passes --ignore-rules to spawned hermes chat -q.",
     )
-
-    # v11.13.0 flags — yolo mode, ignore-user-config, source tagging
-    parser.add_argument(
-        "--yolo",
-        action="store_true",
-        help="Bypass all dangerous command approval prompts in spawned sessions. "
-        "Combine with --ignore-rules for fully autonomous operation.",
-    )
-    parser.add_argument(
+    group.add_argument(
         "--ignore-user-config",
         action="store_true",
         help="Pass --ignore-user-config to spawned sessions so they skip "
         "~/.hermes/config.yaml and fall back to built-in defaults.",
     )
-    parser.add_argument(
-        "--spawn-source",
-        default="infinite-loop",
-        help="Source tag for spawned sessions (passed as --source to hermes chat -q). "
-        "Default: 'infinite-loop'. Set to empty string '' for no source tag.",
+    group.add_argument(
+        "--yolo",
+        action="store_true",
+        help="Bypass all dangerous command approval prompts in spawned sessions. "
+        "Combine with --ignore-rules for fully autonomous operation.",
     )
-
-    # v11.14.0 flags — safe-mode, accept-hooks, worktree, continue for spawned sessions
-    parser.add_argument(
+    group.add_argument(
         "--safe-mode",
         action="store_true",
         help="Troubleshooting mode: disable ALL customizations in spawned sessions — "
         "user config, AGENTS.md/memory injection, plugins, and MCP servers. "
         "Implies --ignore-user-config and --ignore-rules. Passes --safe-mode to spawned chat -q.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--accept-hooks",
         action="store_true",
         help="Auto-approve shell hooks in spawned sessions. "
         "Passes --accept-hooks to spawned hermes chat -q.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--worktree",
         action="store_true",
         help="Run spawned sessions in an isolated git worktree. "
         "Passes --worktree to spawned hermes chat -q.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--continue",
         dest="continue_session",
         action="store_true",
@@ -7378,60 +7484,48 @@ def main():
         "Passes --continue to spawned hermes chat -q.",
     )
 
-    # v11.8.0 flags — preflight health checks
-    parser.add_argument(
+    # ── 22. Startup & Debug ─────────────────────────────────────────────────
+    group = parser.add_argument_group(
+        "Startup & Debug",
+        "Preflight checks, dry-run, self-test, config loading, and startup delay",
+    )
+    group.add_argument(
+        "--startup-delay",
+        type=float,
+        default=0.0,
+        help="Wait N seconds before the first iteration (default: 0). Useful for debugging.",
+    )
+    group.add_argument(
         "--preflight",
         action="store_true",
         help="Run preflight health checks and exit (or before loop when --run is used). "
         "Checks: hermes binary, workdir, git repo, sentinel, context/goals/schema files, "
         "webhook port, disk space.",
     )
-    parser.add_argument(
+    group.add_argument(
         "--preflight-fail-fast",
         action="store_true",
         help="Exit immediately on the first preflight check failure.",
     )
-
-    parser.add_argument(
-        "--evolve",
+    group.add_argument(
+        "--dry-run",
         action="store_true",
-        help="Let iterations propose the next goal (self-directing)",
+        help="Print what would happen without spawning any sessions",
     )
-    parser.add_argument(
-        "--git", action="store_true", help="Capture git diff stats per iteration"
-    )
-    parser.add_argument(
-        "--git-commit",
+    group.add_argument(
+        "--self-test",
         action="store_true",
-        help="Auto-commit changes per iteration (implies --git)",
+        help="Run self-test suite and exit",
     )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=1,
-        help="Run N concurrent Hermes sessions per iteration",
-    )
-    parser.add_argument(
-        "--notify-cmd",
+    group.add_argument(
+        "--save-config",
         default="",
-        help="Shell command to run after each iteration (receives JSON on stdin)",
+        help="Save current configuration to a JSON file and exit. Path to output file.",
     )
-    parser.add_argument(
-        "--max-output-chars",
-        type=int,
-        default=2000,
-        help="Max chars of spawned output to store (0=unlimited)",
-    )
-    parser.add_argument(
-        "--max-idle-iterations",
-        type=int,
-        default=0,
-        help="Stop after N consecutive iterations with no git changes (requires --git)",
-    )
-    parser.add_argument(
-        "--status-file",
-        default=STATUS_FILE_DEFAULT,
-        help="Path to write one-line JSON status file for external monitoring",
+    group.add_argument(
+        "--config",
+        default="",
+        help="Load configuration from a JSON file. Overrides default values, command-line flags take precedence.",
     )
 
     args = parser.parse_args()

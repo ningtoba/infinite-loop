@@ -17,8 +17,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Logging, Status/Dashboard, Ledger Management, Archiving, File Watcher,
   Worker, Spawned Session Flags, Startup/Debug) for much more readable
   `--help` output.
+- **Structured `--help` description**: Replaced the wall-of-text argparse
+  description with a readable multi-line summary: "Features at a glance"
+  grouped by category (Iteration, Parallel, Notify, Sessions, Spawn, Debug,
+  Git, Web), common usage examples, and stop/pause/status commands. Uses
+  `RawDescriptionHelpFormatter` for proper formatting. (`--help` and `--help
+  -h` now bypass argparse for instant response.)
+- **Friendly missing `--goal` error**: Before argparse's default "required"
+  error, prints a clear message: "ERROR: --goal is required (or use
+  --goals-file for batch mode)" with usage hint and pointer to `--help`.
 
 ### Changed
+- **Readable startup banner**: Replaced the 10-line wall-of-features text with
+  a compact feature summary (3 lines, pipe-separated categories under a
+  Unicode ═ header). No more version-dependent banner drift.
 - Bumped `launch-loop.py` from v14.2.0 to v14.3.0
 
 ### Fixed

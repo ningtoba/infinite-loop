@@ -1,0 +1,123 @@
+"""Signal handlers and auto-reload functionality."""
+
+import os
+import signal
+import sys
+import subprocess as _subprocess
+from datetime import datetime, timezone
+
+import json
+
+from .config import LEDGER_PATH
+from .file_utils import _log, write_ledger, write_status_file
+
+# Flag set by signal handler for graceful shutdown
+_shutdown_requested = False
+# References to current state for signal-safe ledger write
+_shutdown_state_ref: dict | None = None
+_hermes_worker_ref: object | None = None
+
+# Module-level cache: store file mtime and size at daemon startup
+_startup_file_snapshots: dict[str, tuple[float, int]] = {}
+
+
+def _handle_shutdown(signum, frame):
+    """Handle SIGINT/Ctrl+C and SIGTERM by cleaning up child processes and exiting."""
+    global _shutdown_requested
+    if _shutdown_requested:
+        return
+    _shutdown_requested = True
+
+    signame = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
+
+    state = _shutdown_state_ref
+    if state is not None:
+        state["status"] = f"stopped: {signame}"
+        state["last_updated"] = datetime.now(timezone.utc).isoformat()
+        try:
+            tmp_path = LEDGER_PATH + ".sigterm.tmp"
+            with open(tmp_path, "w") as f:
+                json.dump(state, f, indent=2, default=str)
+            os.replace(tmp_path, LEDGER_PATH)
+        except Exception:
+            pass
+
+    worker = _hermes_worker_ref
+    if worker is not None:
+        try:
+            worker.stop()
+        except Exception:
+            pass
+
+    import json  # noqa: F811 — local import for signal handler safety
+
+    try:
+        _subprocess.run(
+            ["pkill", "-9", "-f", "hermes.*chat -q"], capture_output=True, timeout=5
+        )
+    except Exception:
+        pass
+
+    _log(f"[STOP] {signame} received. Worker and child processes cleaned up. Exiting.")
+    sys.exit(128 + signum)
+
+
+def _snapshot_file(path: str) -> tuple[float, int] | None:
+    """Return (mtime, size) for a file, or None if it doesn't exist."""
+    try:
+        s = os.stat(path)
+        return (s.st_mtime, s.st_size)
+    except (FileNotFoundError, OSError):
+        return None
+
+
+def _check_auto_reload(
+    workdir: str | None,
+    state: dict,
+    worker_manager: object | None,
+    status_file: str,
+    iteration_count: int,
+) -> None:
+    """Check if daemon source files changed on disk and restart if so."""
+    global _startup_file_snapshots
+    if not _startup_file_snapshots or not workdir:
+        return
+
+    files_to_check = [
+        os.path.join(workdir, "launch-loop.py"),
+        os.path.join(workdir, "run.sh"),
+        os.path.join(workdir, ".env"),
+    ]
+
+    changed = []
+    for fpath in files_to_check:
+        current = _snapshot_file(fpath)
+        cached = _startup_file_snapshots.get(fpath)
+        if current is not None and cached is not None:
+            if current != cached:
+                changed.append(os.path.basename(fpath))
+                _startup_file_snapshots[fpath] = current
+
+    if not changed:
+        return
+
+    _log(
+        f"[AUTO-RELOAD] Detected changes in: {', '.join(changed)}. Restarting daemon..."
+    )
+    state["status"] = "reloading"
+    state["last_updated"] = datetime.now(timezone.utc).isoformat()
+    write_ledger(state)
+    write_status_file(status_file, state, iteration_count, "reloading")
+    if worker_manager is not None:
+        try:
+            worker_manager.stop()
+        except Exception:
+            pass
+    _log("[AUTO-RELOAD] Executing os.execv() with updated code...")
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+
+# Register signal handlers at module level (must happen before any imports
+# that might set up their own handlers)
+signal.signal(signal.SIGTERM, _handle_shutdown)
+signal.signal(signal.SIGINT, _handle_shutdown)

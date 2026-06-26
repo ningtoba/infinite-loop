@@ -7,6 +7,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [14.4.0] — 2026-06-26
+
+### Added
+- **Readable startup banner**: Replaced the wall-of-text feature dump (one giant `_log()` call listing 15+ features) with a categorized, conditional configuration overview. Only shows features that are actually enabled, grouped by category (Iteration, Parallel, Sessions, Spawn, Git, Output). Uses `[DAEMON] ═══` header and indented categories for visual hierarchy.
+- **Iteration header shows goal + progress bar**: The `=== Iteration N ===` header now displays the current goal (truncated to 100 chars), a Unicode progress bar with percentage (when `--max-iterations` is set), and active config (workers, turns). No more scrolling up to find what the current goal is.
+- **Informative [DONE] line**: Now includes status icon (✓/✗), duration in seconds, and progress classification alongside the summary. At a glance: was it successful, how long did it take, was it progress or stuck?
+- **Updated run.sh banner**: Restructured with "What's new ⚡" section, expanded info panel (toolsets, evolve status), and organized "Commands:" section with Pause/Help added.
+
+### Changed
+- Bumped `launch-loop.py` from v14.3.0 to v14.4.0
+- Removed 15 redundant `_log()` lines from startup banner (now covered by categorized overview)
+- Shrunk `_log_startup_banner()` by ~30 lines while adding more useful information
+- `_log_startup_banner()` now accepts `max_iterations` parameter
+- Updated run.sh banner version and content
+
+---
+
 ## [14.3.0] — 2026-06-26
 
 ### Added

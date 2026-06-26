@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  hermes-loop:
+    build: .
+    container_name: hermes-loop
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount the host's hermes binary — no need to bundle another instance
+      - /usr/local/bin/hermes:/usr/local/bin/hermes:ro
+      # Mount the host's hermes config directory (profiles, settings, etc.)
+      - ${HOME:-~}/.hermes:/home/hermes/.hermes
+      # Mount the project's .env file for configuration persistence
+      - ./.env:/app/.env
+      # Mount the work directory (your target project)
+      - ${INFINITE_LOOP_WORKDIR:-/tmp}:/workdir
+      # Persist ledger data across container restarts
+      - hermes-loop-data:/tmp
+      # Mount Claude config if using Claude Code as the hermes provider
+      - ${HOME:-~}/.claude:/home/hermes/.claude:ro
+    environment:
+      - INFINITE_LOOP_WORKDIR=/workdir
+      - HOME=/home/hermes
+      - USER=hermes
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    # Pass through host user's environment for hermes auth
+    env_file:
+      - .env
+    # Enable TTY for proper terminal handling in spawned sessions
+    tty: true
+    stdin_open: true
+
+volumes:
+  hermes-loop-data:
+    name: hermes-loop-data

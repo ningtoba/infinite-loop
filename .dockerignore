@@ -1,0 +1,53 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+
+# Docker
+.dockerignore
+docker-compose.yml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+/tmp/
+*.swp
+*.swo
+
+# Research / docs (not needed at runtime)
+research/
+references/
+
+# Scripts (not needed inside container)
+scripts/
+run.sh
+launch-loop.py
+session-self-loop.py
+
+# CI
+.github/
+
+# Misc
+CHANGELOG.md
+CONTRIBUTING.md
+LICENSE
+Makefile
+SKILL.md

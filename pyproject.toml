@@ -12,6 +12,10 @@ requires-python = ">=3.10"
 
 [project.scripts]
 hermes_loop = "hermes_loop.cli:main"
+hermes_loop_web = "web_app.server:main"
+
+[project.optional-dependencies]
+web = ["fastapi>=0.100.0", "uvicorn>=0.23.0", "python-dotenv>=1.0.0"]
 
 [tool.setuptools.packages.find]
 include = ["hermes_loop*"]

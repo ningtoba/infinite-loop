@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Loop — Web UI</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%99%BE%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="sidebar-header">
+      <h1>&#x267E;&#xFE0F; Hermes Loop</h1>
+      <span class="version">Web UI v1.0</span>
+    </div>
+    <div class="sidebar-nav">
+      <button class="nav-btn active" data-tab="dashboard">
+        <span class="nav-icon">&#x25A3;</span> Dashboard
+      </button>
+      <button class="nav-btn" data-tab="config">
+        <span class="nav-icon">&#x2699;</span> Configuration
+      </button>
+      <button class="nav-btn" data-tab="iterations">
+        <span class="nav-icon">&#x25B7;</span> Iterations
+      </button>
+      <button class="nav-btn" data-tab="logs">
+        <span class="nav-icon">&#x2261;</span> Logs
+      </button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="connection-status" id="connection-indicator">
+        <span class="conn-dot disconnected"></span>
+        <span id="connection-text">disconnected</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main id="main-content">
+    <!-- Dashboard Tab -->
+    <section id="tab-dashboard" class="tab-content active">
+      <div class="top-bar">
+        <h2>Dashboard</h2>
+        <div class="control-buttons">
+          <button id="btn-start" class="ctrl-btn start" onclick="controlLoop('start')" title="Start the loop">
+            &#x25B6; Start
+          </button>
+          <button id="btn-pause" class="ctrl-btn pause" onclick="controlLoop('pause')" title="Pause the loop" disabled>
+            &#x23F8; Pause
+          </button>
+          <button id="btn-resume" class="ctrl-btn resume" onclick="controlLoop('resume')" title="Resume the loop" disabled>
+            &#x25B6; Resume
+          </button>
+          <button id="btn-stop" class="ctrl-btn stop" onclick="controlLoop('stop')" title="Stop the loop" disabled>
+            &#x25A0; Stop
+          </button>
+        </div>
+      </div>
+
+      <!-- Status Cards -->
+      <div class="status-grid">
+        <div class="status-card">
+          <div class="card-label">Loop Status</div>
+          <div class="card-value"><span id="loop-status-badge" class="badge stopped">stopped</span></div>
+        </div>
+        <div class="status-card">
+          <div class="card-label">Total Iterations</div>
+          <div class="card-value"><span id="stat-iterations">0</span></div>
+        </div>
+        <div class="status-card">
+          <div class="card-label">Success / Errors</div>
+          <div class="card-value"><span id="stat-success-errors">0 / 0</span></div>
+        </div>
+        <div class="status-card">
+          <div class="card-label">Total Duration</div>
+          <div class="card-value"><span id="stat-duration">0s</span></div>
+        </div>
+        <div class="status-card">
+          <div class="card-label">Avg Duration</div>
+          <div class="card-value"><span id="stat-avg-duration">0s</span></div>
+        </div>
+        <div class="status-card">
+          <div class="card-label">ETA</div>
+          <div class="card-value"><span id="stat-eta">N/A</span></div>
+        </div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="progress-section">
+        <div class="progress-label">
+          <span>Progress</span>
+          <span id="progress-text">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Goal Info -->
+      <div class="info-row">
+        <div class="info-item">
+          <span class="info-label">Goal:</span>
+          <span class="info-value" id="info-goal">—</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Evolved:</span>
+          <span class="info-value" id="info-evolved">—</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Started:</span>
+          <span class="info-value" id="info-started">—</span>
+        </div>
+      </div>
+
+      <!-- Error Breakdown -->
+      <div class="section" id="error-section" style="display:none">
+        <h3>Error Breakdown</h3>
+        <div class="error-grid" id="error-grid"></div>
+      </div>
+
+      <!-- Mitigations -->
+      <div class="section" id="mitigation-section" style="display:none">
+        <h3>Active Mitigations</h3>
+        <div id="mitigation-list"></div>
+      </div>
+
+      <!-- Latest Iteration -->
+      <div class="section">
+        <h3>Latest Iteration</h3>
+        <div id="latest-iteration" class="latest-iter">No iterations yet</div>
+      </div>
+
+      <!-- Recent Iterations Mini-Table -->
+      <div class="section">
+        <h3>Recent Iterations</h3>
+        <div class="table-wrap">
+          <table id="recent-iterations-table">
+            <thead><tr><th>#</th><th>Type</th><th>Duration</th><th>Summary</th><th>Status</th></tr></thead>
+            <tbody id="recent-iterations-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Configuration Tab -->
+    <section id="tab-config" class="tab-content">
+      <div class="top-bar">
+        <h2>Configuration</h2>
+        <div class="config-actions">
+          <button class="ctrl-btn secondary" onclick="saveConfig()">&#x1F4BE; Save Config</button>
+          <button class="ctrl-btn secondary" onclick="resetConfig()">&#x21BA; Reset</button>
+          <span id="config-saved-msg" class="saved-msg"></span>
+        </div>
+      </div>
+
+      <div class="config-layout">
+        <!-- Group sidebar -->
+        <div class="config-groups" id="config-groups">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Settings panel -->
+        <div class="config-panel" id="config-panel">
+          <div class="config-empty">
+            Select a configuration group from the left to edit settings.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Iterations Tab -->
+    <section id="tab-iterations" class="tab-content">
+      <div class="top-bar">
+        <h2>Iterations</h2>
+        <span class="subtitle" id="iterations-count">0 total</span>
+      </div>
+      <div class="table-wrap">
+        <table id="iterations-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Started</th><th>Duration</th><th>Type</th>
+              <th>Classification</th><th>Summary</th><th>Error</th>
+            </tr>
+          </thead>
+          <tbody id="iterations-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="iterations-pagination"></div>
+    </section>
+
+    <!-- Logs Tab -->
+    <section id="tab-logs" class="tab-content">
+      <div class="top-bar">
+        <h2>Logs</h2>
+        <button class="ctrl-btn secondary" onclick="clearLogs()">Clear</button>
+      </div>
+      <div class="log-container" id="log-container">
+        <div class="log-empty">No logs yet. Start the loop to see output.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

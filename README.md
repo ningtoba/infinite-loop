@@ -22,6 +22,8 @@ skill for independent use, development, and documentation.
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Web UI (New!)](#web-ui-new)
+- [Docker Deployment](#docker-deployment)
 - [Architecture](#architecture)
 - [How It Works](#how-it-works)
 - [Scripts](#scripts)
@@ -103,6 +105,133 @@ bash scripts/inspect-ledger.sh --summary                 # compact one-liner
 **Stop the loop**:
 ```bash
 echo "stop" > /tmp/infinite-loop-stop
+```
+
+---
+
+## Web UI (New!)
+
+A full-featured web interface for managing the infinite loop daemon. Configure
+everything from your browser — no more editing `.env` files by hand.
+
+### Features
+
+- **Configuration Panel** — Edit all 80+ settings organized by category
+- **Start / Stop / Pause / Resume** — Control the loop from the browser
+- **Live Dashboard** — Real-time progress via Server-Sent Events (SSE)
+- **Iteration History** — Browse all past iterations with filtering
+- **Live Logs** — Watch daemon output in real-time
+- **Dark / Light Theme** — Respects your system preference
+
+### Quick Start
+
+```bash
+# Install web dependencies
+pip install fastapi uvicorn python-dotenv
+
+# Start the web server
+python -m web_app --port 8080
+
+# Or with auto-reload for development
+python -m web_app --port 8080 --reload
+```
+
+Then open **http://localhost:8080** in your browser.
+
+### How It Works
+
+```
+Browser (Web UI)
+  │
+  ├─ GET  /                  → Serves the SPA (single-page app)
+  ├─ GET  /api/status        → Loop status + ledger stats
+  ├─ GET  /api/config        → Full configuration with schema
+  ├─ POST /api/config        → Save configuration to .env
+  ├─ POST /api/loop/start    → Spawns python3 -m hermes_loop ... --run
+  ├─ POST /api/loop/stop     → Writes "stop" to sentinel file
+  ├─ POST /api/loop/pause    → Writes "pause" to sentinel file
+  ├─ POST /api/loop/resume   → Removes sentinel file
+  ├─ GET  /api/ledger        → Full ledger JSON
+  ├─ GET  /api/iterations    → Paginated iteration history
+  ├─ GET  /api/logs          → Recent daemon output
+  └─ GET  /live              → SSE stream for real-time updates
+```
+
+The web server manages the daemon as a subprocess — it reads `.env` for
+configuration, builds the CLI arguments, and spawns `python3 -m hermes_loop`.
+Control is handled via the sentinel file (the same mechanism used by the
+standalone daemon).
+
+### Configuration Persistence
+
+The web UI reads and writes the `.env` file. Changes are saved immediately
+and will be used the next time the loop starts. You can also use the raw
+`.env` file directly — the web UI just provides a friendlier interface.
+
+---
+
+## Docker Deployment
+
+Run the entire web UI in a container while using your host's `hermes` binary.
+No need to bundle another Hermes agent instance.
+
+### Prerequisites
+
+- Docker and Docker Compose installed
+- `hermes` binary on your host (at `/usr/local/bin/hermes` or adjust the mount)
+- A `.env` file configured (or use the web UI to configure after startup)
+
+### Quick Start
+
+```bash
+# Clone and configure
+cp .env.example .env
+# Edit .env with your settings (or skip — configure via web UI later)
+
+# Build and start
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Open the web UI
+open http://localhost:8080
+```
+
+### What Gets Mounted
+
+| Host Path | Container Path | Purpose |
+|-----------|---------------|---------|
+| `/usr/local/bin/hermes` | `/usr/local/bin/hermes` (ro) | Host's Hermes binary |
+| `~/.hermes/` | `/home/hermes/.hermes/` | Hermes profiles, config, plugins |
+| `~/.claude/` | `/home/hermes/.claude/` (ro) | Claude Code config (if using Claude as provider) |
+| `./.env` | `/app/.env` | Loop configuration |
+| Your workdir | `/workdir` | Target project directory |
+| Docker volume | `/tmp` | Ledger data persistence |
+
+### Customizing Mounts
+
+```bash
+# If hermes is in a different location:
+INFINITE_LOOP_WORKDIR=/home/you/Projects/myapp \
+  docker compose up -d
+
+# Or edit docker-compose.yml to adjust mount paths
+```
+
+### Without Docker Compose
+
+```bash
+docker build -t hermes-loop .
+docker run -d \
+  --name hermes-loop \
+  -p 8080:8080 \
+  -v /usr/local/bin/hermes:/usr/local/bin/hermes:ro \
+  -v $HOME/.hermes:/home/hermes/.hermes \
+  -v $(pwd)/.env:/app/.env \
+  -v /your/project:/workdir \
+  -e INFINITE_LOOP_WORKDIR=/workdir \
+  hermes-loop
 ```
 
 ---
@@ -1222,6 +1351,21 @@ infinite-loop/
 │   ├── self_test.py             ← In-process unit tests
 │   ├── tracker.py               ← Context window tracker
 │   └── legacy.py                ← Backward compatibility
+│
+├── web_app/                     ← Web UI package (NEW!) ★
+│   ├── __init__.py
+│   ├── __main__.py              ← `python -m web_app` entry point
+│   ├── server.py                ← FastAPI server + REST API + SSE
+│   ├── loop_manager.py          ← Subprocess lifecycle management
+│   ├── config_manager.py        ← .env read/write + config schema
+│   └── static/
+│       ├── index.html           ← Single-page application
+│       ├── app.js               ← Frontend logic (vanilla JS)
+│       └── style.css            ← Dark/light theme styling
+│
+├── Dockerfile                   ← Container image definition
+├── docker-compose.yml           ← Docker Compose orchestration
+├── .dockerignore                ← Docker build exclusions
 │
 ├── scripts/
 │   ├── run-loop.sh              ← Unified shell wrapper

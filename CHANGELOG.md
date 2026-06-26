@@ -4,6 +4,52 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.19.0] — 2026-06-26
+
+### Added
+- **Shutdown summary banner** in `hermes_loop/loop.py`: New `_print_shutdown_summary()`
+  function that prints a comprehensive final summary when the daemon stops — total
+  iterations, duration, success/fail counts, error type breakdown, git stats, and
+  actionable next-steps (how to view the ledger, re-run, or get help). Called from
+  every exit path: signal, sentinel, max-iterations, idle, convergence, goals-exhausted,
+  error-backoff, and persistent-failure. Example output:
+  ```
+  ═══════════════ SHUTDOWN SUMMARY ═══════════════
+    Status:       stopped: max_iterations (10)
+    Iterations:   10
+    Duration:     1245s (20.8m)
+    Success:      ✓8
+    Errors:       ✗2
+    Breakdown:    timeout=2
+    Final goal:  Fix lint errors one at a time
+
+  Next steps:
+    View ledger:     bash scripts/inspect-ledger.sh
+    Summary:         bash scripts/inspect-ledger.sh --summary
+    Errors:          bash scripts/inspect-ledger.sh --errors-only
+    Re-run:          bash run.sh
+    Restart with:    python3 -m hermes_loop --goal "..." --run
+    Help:            python3 -m hermes_loop --help
+    Examples:        python3 -m hermes_loop --examples
+  ══════════════════════════════════════════════
+  ```
+- **Signal handler shutdown summary** in `hermes_loop/signal_handlers.py`: When
+  SIGINT (Ctrl+C) or SIGTERM is received, a compact shutdown summary is printed
+  before the process exits, showing the signal name, iteration count, and status.
+- **Improved post-run message** in `hermes_loop/cli.py`: Changed "Done." to
+  `[DONE] Daemon finished. Ledger at /tmp/infinite-loop-state.json` so users
+  always know where to find the ledger.
+
+### Changed
+- `hermes_loop/loop.py` — Added `_print_shutdown_summary()` function and
+  wired it into all 7 exit paths in `run_loop()`.
+- `hermes_loop/signal_handlers.py` — Added signal-safe shutdown summary using
+  imported colorizer and inline summary generation.
+- `hermes_loop/cli.py` — Post-run loop message now includes ledger path.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.18.0 to 14.19.0.
+
+---
+
 ## [14.18.0] — 2026-06-26
 
 ### Added

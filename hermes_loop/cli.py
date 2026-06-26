@@ -1475,7 +1475,7 @@ def main():
             notify_ntfy_server=args.notify_ntfy_server,
         )
 
-    _log("Done.")
+    _log(f"[DONE] Daemon finished. Ledger at {LEDGER_PATH}")
 
 
 if __name__ == "__main__":

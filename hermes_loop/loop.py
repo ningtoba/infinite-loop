@@ -52,6 +52,80 @@ from .iteration import (
     _sleep_with_shutdown_check,
 )
 from .stats import _recalc_stats
+from .color_utils import colorizer as _shutdown_colorizer
+
+
+def _print_shutdown_summary(
+    state: dict,
+    iteration_count: int,
+    stop_reason: str,
+    goal: str = "",
+    git: bool = False,
+    workers: int = 1,
+    gs: dict | None = None,
+) -> None:
+    """Print a comprehensive shutdown summary banner.
+
+    Shows total iterations, duration, success/fail breakdown, git changes,
+    error counts, and actionable next-steps for the user. Called from every
+    stop path in run_loop() so the user always gets a clear picture of what
+    happened and what to do next.
+    """
+    from .file_utils import _log as _slog
+
+    iters = state.get("iterations", [])
+    total = iteration_count
+    total_dur = state.get("stats", {}).get("total_duration_seconds", 0)
+    success_count = sum(
+        1 for it in iters if not it.get("error") and it.get("classification") != "stuck"
+    )
+    error_count = sum(1 for it in iters if it.get("error"))
+    stuck_count = sum(
+        1 for it in iters if not it.get("error") and it.get("classification") == "stuck"
+    )
+    error_type_counts = state.get("error_type_counts", {})
+    err_types = []
+    for err_type in ("timeout", "network", "schema", "unknown", "heartbeat"):
+        cnt = error_type_counts.get(err_type, 0)
+        if cnt:
+            err_types.append(f"{err_type}={cnt}")
+
+    c = _shutdown_colorizer
+    _slog("")
+    _slog(f"{c.header('═══════════════ SHUTDOWN SUMMARY ═══════════════')}")
+    _slog(f"  {c.value('Status:')}       {c.flag(stop_reason)}")
+    _slog(f"  {c.value('Iterations:')}   {c.flag(str(total))}")
+    if total_dur > 0:
+        dur_str = f"{total_dur:.0f}s"
+        if total_dur >= 60:
+            dur_str += f" ({total_dur/60:.1f}m)"
+        _slog(f"  {c.value('Duration:')}    {c.dim(dur_str)}")
+    _slog(f"  {c.value('Success:')}     {c.tag_ok()}{success_count}")
+    if error_count:
+        _slog(f"  {c.value('Errors:')}      {c.tag_fail()}{error_count}")
+    if stuck_count:
+        _slog(f"  {c.value('Stuck:')}       {c.dim(str(stuck_count))}")
+    if err_types:
+        _slog(f"  {c.value('Breakdown:')}   {c.dim(', '.join(err_types))}")
+    if goal:
+        _slog(f"  {c.value('Final goal:')}  {c.dim(goal[:80])}")
+
+    # Next-steps
+    _slog("")
+    _slog(f"  {c.group_title('Next steps:')}")
+    _slog(f"    {c.dim('View ledger:')}     bash scripts/inspect-ledger.sh")
+    _slog(f"    {c.dim('Summary:')}         bash scripts/inspect-ledger.sh --summary")
+    _slog(
+        f"    {c.dim('Errors:')}          bash scripts/inspect-ledger.sh --errors-only"
+    )
+    _slog(f"    {c.dim('Re-run:')}          bash run.sh")
+    _slog(f"    {c.dim('Restart with:')}  python3 -m hermes_loop --goal \"...\" --run")
+    _slog(f"    {c.dim('Help:')}           python3 -m hermes_loop --help")
+    _slog(f"    {c.dim('Examples:')}       python3 -m hermes_loop --examples")
+    _slog(f"{c.header('══════════════════════════════════════════════')}")
+    _slog("")
+
+
 from .archiving import (
     _archive_iterations,
     _cleanup_old_archives,
@@ -269,10 +343,14 @@ def run_loop(
     while True:
         if _shutdown_requested:
             _log("[STOP] Shutdown signal received. Stopping.")
-            state["status"] = "stopped: signal"
+            stop_reason = "stopped: signal"
+            state["status"] = stop_reason
             state["last_updated"] = datetime.now(timezone.utc).isoformat()
             write_ledger(state)
-            write_status_file(status_file, state, iteration_count, "stopped: signal")
+            write_status_file(status_file, state, iteration_count, stop_reason)
+            _print_shutdown_summary(
+                state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
+            )
             return
 
         if file_watcher and file_watcher.check_change():
@@ -327,11 +405,13 @@ def run_loop(
                     time.sleep(5)
                 continue
             _log(f"[STOP] Sentinel detected ('{stop_signal}'). Stopping.")
-            state["status"] = f"stopped: {stop_signal}"
+            stop_reason = f"stopped: {stop_signal}"
+            state["status"] = stop_reason
             state["last_updated"] = datetime.now(timezone.utc).isoformat()
             write_ledger(state)
-            write_status_file(
-                status_file, state, iteration_count, f"stopped: {stop_signal}"
+            write_status_file(status_file, state, iteration_count, stop_reason)
+            _print_shutdown_summary(
+                state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
             )
             return
 
@@ -343,18 +423,30 @@ def run_loop(
             write_status_file(
                 status_file, state, iteration_count, "stopped: max_iterations"
             )
+            _print_shutdown_summary(
+                state,
+                iteration_count,
+                "stopped: max_iterations",
+                goal=goal,
+                git=git,
+                workers=workers,
+            )
             return
 
         if max_idle_iterations > 0 and consecutive_idle >= max_idle_iterations:
             _log(
                 f"[STOP] No changes detected for {consecutive_idle} iterations (max_idle={max_idle_iterations}). Stopping."
             )
-            state["status"] = (
+            stop_reason = (
                 f"stopped: idle ({consecutive_idle} iterations without changes)"
             )
+            state["status"] = stop_reason
             state["last_updated"] = datetime.now(timezone.utc).isoformat()
             write_ledger(state)
             write_status_file(status_file, state, iteration_count, "stopped: idle")
+            _print_shutdown_summary(
+                state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
+            )
             return
 
         iteration_count += 1
@@ -397,6 +489,14 @@ def run_loop(
                 write_ledger(state)
                 write_status_file(
                     status_file, state, iteration_count, "stopped: goals-exhausted"
+                )
+                _print_shutdown_summary(
+                    state,
+                    iteration_count,
+                    "stopped: goals-exhausted",
+                    goal=goal,
+                    git=git,
+                    workers=workers,
                 )
                 return
 
@@ -520,6 +620,14 @@ def run_loop(
             state=state,
             status_file=status_file,
         ):
+            _print_shutdown_summary(
+                state,
+                iteration_count,
+                "stopped: convergence",
+                goal=goal,
+                git=git,
+                workers=workers,
+            )
             return
 
         existing_summaries, is_compacted = _compact_summaries(
@@ -792,15 +900,27 @@ def run_loop(
             iteration_count=iteration_count,
         )
         if should_stop:
+            _print_shutdown_summary(
+                state,
+                iteration_count,
+                "stopped: error-backoff",
+                goal=goal,
+                git=git,
+                workers=workers,
+            )
             return
 
         if state["mitigations"].get("mitigation_level", 0) >= 3:
             _log("[AUTO-RECOVERY] Persistent failure detected — stopping daemon")
-            state["status"] = (
+            stop_reason = (
                 f"stopped: {primary_error_type}-failure-"
                 f"{state.get('error_type_counts', {}).get(primary_error_type, 0)}"
             )
+            state["status"] = stop_reason
             state["last_updated"] = datetime.now(timezone.utc).isoformat()
             write_ledger(state)
-            write_status_file(status_file, state, iteration_count, state["status"])
+            write_status_file(status_file, state, iteration_count, stop_reason)
+            _print_shutdown_summary(
+                state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
+            )
             return

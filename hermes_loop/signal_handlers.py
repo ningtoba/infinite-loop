@@ -10,6 +10,7 @@ import json
 
 from .config import LEDGER_PATH
 from .file_utils import _log, write_ledger, write_status_file
+from .color_utils import colorizer as _shutdown_signal_colorizer
 
 # Flag set by signal handler for graceful shutdown
 _shutdown_requested = False
@@ -55,6 +56,33 @@ def _handle_shutdown(signum, frame):
         _subprocess.run(
             ["pkill", "-9", "-f", "hermes.*chat -q"], capture_output=True, timeout=5
         )
+    except Exception:
+        pass
+
+    # Print shutdown summary from signal context
+    try:
+        iteration_count = len(state.get("iterations", [])) if state else 0
+        # Avoid circular import — inline a compact summary for signal handler
+        c = _shutdown_signal_colorizer
+        _log("")
+        _log(f"{c.header('═══════════ SHUTDOWN SUMMARY (signal) ═══════════')}")
+        _log(f"  {c.value('Signal:')}      {c.flag(signame)}")
+        _log(f"  {c.value('Iterations:')}   {c.flag(str(iteration_count))}")
+        if state:
+            stop_reason = state.get("status", "interrupted")
+            _log(f"  {c.value('Status:')}      {c.dim(stop_reason)}")
+        _log("")
+        _log(f"  {c.group_title('Next steps:')}")
+        _log(f"    {c.dim('View ledger:')}     bash scripts/inspect-ledger.sh")
+        _log(
+            f"    {c.dim('Errors:')}          bash scripts/inspect-ledger.sh --errors-only"
+        )
+        _log(f"    {c.dim('Resume:')}          bash run.sh")
+        _log(
+            f"    {c.dim('Check status:')}    cat /tmp/infinite-loop-state.json | python3 -m json.tool"
+        )
+        _log(f"{c.header('══════════════════════════════════════════════')}")
+        _log("")
     except Exception:
         pass
 

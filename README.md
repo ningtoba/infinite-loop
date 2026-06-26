@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.18.0
+# Infinite Loop Daemon — v14.19.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -435,6 +435,14 @@ echo '{"summary": "added feature X", "next_goal": "add feature Y"}' > /tmp/sessi
 echo '{"done": true}' > /tmp/session-loop-state.json
 kill $LOOP_PID
 ```
+
+---
+
+## v14.19.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Shutdown summary banner | UX | `loop.py`, `signal_handlers.py`, `cli.py` | Prints comprehensive final summary on any stop: iterations, duration, success/fail, error breakdown, and actionable next-steps. Also shown on SIGINT/SIGTERM. 7 exit paths covered. |
 
 ---
 

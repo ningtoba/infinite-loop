@@ -4,6 +4,28 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.24.0] — 2026-06-26
+
+### Added
+- **Enhanced `--init` wizard**: Expanded from 8 to 13 steps — now covers:
+  - **Convergence detection** (auto-stop on stuck/results plateau)
+  - **Model / Profile / Provider** overrides for spawned sessions
+  - **Persistent log file** with configurable rotation size
+  - **Toolsets** customization for spawned session capabilities
+  - **Heartbeat timeout** for session health monitoring
+  All new steps are optional (defaults remain for skips).
+
+### Changed
+- `hermes_loop/wizard.py` — Expanded `run_wizard()` from 313 to ~460 lines
+  with 5 new interactive steps, improved summaries (flag-style display for
+  boolean options), and default `INFINITE_LOOP_RUN=true` so `bash run.sh`
+  works immediately after wizard completes.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.23.0 to 14.24.0.
+- `run.sh` — Bumped banner and docstring from v14.20.0/v14.22.0 to v14.24.0;
+  updated "What's new" section to reflect enhanced wizard.
+
+---
+
 ## [14.23.0] — 2026-06-26
 
 ### Added

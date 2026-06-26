@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.22.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.24.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -19,7 +19,7 @@ LEDGER_PATH="/tmp/infinite-loop-state.json"
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.22.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.24.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
@@ -202,13 +202,13 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo '╔══════════════════════════════════════════════╗'
-  echo '║  Infinite Loop Daemon v14.20.0               ║'
+  echo '║  Infinite Loop Daemon v14.24.0               ║'
   echo '║  run.sh — one command to start               ║'
   echo '║                                                ║'
   echo '║  What's new ⚡                                ║'
-  echo '║  • --status: built-in ledger status viewer    ║'
-  echo '║  • Shutdown summary banner on daemon stop     ║'
-  echo '║  • --check-env: validate .env for typos       ║'
+  echo '║  • --init wizard: 2x more config options      ║'
+  echo '║  • Now asks about model, convergence, logs    ║'
+  echo '║  • Heartbeat, toolsets, and more              ║'
   echo '║                                                ║'
   echo '║  Also available:                              ║'
   echo '║  • --status: compact ledger overview          ║'

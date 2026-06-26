@@ -15,9 +15,14 @@ The wizard asks about:
   3. Git integration (git, git-commit, store-git-diff)
   4. Evolve mode
   5. Max iterations
-  6. Notifications (desktop, ntfy, pushbullet)
-  7. Quiet mode
-  8. Output path for .env (default: ./.env)
+  6. Convergence detection (auto-stop on stuck results)
+  7. Model / Profile / Provider (spawned session overrides)
+  8. Notifications (desktop, ntfy, pushbullet)
+  9. Log file (persistent logging to disk)
+  10. Toolsets (spawned session capabilities)
+  11. Heartbeat timeout (session health monitoring)
+  12. Quiet mode
+  13. Output path for .env (default: ./.env)
 
 At the end it writes the chosen settings to a .env file and shows
 a summary of how to run.
@@ -74,9 +79,11 @@ def _print_header() -> None:
 
 def _print_summary(env_lines: list[str]) -> None:
     """Print a summary of the configuration chosen."""
+    from .config import LAUNCH_LOOP_VERSION
+
     print()
     print("  ═══════════════════════════════════════════════════════")
-    print("   Configuration Summary")
+    print(f"   Configuration Summary (v{LAUNCH_LOOP_VERSION})")
     print("  ═══════════════════════════════════════════════════════")
     print()
     for line in env_lines:
@@ -86,7 +93,12 @@ def _print_summary(env_lines: list[str]) -> None:
             key, val = line.split("=", 1)
             val = val.strip('"')
             if val:
-                print(f"    {key} = {val}")
+                # Present boolean flags as --flag for readability
+                if val.lower() == "true":
+                    flag = key.replace("INFINITE_LOOP_", "").lower().replace("_", "-")
+                    print(f"    --{flag}")
+                else:
+                    print(f"    {key} = {val}")
     print()
 
 
@@ -128,6 +140,8 @@ def run_wizard() -> None:
     """Run the interactive setup wizard."""
     _print_header()
 
+    env_lines: list[str] = []
+
     # ── Step 1: Goal ────────────────────────────────────────────────
     print("  ── Step 1: Goal ───────────────────────────────────────")
     goal = _ask("  What task should the loop work on?", "")
@@ -155,7 +169,10 @@ def run_wizard() -> None:
 
     # ── Step 3: Git ─────────────────────────────────────────────────
     print("  ── Step 3: Git Integration ────────────────────────────")
-    use_git = _ask_yesno("  Capture git diff stats per iteration?", False)
+    git_desc = (
+        "  Capture git diff stats per iteration? " "(tracks file changes, line counts)"
+    )
+    use_git = _ask_yesno(git_desc, False)
     git_commit = False
     store_git_diff = False
     if use_git:
@@ -186,8 +203,56 @@ def run_wizard() -> None:
         max_iter = 0
     print()
 
-    # ── Step 6: Notifications ───────────────────────────────────────
-    print("  ── Step 6: Notifications ──────────────────────────────")
+    # ── Step 6: Convergence Detection ───────────────────────────────
+    print("  ── Step 6: Convergence Detection ───────────────────────")
+    print("  Convergence detection stops the loop when iterations")
+    print("  produce very similar summaries (stuck detection).")
+    convergence_stop = _ask_yesno(
+        "  Auto-stop when iterations stop making progress?",
+        False,
+    )
+    threshold = 0.9
+    window = 5
+    if convergence_stop:
+        print()
+        print("  Convergence compares word-overlap similarity across")
+        print("  recent iterations. Higher = more restrictive.")
+        threshold_str = _ask(
+            "  Similarity threshold (0.6=moderate, 0.9=strict, default 0.9)",
+            "0.9",
+        )
+        try:
+            threshold = float(threshold_str)
+            if threshold < 0.0:
+                threshold = 0.9
+            elif threshold > 1.0:
+                threshold = 1.0
+        except ValueError:
+            threshold = 0.9
+        window_str = _ask(
+            "  How many recent iterations to compare (default 5)",
+            "5",
+        )
+        try:
+            window = int(window_str)
+            if window < 2:
+                window = 5
+        except ValueError:
+            window = 5
+    print()
+
+    # ── Step 7: Model / Profile / Provider ──────────────────────────
+    print("  ── Step 7: Model & Profile (advanced) ─────────────────")
+    print("  These override the Hermes model/profile/provider used")
+    print("  in spawned sessions. Leave empty to use defaults.")
+    print()
+    model = _ask("  Model override (e.g., 'anthropic/claude-sonnet-4')", "")
+    profile = _ask("  Profile name (e.g., 'work')", "")
+    provider = _ask("  Provider override (e.g., 'openrouter')", "")
+    print()
+
+    # ── Step 8: Notifications ───────────────────────────────────────
+    print("  ── Step 8: Notifications ──────────────────────────────")
     notify_desktop = _ask_yesno("  Desktop notifications (Linux notify-send)?", False)
     notify_ntfy = ""
     if _ask_yesno("  Push notifications via ntfy.sh?", False):
@@ -200,16 +265,75 @@ def run_wizard() -> None:
         )
     print()
 
-    # ── Step 7: Quiet mode ──────────────────────────────────────────
-    print("  ── Step 7: Output ─────────────────────────────────────")
+    # ── Step 9: Log file ────────────────────────────────────────────
+    print("  ── Step 9: Logging ────────────────────────────────────")
+    log_file = _ask(
+        "  Path to persistent log file (leave empty for stdout only)",
+        "",
+    )
+    log_max_mb = 10
+    if log_file:
+        log_max_mb_str = _ask("  Max log file size in MB before rotation", "10")
+        try:
+            log_max_mb = int(log_max_mb_str)
+            if log_max_mb < 1:
+                log_max_mb = 10
+        except ValueError:
+            log_max_mb = 10
+    print()
+
+    # ── Step 10: Toolsets ───────────────────────────────────────────
+    print("  ── Step 10: Toolsets (advanced) ──────────────────────")
+    print("  Toolsets control what tools spawned Hermes sessions")
+    print("  have access to. The defaults are good for most users.")
+    print()
+    custom_toolsets = _ask_yesno("  Customize spawned session toolsets?", False)
+    toolsets_str = ""
+    if custom_toolsets:
+        print()
+        print("  Available toolsets:")
+        print("    terminal, file, web, delegation, skills, browser,")
+        print("    memory, session_search, code_execution, todo, vision,")
+        print("    search, image_gen, video, computer_use")
+        print()
+        toolsets_str = _ask(
+            "  Comma-separated toolsets",
+            "terminal,file,delegation,web,skills,browser,memory,session_search,code_execution,todo,vision",
+        )
+    print()
+
+    # ── Step 11: Heartbeat timeout ──────────────────────────────────
+    print("  ── Step 11: Session Health (advanced) ─────────────────")
+    print("  Heartbeat monitoring detects hung/frozen sessions")
+    print("  and automatically retries them.")
+    print()
+    use_heartbeat = _ask_yesno(
+        "  Enable heartbeat-based session health monitoring?", False
+    )
+    hb_timeout = 0
+    if use_heartbeat:
+        hb_str = _ask(
+            "  Seconds of inactivity before a session is considered hung",
+            "120",
+        )
+        try:
+            hb_timeout = int(hb_str)
+            if hb_timeout < 10:
+                hb_timeout = 120
+        except ValueError:
+            hb_timeout = 120
+    print()
+
+    # ── Step 12: Quiet mode ─────────────────────────────────────────
+    print("  ── Step 12: Output Style ─────────────────────────────")
     quiet = _ask_yesno(
         "  Quiet mode (compact output, ideal for background daemons)?",
         False,
     )
     print()
 
-    # ── Step 8: Output path ─────────────────────────────────────────
-    print("  ── Step 8: Save ───────────────────────────────────────")
+    # ── Step 13: Output path ────────────────────────────────────────
+    print("  ── Step 13: Save ─────────────────────────────────────")
     default_env = os.path.join(os.getcwd(), ".env")
     env_path = _ask("  Path to save .env file", default_env)
     if not env_path:
@@ -217,8 +341,6 @@ def run_wizard() -> None:
     print()
 
     # ── Build env lines ─────────────────────────────────────────────
-    env_lines: list[str] = []
-
     if goal:
         env_lines.append(f'INFINITE_LOOP_GOAL="{goal}"')
     if goals_file:
@@ -235,14 +357,35 @@ def run_wizard() -> None:
         env_lines.append("INFINITE_LOOP_EVOLVE=true")
     if max_iter > 0:
         env_lines.append(f"INFINITE_LOOP_MAX_ITERATIONS={max_iter}")
+    if convergence_stop:
+        env_lines.append("INFINITE_LOOP_CONVERGENCE_STOP=true")
+        env_lines.append(f"INFINITE_LOOP_CONVERGENCE_THRESHOLD={threshold}")
+        env_lines.append(f"INFINITE_LOOP_CONVERGENCE_WINDOW={window}")
+    if model:
+        env_lines.append(f'INFINITE_LOOP_MODEL="{model}"')
+    if profile:
+        env_lines.append(f'INFINITE_LOOP_PROFILE="{profile}"')
+    if provider:
+        env_lines.append(f'INFINITE_LOOP_PROVIDER="{provider}"')
     if notify_desktop:
         env_lines.append("INFINITE_LOOP_NOTIFY_DESKTOP=true")
     if notify_ntfy:
         env_lines.append(f'INFINITE_LOOP_NOTIFY_NTFY="{notify_ntfy}"')
     if notify_pushbullet:
         env_lines.append(f'INFINITE_LOOP_NOTIFY_PUSHBULLET="{notify_pushbullet}"')
+    if log_file:
+        env_lines.append(f'INFINITE_LOOP_LOG_FILE="{log_file}"')
+        if log_max_mb != 10:
+            env_lines.append(f"INFINITE_LOOP_LOG_MAX_MB={log_max_mb}")
+    if toolsets_str:
+        env_lines.append(f'INFINITE_LOOP_TOOLSETS="{toolsets_str}"')
+    if hb_timeout > 0:
+        env_lines.append(f"INFINITE_LOOP_HEARTBEAT_TIMEOUT={hb_timeout}")
     if quiet:
         env_lines.append("INFINITE_LOOP_QUIET=true")
+
+    # ── Always add INFINITE_LOOP_RUN so bash run.sh works ────────────
+    env_lines.append("INFINITE_LOOP_RUN=true")
 
     # ── Summary & save ──────────────────────────────────────────────
     _print_summary(env_lines)
@@ -262,6 +405,8 @@ def run_wizard() -> None:
             print()
             print("    python3 -m hermes_loop \\")
             for line in env_lines:
+                if line.startswith("INFINITE_LOOP_RUN="):
+                    continue  # skip --run, added automatically
                 key, val = line.split("=", 1)
                 flag = key.replace("INFINITE_LOOP_", "").lower()
                 val_clean = val.strip('"')
@@ -285,8 +430,8 @@ def run_wizard() -> None:
     print("  To start the daemon with your configuration:")
     print()
     if env_lines and save:
-        print(f"    bash run.sh")
-        print(f"    # or: make run")
+        print("    bash run.sh")
+        print("    # or: make run")
     else:
         print("    python3 -m hermes_loop --goal '<your goal>' --run")
     print()

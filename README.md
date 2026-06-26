@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.23.0
+# Infinite Loop Daemon — v14.24.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -457,6 +457,14 @@ kill $LOOP_PID
 | Feature | Type | Files | Description |
 |---------|------|-------|-------------|
 | `--explain` flag | UX | `cli.py` | Detailed help on any single CLI flag. Accepts full names or unambiguous prefixes. Shows: group, type, default, full description, aliases, related flags, and usage example. Pre-argparse, no `--goal` required. |
+
+---
+
+## v14.24.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Enhanced `--init` wizard | DX | `wizard.py` | Expanded from 8 to 13 steps: convergence detection, model/profile/provider overrides, log file, toolsets, heartbeat timeout. All optional. `INFINITE_LOOP_RUN=true` auto-added so `bash run.sh` works immediately. |
 
 ---
 

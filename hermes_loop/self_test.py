@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 from .file_utils import extract_json_from_output
-from .error_utils import classify_error, _classify_progress
+from .error_utils import classify_error, _classify_progress, _suggest_actionable_fix
 from .similarity import text_similarity, check_convergence
 from .validation import validate_json_output
 from .cooldown import calc_adaptive_cooldown
@@ -421,6 +421,117 @@ def _run_self_test() -> dict:
         return cases
 
     _run_subtests("test_classify_progress", _test_classify_progress())
+
+    # ------------------------------------------------------------------
+    # Test: _suggest_actionable_fix
+    # ------------------------------------------------------------------
+    def _test_suggest_actionable_fix():
+        cases = []
+        # Completed/progress should return None (no suggestion)
+        cases.append(
+            (
+                "completed-no-suggestion",
+                lambda: _suggest_actionable_fix(None, "completed", "fix tests"),
+                lambda r: (
+                    r is None,
+                    f"expected None for completed, got {r!r}",
+                ),
+            )
+        )
+        cases.append(
+            (
+                "progress-no-suggestion",
+                lambda: _suggest_actionable_fix(None, "progress", "implement feature"),
+                lambda r: (
+                    r is None,
+                    f"expected None for progress, got {r!r}",
+                ),
+            )
+        )
+        # Timeout error should suggest session-timeout increase
+        cases.append(
+            (
+                "timeout-suggestion",
+                lambda: _suggest_actionable_fix("timeout", "stuck", "refactor auth"),
+                lambda r: (
+                    r is not None and "--session-timeout" in r,
+                    f"expected timeout suggestion, got {r!r}",
+                ),
+            )
+        )
+        # Network error should suggest connectivity checks
+        cases.append(
+            (
+                "network-suggestion",
+                lambda: _suggest_actionable_fix("network", "stuck", "deploy api"),
+                lambda r: (
+                    r is not None and "network" in r.lower(),
+                    f"expected network suggestion, got {r!r}",
+                ),
+            )
+        )
+        # Stuck classification with workers>1 should suggest --workers 1
+        cases.append(
+            (
+                "stuck-workers-suggestion",
+                lambda: _suggest_actionable_fix(None, "stuck", "fix bug", workers=3),
+                lambda r: (
+                    r is not None and "--workers" in r,
+                    f"expected workers suggestion for stuck, got {r!r}",
+                ),
+            )
+        )
+        # Stuck classification with library mode should NOT mention workers
+        cases.append(
+            (
+                "stuck-library-no-workers-tip",
+                lambda: _suggest_actionable_fix(
+                    None, "stuck", "fix bug", workers=3, use_library=True
+                ),
+                lambda r: (
+                    r is not None and "--workers" not in r,
+                    f"expected NOT to mention -workers in library mode, got {r!r}",
+                ),
+            )
+        )
+        # Regression should suggest reviewing git diff
+        cases.append(
+            (
+                "regression-suggestion",
+                lambda: _suggest_actionable_fix(None, "regression", "refactor db"),
+                lambda r: (
+                    r is not None and "git diff" in r.lower(),
+                    f"expected git diff suggestion for regression, got {r!r}",
+                ),
+            )
+        )
+        # Consecutive errors >= 3 should suggest preflight
+        cases.append(
+            (
+                "consecutive-errors-suggestion",
+                lambda: _suggest_actionable_fix(
+                    "unknown", "stuck", "deploy app", consecutive_errors=5
+                ),
+                lambda r: (
+                    r is not None and "--preflight" in r,
+                    f"expected preflight suggestion for 5 consecutive errors, got {r!r}",
+                ),
+            )
+        )
+        # Schema error should suggest output-schema review
+        cases.append(
+            (
+                "schema-suggestion",
+                lambda: _suggest_actionable_fix("schema", "stuck", "parse data"),
+                lambda r: (
+                    r is not None and "--output-schema" in r,
+                    f"expected schema suggestion, got {r!r}",
+                ),
+            )
+        )
+        return cases
+
+    _run_subtests("test_suggest_actionable_fix", _test_suggest_actionable_fix())
 
     total = passed_total + failed_total
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")

@@ -23,6 +23,7 @@ from .error_recovery import (
     _ORIGINAL_USE_LIBRARY,
     _ORIGINAL_WORKERS,
 )
+from .error_utils import _classify_progress, classify_error, _suggest_actionable_fix
 from .tracker import ETATracker
 from .file_watcher import FileWatcherTrigger
 from .webhook import _start_webhook_server
@@ -590,6 +591,19 @@ def run_loop(
             f" ({total_duration}s, {classification})"
             f": {combined_summary[:100]}"
         )
+
+        # Show actionable suggestion for blocked/error iterations
+        suggestion = _suggest_actionable_fix(
+            error_type=primary_error_type,
+            classification=classification,
+            goal=goal,
+            workers=workers,
+            use_library=use_library,
+            consecutive_errors=consecutive_errors,
+        )
+        if suggestion:
+            for line in suggestion.split("\n"):
+                _log(f"[SUGGEST] {line}")
 
         _handle_notifications(
             notify_desktop=notify_desktop,

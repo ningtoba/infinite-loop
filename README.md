@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.3.0
+# Infinite Loop Daemon — v14.5.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -31,6 +31,7 @@ skill for independent use, development, and documentation.
   - [Daemon Mode (launch-loop.py)](#daemon-mode-launch-looppy)
   - [In-Session Self-Loop (session-self-loop.py)](#in-session-self-loop-session-self-looppy)
 - [Feature Deep-Dive](#feature-deep-dive)
+  - [Actionable Error Suggestions](#actionable-error-suggestions)
   - [Self-Test Mode](#self-test-mode)
   - [Progress Classification](#output-progress-classification)
   - [Convergence Detection](#convergence-detection)
@@ -425,6 +426,15 @@ kill $LOOP_PID
 
 ---
 
+## v14.5.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Actionable [SUGGEST] messages | Usability | `error_utils.py`, `loop.py` | Context-aware suggestions after errors (timeout, network, schema) and stuck/regression classifications. Shows specific CLI flags to adjust. |
+| Self-tests for suggestion engine | Test | `self_test.py` | 9 test cases covering all suggestion patterns. |
+
+---
+
 ## v14.2.0 Changelog
 
 | Feature | Type | Files | Description |
@@ -452,6 +462,38 @@ kill $LOOP_PID
 ---
 
 ## Feature Deep-Dive
+
+### Actionable Error Suggestions
+
+When an iteration encounters an error (timeout, network failure, schema mismatch)
+or gets classified as stuck/regression, the daemon now prints a `[SUGGEST]` block
+with context-aware, actionable advice. Each suggestion maps to a specific CLI flag
+or configuration change:
+
+| Situation | Suggests |
+|-----------|----------|
+| Timeout error | Increase `--session-timeout`, reduce `--max-turns`, check `--workers` |
+| Network error | Check connectivity, verify Hermes provider config, add `--retry-delay`, run `--preflight` |
+| Schema validation failure | Review `--output-schema`, check `--output-schema-file` format |
+| Stuck (consecutive no-progress iterations) | Set `--workers 1`, try `--use-library`, add `--evolve` |
+| Regression (error after progress) | Review git diff, run `--force-reset`, add `--git-commit` |
+| 3+ consecutive errors | Run `--preflight`, reduce `--workers`, check `--goal` text, add `--context` |
+| Partial progress | Normal for iterative tasks; consider `--evolve` |
+
+These suggestions appear in the daemon log right after the `[DONE]` line, so you
+see the error + actionable fix in one glance:
+
+```
+[DONE] ✗ Iteration 5 (120s, stuck): Could not reproduce the bug
+[SUGGEST] Suggestions:
+[SUGGEST]   • Set --workers 1 to isolate the issue (concurrent sessions may interfere)
+[SUGGEST]   • Try --use-library for in-process execution (bypasses subprocess issues)
+[SUGGEST]   • Add --evolve to let iterations self-direct when stuck in a loop
+```
+
+No extra flags needed — suggestions are always enabled.
+
+---
 
 ### Self-Test Mode
 

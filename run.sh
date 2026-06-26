@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.3.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.5.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -193,13 +193,13 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop Daemon v14.4.0                ║"
+  echo "║  Infinite Loop Daemon v14.5.0                ║"
   echo "║  run.sh — one command to start               ║"
   echo "║                                                ║"
   echo "║  What's new ⚡                                ║"
-  echo "║  • Readable startup banner: config overview   ║"
-  echo "║  • Iteration header shows goal + progress bar ║"
-  echo "║  • [DONE] line shows duration + classification║"
+  echo "║  • Actionable [SUGGEST] on iteration errors   ║"
+  echo "║  • Suggests specific flags to adjust           ║"
+  echo "║  • Covers: timeout, network, schema, stuck     ║"
   echo "╚══════════════════════════════════════════════╝"
   echo ""
   echo "  Config: .env"

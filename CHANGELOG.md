@@ -7,6 +7,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [14.5.0] — 2026-06-26
+
+### Added
+- **Actionable [SUGGEST] messages after errors/stuck/regression iterations**: Each iteration now shows context-aware, actionable suggestions when something goes wrong. Maps error types (timeout → increase session-timeout, network → check connectivity, schema → review schema) and classifications (stuck → reduce workers/try use-library, regression → review git diff) to specific CLI flags the user can adjust.
+- **Self-tests for `_suggest_actionable_fix()`**: 9 test cases covering all suggestion patterns: completed/progress (no suggestion), timeout, network, schema, stuck with workers >1, stuck in library mode, regression, consecutive errors, and schema errors.
+- **Bumped from v14.4.0 to v14.5.0**
+
+### Changed
+- `_suggest_actionable_fix()` imported in `loop.py` and called after every [DONE] line
+- Suggestion output prefixed with `[SUGGEST]` for clear log distinction
+- `error_utils.py` — new `_suggest_actionable_fix()` function (90 lines)
+- `loop.py` — displays suggestion after [DONE] when applicable
+- `self_test.py` — 9 new test cases for suggestion engine
+
+---
+
 ## [14.4.0] — 2026-06-26
 
 ### Added

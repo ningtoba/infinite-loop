@@ -263,7 +263,8 @@ child Hermes sessions. All tests should pass (exit code 0).
 | `validate_json_output()` | 3 | Valid JSON Schema, missing fields, type mismatches |
 | `calc_adaptive_cooldown()` | 4 | Duration ranges: <5s, 5–15s, 15–300s, >300s |
 | `GoalSpec` parsing | 3 | Simple goal, pipe format with profile, trailing spaces |
-| `_classify_progress()` | 6 | Completed, progress, partial, stuck, regression, unknown |
+|| `_classify_progress()` | 6 | Completed, progress, partial, stuck, regression, unknown |
+|| `_suggest_actionable_fix()` | 9 | Timeout, network, schema, stuck (workers/library), regression, consecutive errors, completed/progress (no suggestion), unknown |
 
 **If you're adding a new function**, consider adding a self-test for it in the
 `run_self_tests()` function at the bottom of `launch-loop.py`.

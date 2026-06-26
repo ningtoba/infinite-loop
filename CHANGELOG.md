@@ -7,7 +7,26 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [14.6.0] — 2026-06-26
+## [14.7.0] — 2026-06-26
+
+### Added
+- **`--list-flags` and `--list-groups` flags**: Quick-reference flag listing that doesn't require `--goal`. `--list-flags` prints all 80+ flags organized by group with help text. `--list-groups` prints only group names with flag counts. Much faster than scrolling through the full `--help` output. Usage: `python3 -m hermes_loop --list-flags` or `python3 launch-loop.py --list-groups`.
+- **Shell tab-completion scripts** for bash and zsh: Auto-completes all 80+ CLI flags with deduplication (flags already on the command line are hidden). Supports `python3 launch-loop.py --<TAB>`, `python3 -m hermes_loop --<TAB>`, and `bash run.sh --<TAB>`. Boolean flags and value flags are distinguished — value flags show file/directory completion where applicable. `--task-type` and `--cooldown-mode` offer specific choice values.
+- **`make completion` target**: Installs the appropriate completion script for your current shell (bash or zsh) when run with `make completion`. Also shows manual install instructions.
+- **Bumped from v14.6.0 to v14.7.0**
+
+### Changed
+- `cli.py` — new `_list_flags()` function (150 lines) with all flags organized by 22 groups. Added pre-argparse handlers for `--list-flags` and `--list-groups` (bypasses `--goal` requirement).
+- `scripts/completion/bash` — new bash completion script (224 lines). Uses `_init_completion` for robust Zsh-incompatible-bash completion. Deduplicates flags already on the command line. `--task-type` and `--cooldown-mode` offer specific choice values; file-type flags offer `_filedir`.
+- `scripts/completion/zsh` — new zsh completion script (140 lines). Uses `#compdef` header and `_arguments -C` with `_files` fallback.
+- `Makefile` — new `completion` target that detects shell and installs the right script.
+- `README.md` — updated to v14.7.0, added Shell Completion section to feature deep-dive and TOC.
+- `run.sh` — banner updated to v14.7.0 with new features listed.
+- `.env.example` — documented `INFINITE_LOOP_QUIET` and `--list-flags` in Startup & Debug section.
+- `scripts/run-loop.sh` — version bump.
+
+---
+
 
 ### Added
 - **`--quiet` flag**: Suppresses the verbose startup banner, per-iteration headers (`=== Iteration N ===`), and config dump. Shows only compact one-line status updates. Ideal for background daemon runs (`bash run.sh --quiet` or `INFINITE_LOOP_QUIET=true` in `.env`).

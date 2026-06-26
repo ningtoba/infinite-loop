@@ -236,6 +236,8 @@ Make your changes. A few guidelines:
   3. `run.sh` forwarding logic
   4. `README.md` flag table
   5. The `SKILL.md` metadata block (tags, description)
+  6. **Completion scripts** — if a `--list-flags` feature or shell completion
+     script exists, regenerate or update it so new flags appear in tab-completion.
 - **Stay stdlib-only** — do not introduce external Python dependencies.
   If you need a utility, implement it with stdlib.
 - **Signal safety** — file writes should use temp-file + atomic rename

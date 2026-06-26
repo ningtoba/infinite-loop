@@ -1,0 +1,125 @@
+#compdef launch-loop.py run.sh run-loop.sh
+#compdef python3
+
+# zsh completion for the infinite-loop daemon (hermes_loop)
+# Source: scripts/completion/zsh
+# Install: cp this file to /usr/share/zsh/site-functions/_hermes_loop
+
+# ---------------------------------------------------------------------------
+# ALL BOOLEAN (no-argument) flags
+# ---------------------------------------------------------------------------
+local -a bool_flags
+bool_flags=(
+    '--no-auto-toolsets[Disable automatic toolset enrichment based on task type]'
+    '--no-failure-learning[Disable injection of past failure context into spawned sessions]'
+    '--evolve[Let iterations propose the next goal (self-directing)]'
+    '--run[Start the actual loop]'
+    '--git[Capture git diff stats per iteration]'
+    '--git-commit[Auto-commit changes per iteration (implies --git)]'
+    '--store-git-diff[Store actual git diff (capped at 10KB) in the ledger]'
+    '--stop-at-goals-end[Stop when all goals are exhausted instead of wrapping]'
+    '--track-goals[Track completed goals so restarted runs skip finished ones]'
+    '--reset-goals[Clear goals_completed tracking for a fresh run]'
+    '--convergence-stop[Auto-stop when N consecutive iterations produce similar summaries]'
+    '--notify-desktop[Send desktop notifications via notify-send (Linux)]'
+    '--notify-on-completion[Send a summary notification when the daemon finishes]'
+    '--force-reset[Clear existing ledger and start fresh]'
+    '--use-library[Use AIAgent.run_conversation() in-process instead of subprocess]'
+    '--pass-session-id[Pass session ID to spawned sessions]'
+    '--checkpoints[Enable file checkpoints in spawned sessions]'
+    '--resume[Chain spawned sessions across iterations via --resume SESSION_ID]'
+    '--ignore-rules[Clean-slate mode (no AGENTS.md, memory, or rules)]'
+    '--ignore-user-config[Skip ~/.hermes/config.yaml in spawned sessions]'
+    '--yolo[Bypass all dangerous command approval prompts]'
+    '--safe-mode[Troubleshooting mode (disable ALL customizations)]'
+    '--accept-hooks[Auto-approve shell hooks in spawned sessions]'
+    '--worktree[Run spawned sessions in an isolated git worktree]'
+    '--continue[Resume the most recent session in spawned sessions]'
+    '--quiet[Suppress verbose startup banner and per-iteration headers]'
+    '--preflight[Run preflight health checks and exit (or before loop)]'
+    '--preflight-fail-fast[Exit immediately on first preflight check failure]'
+    '--dry-run[Print what would happen without spawning sessions]'
+    '--self-test[Run self-test suite and exit]'
+    '--version[Print daemon version and exit]'
+    '--help[Show full detailed help with all 80+ flags and examples]'
+    '--list-flags[Print organized flag listing with help text]'
+    '--list-groups[Print group names only (compact overview)]'
+)
+
+# ---------------------------------------------------------------------------
+# ALL VALUE (argument-taking) flags
+# ---------------------------------------------------------------------------
+local -a value_flags
+value_flags=(
+    '--goal:Core task for spawned sessions'
+    '--context:Initial context (paths, constraints, language)'
+    '--context-file:Read context from a file'
+    '--workdir:Working directory'
+    '--prompt-suffix:Extra text appended to every spawned prompt'
+    '--task-type:Force a specific task type'
+    '--toolsets:Comma-separated toolsets for spawned Hermes sessions'
+    '--max-iterations:Auto-stop after N iterations (0=infinite)'
+    '--max-turns:Max turns per spawned Hermes session (default: 500)'
+    '--compact-every:Compact context every N iters'
+    '--workers:Run N concurrent Hermes sessions per iteration'
+    '--session-timeout:Max seconds per Hermes session (default: 7200)'
+    '--retry-delay:Backoff delay on error'
+    '--max-retries:Retry a failed iteration up to N times'
+    '--heartbeat-timeout:Enable heartbeat-based session health monitoring'
+    '--max-idle-iterations:Stop after N consecutive iterations with no git changes'
+    '--goals-file:Path to file with one goal per line'
+    '--cooldown:Wait N seconds between iterations'
+    '--cooldown-mode:Cooldown mode (fixed or adaptive)'
+    '--convergence-threshold:Similarity threshold (0.0-1.0, default: 0.9)'
+    '--convergence-window:Number of recent iterations to compare (default: 5)'
+    '--output-schema:Inline JSON Schema as JSON string'
+    '--output-schema-file:Path to a JSON Schema file'
+    '--max-output-chars:Max chars of spawned output to store (0=unlimited)'
+    '--shutdown-sentinel:Sentinel file path'
+    '--profile:Hermes profile for spawned sessions'
+    '--model:Model override for spawned sessions'
+    '--provider:Provider override for spawned sessions'
+    '--spawn-source:Source tag for spawned sessions'
+    '--webhook-port:Port for HTTP webhook server (0=disabled)'
+    '--http-callback:HTTP POST URL for iteration JSON'
+    '--notify-cmd:Shell command to run after each iteration'
+    '--on-error-cmd:Shell command when an iteration fails'
+    '--notify-pushbullet:Pushbullet API access token'
+    '--notify-ntfy:ntfy topic name for push notifications'
+    '--notify-ntfy-server:ntfy server URL (default: https://ntfy.sh)'
+    '--log-file:Path to daemon log file'
+    '--log-max-mb:Max log file size in MB before rotation'
+    '--status-html:Path to self-contained HTML status dashboard'
+    '--status-file:Path to write one-line JSON status file'
+    '--keep-iterations:Auto-shrink ledger to keep last N iterations'
+    '--tag:Label/identifier for the run'
+    '--archive-dir:Directory to store archived iteration files'
+    '--archive-retention:Days to keep archived iterations'
+    '--archive-max-size:Max total size of archive directory in MB'
+    '--watch-dir:Watch a directory/file for changes to trigger iterations'
+    '--watch-poll:File watcher poll interval in seconds'
+    '--worker-url:Hermes worker URL'
+    '--skills:Skills to preload in spawned Hermes sessions'
+    '--startup-delay:Wait N seconds before the first iteration'
+    '--save-config:Save current configuration to a JSON file and exit'
+    '--config:Load configuration from a JSON file'
+)
+
+# ---------------------------------------------------------------------------
+# Completion state
+# ---------------------------------------------------------------------------
+local curcontext="$curcontext" state line
+_arguments -C \
+    "${bool_flags[@]}" \
+    "${value_flags[@]}" \
+    '--task-type=-[Force a specific task type]:task type:(auto research code-fix code-build system-admin data-processing content general)' \
+    '--cooldown-mode=-[Cooldown mode]:mode:(fixed adaptive)' \
+    '*::arg:->args' \
+    && return 0
+
+# For non-flag args, fall back to file completion
+case $state in
+    args)
+        _files
+        ;;
+esac

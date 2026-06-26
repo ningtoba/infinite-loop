@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.5.0
+# Infinite Loop Daemon — v14.7.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -47,6 +47,7 @@ skill for independent use, development, and documentation.
   - [Ledger Archiving](#ledger-archiving)
   - [Multi-Profile Goals](#multi-profile-goals)
   - [AIAgent Library Mode](#aiagent-library-mode)
+  - [Shell Completion](#shell-completion)
 - [References](#references)
 - [Pitfalls](#pitfalls)
 
@@ -427,6 +428,24 @@ kill $LOOP_PID
 
 ---
 
+## v14.7.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `--list-flags` flag | Usability | `cli.py` | Prints every supported CLI flag as a tab-separated triple (`short`, `long`, `description`) — one per line — for shell autocompletion integration. Machine-parseable output, stable format. |
+| `make completion` target | Usability | `Makefile` | Convenience target that generates a list of all CLI flags by running `--list-flags` and writing them to `/tmp/loop-flags.txt`. |
+
+---
+
+## v14.6.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Quiet mode (`--quiet`) | Usability | `cli.py`, `loop.py`, `functions.py`, `iteration.py`, `run.sh`, `.env.example` | Suppresses verbose startup banner, per-iteration headers, and config dump. Shows only compact one-line status. Ideal for background daemon runs. |
+| Iteration heartbeat (`[BEAT]`) | Usability | `iteration.py` | Background thread logs periodic `[BEAT] Iteration #N still running (120s elapsed)...` messages during long-running iterations. No more ambiguous silence. |
+
+---
+
 ## v14.5.0 Changelog
 
 | Feature | Type | Files | Description |
@@ -798,6 +817,51 @@ back to subprocess mode automatically if AIAgent is not importable.
 
 Since v12.0.0, `--use-library` works with `--workers > 1` via
 `multiprocessing.Pool`, enabling true parallel in-process execution.
+
+---
+
+### Shell Completion
+
+The daemon ships with a `--list-flags` flag that prints every supported CLI flag
+as a tab-separated triple (`short-flag`, `long-flag`, `description`) — one per
+line — making it straightforward to wire up shell autocompletion for bash, zsh,
+or fish:
+
+```bash
+# View all flags with their short form, long form, and description
+python3 launch-loop.py --list-flags | head -20
+```
+
+**Usage from a completion script:**
+
+```bash
+# Bash: generate completions by parsing --list-flags output
+_list_loop_flags() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    COMPREPLY=($(compgen -W "$(python3 launch-loop.py --list-flags 2>/dev/null | cut -f2)" -- "$cur"))
+}
+complete -F _list_loop_flags launch-loop.py
+```
+
+**Makefile convenience target:**
+
+```makefile
+completion:
+    @echo "Generating shell completion scripts..."
+    @python3 launch-loop.py --list-flags 2>/dev/null | cut -f2 > /tmp/loop-flags.txt
+    @echo "  ✓ Written to /tmp/loop-flags.txt"
+    @echo "Source this in your .bashrc or .zshrc to enable tab-completion for launch-loop.py flags."
+```
+
+Run it with:
+
+```bash
+make completion
+```
+
+This makes it easy to discover and autocomplete the 80+ CLI flags without
+referring to `--help` every time. The `--list-flags` output is stable and
+machine-parseable — it will not change format across minor releases.
 
 ---
 

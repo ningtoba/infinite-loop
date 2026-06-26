@@ -1,5 +1,5 @@
 #!/bin/bash
-# run-loop.sh — Unified entrypoint (v14.5.0 — Actionable [SUGGEST] on errors)
+# run-loop.sh — Unified entrypoint (v14.7.0 — Shell completion + --list-flags)
 #
 # THE PRIMARY way to create an autonomous delegation loop. No cron jobs.
 #
@@ -222,7 +222,7 @@ fi
 
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop - v14.5.0                       ║"
+  echo "║  Infinite Loop - v14.6.0                       ║"
   echo "║  Makefile, CONTRIBUTING.md,                       ║"
   echo "║  Improved --help, SSE fix, Dashboard v3 SSE,     ║"
   echo "║  Error Panel, Performance Metrics,               ║"

@@ -151,6 +151,39 @@ lint:
 	$(PYTHON) -m py_compile session-self-loop.py && echo "  ✓ session-self-loop.py"
 	@echo "Syntax OK"
 
+.PHONY: completion
+completion:
+	@SHELL="$${SHELL:-/bin/bash}"; \
+	SHELL_NAME="$$(basename "$$SHELL")"; \
+	case "$$SHELL_NAME" in \
+		bash) \
+			echo "Installing bash completion..."; \
+			mkdir -p ~/.local/share/bash-completion/completions; \
+			cp scripts/completion/bash ~/.local/share/bash-completion/completions/hermes-loop; \
+			echo "  ✓ Copied to ~/.local/share/bash-completion/completions/hermes-loop"; \
+			echo "  To activate: source ~/.local/share/bash-completion/completions/hermes-loop"; \
+			echo "  Or add to ~/.bashrc: source ~/.local/share/bash-completion/completions/hermes-loop"; \
+			;; \
+		zsh) \
+			echo "Installing zsh completion..."; \
+			mkdir -p ~/.zsh/completion; \
+			cp scripts/completion/zsh ~/.zsh/completion/_hermes_loop; \
+			echo "  ✓ Copied to ~/.zsh/completion/_hermes_loop"; \
+			echo "  To activate, add to ~/.zshrc:"; \
+			echo '    fpath=(~/.zsh/completion $$fpath)'; \
+			echo '    autoload -Uz compinit && compinit'; \
+			;; \
+		*) \
+			echo "Unsupported shell: $$SHELL_NAME"; \
+			echo "Manual install:"; \
+			echo "  bash: source scripts/completion/bash"; \
+			echo "  zsh:  cp scripts/completion/zsh ~/.zsh/completion/_hermes_loop"; \
+			;; \
+	esac
+	@echo ""
+	@echo "Completion installed. Restart your shell or source the file to activate."
+	@echo "Try: python3 launch-loop.py --<TAB>"
+
 .PHONY: archive
 archive:
 	@if [ -f $(SCRIPTS)/archive-state.sh ]; then \

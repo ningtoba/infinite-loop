@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-#!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.6.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.7.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -20,7 +19,7 @@ LEDGER_PATH="/tmp/infinite-loop-state.json"
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.6.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.7.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
@@ -66,6 +65,7 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "  Resume:    echo 'resume' > /tmp/infinite-loop-stop"
   echo "  Dashboard: python3 -m http.server 8080 --directory /tmp/"
   echo "             → http://localhost:8080/loop-status.html"
+  echo "  Completions: make completion"
   exit 0
 fi
 
@@ -187,6 +187,7 @@ while [[ $# -gt 0 ]]; do
     --workers)    DAEMON_ARGS+=("--workers" "$2"); shift 2 ;;
     --tag)        DAEMON_ARGS+=("--tag" "$2"); shift 2 ;;
     --help|-h)    echo "See 'bash run.sh --help' for usage."; exit 0 ;;
+    --list-flags|--list-groups) DAEMON_ARGS+=("$1"); shift ;;
     *)            EXTRA_ARGS+=("$1"); shift ;;
   esac
 done
@@ -194,11 +195,13 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop Daemon v14.6.0                ║"
+  echo "║  Infinite Loop Daemon v14.7.0                ║"
   echo "║  run.sh — one command to start               ║"
   echo "║                                                ║"
   echo "║  What's new ⚡                                ║"
-  echo "║  • --quiet mode: compact output              ║"
+  echo "║  • Shell tab-completion for all 80+ flags     ║"
+  echo "║  • --list-flags and --list-groups quick ref    ║"
+  echo "║  • --quiet mode: compact output               ║"
   echo "║  • [BEAT] heartbeat during long iterations    ║"
   echo "║  • Actionable [SUGGEST] on errors             ║"
   echo "║  • Suggests specific flags to adjust           ║"

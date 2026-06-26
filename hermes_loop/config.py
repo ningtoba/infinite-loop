@@ -264,4 +264,4 @@ HEARTBEAT_POLL_INTERVAL = 5  # daemon polling interval (seconds)
 HEARTBEAT_KILL_GRACE = 5  # seconds between SIGTERM and SIGKILL
 
 # Version
-LAUNCH_LOOP_VERSION = "14.17.0"
+LAUNCH_LOOP_VERSION = "14.18.0"

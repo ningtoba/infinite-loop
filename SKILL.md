@@ -643,7 +643,7 @@ If you see prompts growing large, consider:
 | `--accept-hooks` | `false` | Auto-approve shell hooks in spawned sessions without a TTY prompt. Passes `--accept-hooks` to spawned `hermes chat -q`. Subprocess mode only. |
 | `--worktree` | `false` | Run spawned sessions in an isolated git worktree. Passes `--worktree` to spawned `hermes chat -q`. Subprocess mode only. |
 | `--continue` | `false` | Resume the most recent session in spawned sessions. Passes `--continue` to spawned `hermes chat -q`. Subprocess mode only. |
-| `--self-test` | `false` | Run in-process self-tests (9 groups, 45 cases across 9 daemon functions) and exit without spawning any sessions. Tests JSON parsing, error classification, text similarity, convergence detection, schema validation, adaptive cooldown, GoalSpec parsing, progress classification, and actionable suggestions. |
+| `--self-test` | `false` | Run in-process self-tests (groups/cases auto-detected at runtime) and exit without spawning any sessions. Tests JSON parsing, error classification, text similarity, convergence detection, schema validation, adaptive cooldown, GoalSpec parsing, progress classification, and actionable suggestions. |
 | `--track-goals` | `false` | Track completed goals in the ledger when using --goals-file. Completed goals are automatically skipped on restart (avoids re-doing work after crashes). |
 | `--reset-goals` | `false` | Clear the goals_completed tracking in the ledger for a fresh start. Use with --goals-file when you want to re-execute all goals. |
 

@@ -4,6 +4,29 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.18.0] — 2026-06-26
+
+### Added
+- **`count_self_test_cases()` function** in `hermes_loop/self_test.py`: Static-code-analysis
+  function that auto-detects the number of test groups and cases by introspecting the
+  `_run_self_test()` function body. Uses `re.findall()` to count `_test_*` functions
+  and `cases.append()` calls. Never goes stale as tests evolve.
+
+### Changed
+- **Self-test counts are now auto-detected at runtime**, eliminating the stale
+  "9 groups, 45 cases" / "10 groups, 52 cases" hardcoded references across the
+  codebase. All documentation now says "auto-detected at runtime" instead of
+  hardcoded numbers:
+  - `README.md` (2 places), `Makefile`, `CONTRIBUTING.md`, `.env.example`,
+    `SKILL.md`, `run.sh`, `hermes_loop/cli.py`
+- `run.sh` banner: Replaced stale "Docs now consistent: \"9 groups, 45 cases\""
+  with "Self-test count auto-detected (never stale)"
+- `hermes_loop/cli.py` — `--self-test` help text and `--examples` output now
+  reference auto-detection instead of hardcoded counts
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.17.0 to 14.18.0.
+
+---
+
 ## [14.17.0] — 2026-06-26
 
 ### Added

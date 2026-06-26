@@ -52,7 +52,7 @@ is met.
 - **`scripts/archive-state.sh`** — Archive old iterations to JSONL or Markdown.
 - **`scripts/replay-ledger.sh`** — Re-run archived iterations from JSONL files.
 
-**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.17.0"`
+**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.18.0"`
 in `hermes_loop/config.py`. The project follows
 [Semantic Versioning](https://semver.org/).
 
@@ -185,7 +185,7 @@ kill <PID>
 |---------|---------|
 | `bash run.sh --dry-run` | Preview the resolved configuration |
 | `bash run.sh --force-reset --quiet` | Clear ledger and start fresh, noise-free |
-| `python3 launch-loop.py --self-test` | Run self-tests (10 groups, 52 cases) |
+| `python3 launch-loop.py --self-test` | Run self-tests (count auto-detected at runtime) |
 | `python3 launch-loop.py --list-flags` | Print all 87 flags organized by group |
 | `python3 launch-loop.py --list-groups` | Print group names with flag counts |
 | `python3 launch-loop.py --examples` | Print categorized usage examples |

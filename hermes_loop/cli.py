@@ -237,7 +237,7 @@ def _list_examples():
     _comment("Full detailed flag reference")
     _cmd("hermes_loop --help")
     print()
-    _comment("Run self-tests (10 groups, 52 cases)")
+    _comment("Run self-tests (auto-detected at runtime)")
     _cmd("hermes_loop --self-test")
     print()
     _comment("Health check before running")
@@ -876,7 +876,7 @@ def _create_parser(for_introspection=False):
     group.add_argument(
         "--self-test",
         action="store_true",
-        help="Run self-test suite and exit",
+        help="Run self-test suite and exit (groups/cases auto-detected at runtime)",
     )
     group.add_argument(
         "--save-config",

@@ -29,7 +29,7 @@ help:
 	@echo "  Run:"
 	@echo "    run          Run the daemon (reads .env). Add ARGS for overrides"
 	@echo "    dry-run      Show config without starting (ARGS supported)"
-	@echo "    self-test    Run in-process self-tests (10 groups, 52 cases)"
+	@echo "    self-test    Run in-process self-tests (count auto-detected at runtime)"
 	@echo "    version      Print daemon version and exit"
 	@echo "    check-env    Validate .env file for typos, unknown variables, common mistakes"
 	@echo "    examples     Print categorized real-world usage examples"

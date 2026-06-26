@@ -1,5 +1,6 @@
 """Integrated self-test suite for daemon functions."""
 
+import re
 from datetime import datetime, timezone
 
 from .file_utils import extract_json_from_output
@@ -8,6 +9,47 @@ from .similarity import text_similarity, check_convergence
 from .validation import validate_json_output
 from .cooldown import calc_adaptive_cooldown
 from .goal_utils import GoalSpec
+
+
+def count_self_test_cases(source_path: str | None = None) -> dict:
+    """Count self-test groups and cases by introspecting the test functions.
+
+    Returns {'groups': N, 'cases': N} where groups are test functions and
+    cases are calls to cases.append() within each test function.
+    This is a static-code-analysis approach that stays correct as tests evolve
+    without requiring manual count updates.
+
+    The counting is done inside _run_self_test()'s body to avoid counting
+    this function's own source code.
+    """
+    if source_path is None:
+        import os
+
+        source_path = os.path.join(os.path.dirname(__file__), "self_test.py")
+
+    groups = 0
+    cases = 0
+    try:
+        with open(source_path) as f:
+            content = f.read()
+
+        # Count test groups (functions named _test_*) — only inside _run_self_test
+        # Find the _run_self_test function body
+        match = re.search(
+            r"def _run_self_test\(\) -> dict:.*?(?=\n\ndef |\Z)",
+            content,
+            re.DOTALL,
+        )
+        if match:
+            body = match.group()
+            test_funcs = re.findall(r"def (_test_\w+)\(\):", body)
+            groups = len(test_funcs)
+            # Count cases.append calls within test functions only
+            cases = body.count("cases.append(")
+    except (FileNotFoundError, IOError):
+        pass
+
+    return {"groups": groups, "cases": cases}
 
 
 def _run_self_test() -> dict:

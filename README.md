@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.17.0
+# Infinite Loop Daemon — v14.18.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -69,7 +69,7 @@ make env                                        # Create .env from .env.example
 make dry-run                                    # Preview config
 make run                                        # Run with .env config
 make run ARGS="--goal 'fix lint errors' --git"  # Run with extra flags
-make self-test                                  # Run self-tests (10 groups, 52 cases)
+make self-test                                  # Run self-tests (count auto-detected at runtime)
 make examples                                   # Print categorized usage examples
 make list-flags                                 # Print all 90 flags organized by group
 make list-groups                                # Print group names with flag counts
@@ -359,7 +359,7 @@ Default toolsets: `terminal,file,delegation,web,skills,browser,memory,session_se
 | `--preflight` | `false` | Run preflight health checks before loop |
 | `--preflight-fail-fast` | `false` | Stop on first preflight failure |
 | `--dry-run` | `false` | Print config and exit (no loop) |
-| `--self-test` | `false` | Run in-process self-tests (10 groups, 52 cases) and exit |
+| `--self-test` | `false` | Run in-process self-tests (count auto-detected at runtime) and exit |
 | `--list-flags` | *(n/a)* | Print all 90 flags organized by group with help text. Pre-argparse (no `--goal` required) |
 | `--list-groups` | *(n/a)* | Print only group names with flag counts (compact overview) |
 | `--examples` | *(n/a)* | Print categorized real-world usage examples across 7 categories |
@@ -438,7 +438,7 @@ kill $LOOP_PID
 
 ---
 
-## v14.17.0 Changelog
+## v14.18.0 Changelog
 
 | Feature | Type | Files | Description |
 |---------|------|-------|-------------|

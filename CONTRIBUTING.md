@@ -102,29 +102,38 @@ make stop                          # Stop the daemon
 git clone <repo-url>
 cd hermes-loop
 
-# 2. Copy the environment template
+# 2. Install the hermes_loop command on your PATH:
+make install
+
+#    This runs `pip install -e .` which adds a `hermes_loop` console_scripts
+#    entry point. After this, you can use `hermes_loop` directly instead of
+#    `python3 -m hermes_loop` or `python3 launch-loop.py`.
+
+# 3. Copy the environment template
 cp .env.example .env
 
-# 3. Set your goal (minimal config)
+# 4. Set your goal (minimal config)
 #    Edit .env and set at minimum INFINITE_LOOP_GOAL
 
-# 4. Verify the daemon can parse its config
-python3 launch-loop.py --dry-run
+# 5. Verify the daemon can parse its config
+hermes_loop --dry-run
 
-# 5. Run the self-tests
-python3 launch-loop.py --self-test
+# 6. Run the self-tests
+hermes_loop --self-test
 
-# 6. (Optional) Create a Python virtual environment
+# 7. (Optional) Create a Python virtual environment
 #    Not required — the daemon is stdlib-only — but useful for
 #    development tooling like linters.
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"   # if a setup.py/pyproject.toml exists in the future
+pip install -e .
 ```
 
-> **No `pip install` is needed** — the daemon uses only Python 3 standard library
-> modules. This is intentional: it reduces deployment friction and keeps the
-> project dependency-free.
+> **No external dependencies** — the daemon uses only Python 3 standard library
+> modules (`argparse`, `json`, `subprocess`, etc.). The `pip install -e .` only
+> registers the `hermes_loop` console command; it adds zero runtime dependencies.
+> This is intentional: it reduces deployment friction and keeps the project
+> dependency-free.
 
 ---
 
@@ -133,10 +142,13 @@ pip install -e ".[dev]"   # if a setup.py/pyproject.toml exists in the future
 ### Daemon Mode (background)
 
 ```bash
-# One-command entrypoint (recommended)
+# One-command entrypoint (recommended) — reads .env
 bash run.sh
 
-# Direct invocation
+# After installing via `make install`:
+hermes_loop --goal "Refactor auth module" --run
+
+# Direct invocation with launch-loop.py shim (always works, no install needed)
 python3 launch-loop.py --goal "Refactor auth module" --run
 
 # With common flags
@@ -185,12 +197,13 @@ kill <PID>
 |---------|---------|
 | `bash run.sh --dry-run` | Preview the resolved configuration |
 | `bash run.sh --force-reset --quiet` | Clear ledger and start fresh, noise-free |
-| `python3 launch-loop.py --self-test` | Run self-tests (count auto-detected at runtime) |
-| `python3 launch-loop.py --list-flags` | Print all 90 flags organized by group |
-| `python3 launch-loop.py --list-groups` | Print group names with flag counts |
-| `python3 launch-loop.py --examples` | Print categorized usage examples |
-| `python3 launch-loop.py --help` | Full CLI reference |
-| `python3 launch-loop.py --version` | Print version string |
+| `make install` | Install `hermes_loop` command on PATH via pip |
+| `hermes_loop --self-test` | Run self-tests (count auto-detected at runtime) |
+| `hermes_loop --list-flags` | Print all flags organized by group |
+| `hermes_loop --list-groups` | Print group names with flag counts |
+| `hermes_loop --examples` | Print categorized usage examples |
+| `hermes_loop --help` | Full CLI reference |
+| `hermes_loop --version` | Print version string |
 | `bash scripts/inspect-ledger.sh` | View the state ledger |
 | `bash scripts/inspect-ledger.sh --watch` | Auto-refresh every 5 seconds |
 | `bash scripts/inspect-ledger.sh --summary` | Compact one-liner status |

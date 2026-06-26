@@ -25,7 +25,7 @@ if [[ "${1:-}" == "--version" ]]; then
   exec python3 "$SCRIPT_DIR/launch-loop.py" "--version"
 fi
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.28.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.29.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
@@ -59,7 +59,6 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "    --check-env           Validate .env file for typos and unknown variables"
   echo "    --doctor              Run comprehensive self-diagnosis"
   echo "    --completion-script {bash|zsh}  Generate shell completion (pipe to source)"
-  echo "    --demo                Interactive daemon lifecycle walkthrough"
   echo ""
   echo "EXAMPLES:"
   echo "  bash run.sh                           # Run with .env config"
@@ -74,6 +73,8 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "See: python3 launch-loop.py --help  (for the full flag reference)"
   echo ""
   echo "QUICK REFERENCE:"
+  echo "  Install:   make install              # hermes_loop on PATH"
+  echo "  Run:       make run                  # reads .env"
   echo "  Ledger:    cat /tmp/infinite-loop-state.json | python3 -m json.tool"
   echo "  Status:    bash scripts/inspect-ledger.sh"
   echo "  Stop:      echo 'stop' > /tmp/infinite-loop-stop"

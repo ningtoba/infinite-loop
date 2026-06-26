@@ -56,24 +56,30 @@ skill for independent use, development, and documentation.
 ## Quick Start
 
 ```bash
+# Quick install (installs `hermes_loop` command on your PATH):
+make install
+# Or: pipx install .                    # if pip is externally-managed
+
 # One command — reads everything from .env
 bash run.sh
 
 # Or use the interactive setup wizard:
-python3 -m hermes_loop --init
+hermes_loop --init
 make init
 
 # Or try the interactive walkthrough:
-python3 -m hermes_loop --demo
+hermes_loop --demo
 make demo
 
 # Or with overrides:
 bash run.sh --dry-run                           # Preview config, don't run
 bash run.sh --max-iterations 10 --quiet         # Run 10 iterations, no banner
 bash run.sh --goal "Fix lint errors" --force-reset  # Override goal, clean start
+hermes_loop --goal "Refactor auth" --git --run  # Install-free direct command
 
 # Or use the Makefile:
 make env                                        # Create .env from .env.example
+make install                                    # Install hermes_loop command
 make dry-run                                    # Preview config
 make run                                        # Run with .env config
 make run ARGS="--goal 'fix lint errors' --git"  # Run with extra flags
@@ -88,7 +94,7 @@ make pre-commit                                 # Quick pre-commit gate (lint + 
 make demo                                       # Interactive daemon lifecycle walkthrough
 
 # Monitor progress:
-python3 -m hermes_loop --status                         # compact built-in status
+hermes_loop --status                               # compact built-in status
 bash scripts/inspect-ledger.sh                           # formatted view
 bash scripts/inspect-ledger.sh --watch                   # auto-refresh
 bash scripts/inspect-ledger.sh --summary                 # compact one-liner
@@ -106,7 +112,7 @@ echo "stop" > /tmp/infinite-loop-stop
 ```
 You (current Hermes agent session / terminal)
   │
-  └─ python3 launch-loop.py --goal "..." --run
+  └─ python3 launch-loop.py / hermes_loop --goal "..." --run
       │
       │  hermes_loop/ package runs the loop in the background:
       │
@@ -130,7 +136,7 @@ You (current Hermes agent session / terminal)
 
 ## How It Works
 
-1. **You** run the daemon via `python3 launch-loop.py --run` (usually in `terminal(background=true)`). The `launch-loop.py` shim delegates to the `hermes_loop/` package.
+1. **You** run the daemon via `python3 launch-loop.py --run` or `hermes_loop --run` (usually in `terminal(background=true)`). The `launch-loop.py` shim or the `hermes_loop` console command delegates to the `hermes_loop/` package.
 2. **Daemon** (`hermes_loop/` package) auto-detects task type from the goal and enriches toolsets
 3. **Daemon** spawns `hermes chat -q "..." -t terminal,file,delegation,... -Q --max-turns 500` on each iteration
 4. **Spawned Hermes** gets task-optimized prompts, past failure context, and the right tools
@@ -158,6 +164,7 @@ The `context` field is critical for iterative work — it tells the NEXT spawned
 
 | Script | Path | Purpose |
 |--------|------|---------|
+| **hermes_loop** | `hermes_loop` (console command) | Installed via `make install`. Invokes `hermes_loop.cli:main`. Alternative to `python3 launch-loop.py`. |
 | **launch-loop.py** | `launch-loop.py` (root) | Thin backward-compatible shim (18 lines). Imports `main()` from the `hermes_loop/` package. All real code lives in the package. |
 | **hermes_loop/** | `hermes_loop/` (directory) | **Main daemon package** (36 modules). Contains all daemon logic: CLI, loop, functions, iteration, webhook, dashboard, preflight, notifications, and more. See [project structure](#files--structure) for the full module list. |
 | **session-self-loop.py** | `session-self-loop.py` (root) | Lightweight in-session loop tracker for self-enhancement from within your current Hermes session. |
@@ -1160,6 +1167,7 @@ infinite-loop/
 ├── README.md                    ← This file
 ├── run.sh                       ← One-command entrypoint (reads .env) ★
 ├── Makefile                     ← Convenience targets ★
+├── pyproject.toml               ← Python packaging (installs hermes_loop command)
 ├── CONTRIBUTING.md              ← Onboarding & development guide
 ├── LICENSE                      ← MIT
 ├── .gitignore

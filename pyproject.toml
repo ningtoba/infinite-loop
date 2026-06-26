@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermes-loop"
+description = "Autonomous loop daemon that spawns Hermes sessions with real tools and delegation"
+version = "14.29.0"
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.scripts]
+hermes_loop = "hermes_loop.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["hermes_loop*"]

@@ -4,6 +4,43 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.29.0] — 2026-06-26
+
+### Added
+- **`pyproject.toml` with `console_scripts` entry point**: Run `make install`
+  to install the `hermes_loop` command on your PATH via `pip install -e .`.
+  No external dependencies — the package is still stdlib-only; `pip` only
+  registers the console script. After install, `hermes_loop --help` works
+  from anywhere, replacing `python3 -m hermes_loop` or `python3 launch-loop.py`.
+- **`make install` / `make install-dev` targets**: New Makefile convenience
+  targets for installing the `hermes_loop` command. Listed in `make help`
+  under a new "Install" section and in the examples list.
+- **`run.sh --help` quick reference**: Added `Install:` and `Run:` entries
+  pointing to `make install` and `make run` respectively.
+
+### Changed
+- `README.md` — Quick Start now leads with `make install`. Replaced all
+  `python3 -m hermes_loop` examples with `hermes_loop`. Updated architecture
+  diagram, How It Works, scripts table, and file structure to mention the
+  `hermes_loop` console command and `pyproject.toml`.
+- `CONTRIBUTING.md` — Setup steps now start with `make install`. Updated
+  running daemon section, common commands table (all entries switch from
+  `python3 launch-loop.py` to `hermes_loop`). Updated "No pip install needed"
+  note to "No external dependencies" reflecting the new packaging.
+- `Makefile` — Added `install` and `install-dev` targets, new "Install"
+  section in `make help`.
+- `run.sh` — Updated version banner to v14.29.0. Added `Install:` and `Run:`
+  lines to the `--help` quick reference. Removed duplicate `--demo` entry
+  from the Info section.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.28.0 to 14.29.0.
+
+### Fixed
+- **Duplicate `--demo` in `run.sh --help`**: The `--demo` flag appeared in
+  both the "Actions" and "Info" sections of `run.sh --help`. Removed the
+  duplicate from the Info section.
+
+---
+
 ## [14.28.0] — 2026-06-26
 
 ### Added

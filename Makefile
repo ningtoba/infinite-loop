@@ -22,6 +22,10 @@ help:
 	@echo ""
 	@echo "TARGETS:"
 	@echo ""
+	@echo "  Install:"
+	@echo "    install      Install hermes_loop as a system command via pip"
+	@echo "    install-dev  Editable install for development"
+	@echo ""
 	@echo "  Setup & Docs:"
 	@echo "    env          Copy .env.example to .env (safe, no overwrite)"
 	@echo "    help         Show this help message"
@@ -62,6 +66,8 @@ help:
 	@echo ""
 	@echo "EXAMPLES:"
 	@echo "  make env                      # Create .env from .env.example"
+	@echo "  make install                  # Install hermes_loop command on PATH"
+	@echo "  make install-dev              # Editable install for development"
 	@echo "  make dry-run                 # Preview default config"
 	@echo "  make run                      # Run with .env config"
 	@echo "  make demo                     # Interactive daemon walkthrough"
@@ -74,6 +80,25 @@ help:
 	@echo "  make stop                    # Stop the daemon"
 	@echo "  make clean                   # Reset state"
 	@echo ""
+
+# ── Install ────────────────────────────────────────────────────────────────────
+
+.PHONY: install
+install:
+	@echo "━━━ Installing hermes_loop command ━━━"
+	@pip install -e . 2>&1 | tail -3 || pipx install . 2>&1 | tail -3
+	@echo ""
+	@echo "  ✓ hermes_loop is now on your PATH."
+	@echo "  Try: hermes_loop --help"
+	@echo ""
+
+.PHONY: install-dev
+install-dev:
+	@echo "━━━ Installing in editable mode for development ━━━"
+	@pip install -e . 2>&1 | tail -3 || pipx install . 2>&1 | tail -3
+	@echo ""
+	@echo "  ✓ Editable install complete. Changes to source are live."
+	@echo "  Run: hermes_loop --self-test"
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 

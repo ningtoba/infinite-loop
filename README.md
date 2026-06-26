@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.20.0
+# Infinite Loop Daemon — v14.21.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -443,6 +443,22 @@ kill $LOOP_PID
 | Feature | Type | Files | Description |
 |---------|------|-------|-------------|
 | Shutdown summary banner | UX | `loop.py`, `signal_handlers.py`, `cli.py` | Prints comprehensive final summary on any stop: iterations, duration, success/fail, error breakdown, and actionable next-steps. Also shown on SIGINT/SIGTERM. 7 exit paths covered. |
+
+---
+
+## v14.21.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `--explain` flag | UX | `cli.py` | Detailed help on any single CLI flag. Accepts full names or unambiguous prefixes. Shows: group, type, default, full description, aliases, related flags, and usage example. Pre-argparse, no `--goal` required. |
+
+---
+
+## v14.20.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `--status` flag | UX | `cli.py`, `config.py`, `README.md`, `Makefile` | Compact built-in ledger status viewer. Displays daemon status, iteration count, success/error/stuck breakdown, duration, goal, last iteration, and quick actions. Pre-argparse, no `--goal` required. `make status` now uses built-in. |
 
 ---
 

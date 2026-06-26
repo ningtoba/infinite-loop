@@ -80,6 +80,7 @@ def _list_flags(show_help=True):
         "--version": "Print daemon version and exit",
         "--completion-script": "Generate shell completion script for bash or zsh from live argparse",
         "--status": "Read the ledger and display a compact status summary (no --goal required)",
+        "--explain": "Show detailed help for a specific CLI flag (no --goal required)",
     }
 
     total_flags = sum(len(v) for v in group_map.values()) + len(introspection_flags)
@@ -238,6 +239,11 @@ def _list_examples():
     _comment("Full detailed flag reference")
     _cmd("hermes_loop --help")
     print()
+    _comment("Detailed help on any single flag")
+    _cmd("hermes_loop --explain workers")
+    _cmd("hermes_loop --explain cooldown")
+    _cmd('hermes_loop --explain "max-iterations"')
+    print()
     _comment("Run self-tests (auto-detected at runtime)")
     _cmd("hermes_loop --self-test")
     print()
@@ -256,6 +262,17 @@ def _list_examples():
     _cmd('bash run.sh --goal "Override" --git --quiet')
     print()
 
+    _section("Flag Reference")
+    _comment("Detailed help on any single CLI flag")
+    _cmd("hermes_loop --explain git")
+    _cmd("hermes_loop --explain converge")
+    _cmd("hermes_loop --explain workers")
+    _cmd("hermes_loop --explain use-library")
+    _comment("List all flags")
+    _cmd("hermes_loop --list-flags")
+    _cmd("hermes_loop --list-groups")
+    print()
+
     _section("Status & Monitoring")
     _comment("Quick status of running daemon (reads ledger, no --goal needed)")
     _cmd("hermes_loop --status")
@@ -268,6 +285,151 @@ def _list_examples():
     _comment("Live log tail / HTML dashboard")
     _cmd("tail -f /tmp/infinite-loop.log")
     _cmd('hermes_loop --goal "..." --status-html /tmp/dash.html --run')
+    print()
+
+
+def _explain_flag(flag_name: str) -> None:
+    """Print detailed help for a single CLI flag.
+
+    Searches the argparse parser for the flag by any unambiguous prefix
+    (with or without leading '--'), and shows: full help text, type,
+    default value, accepted choices, argument group, and related flags.
+    """
+    parser = _create_parser(for_introspection=True)
+    c = colorizer
+
+    # Normalize: strip leading --, strip hyphens
+    search = flag_name.lstrip("-").replace("_", "-").lower()
+
+    # Collect all actions with their flag name aliases
+    all_actions: list[tuple[str, argparse.Action, str]] = []
+    for group in parser._action_groups:
+        for action in group._group_actions:
+            if not action.option_strings:
+                continue
+            canonical = action.option_strings[0].lstrip("-").replace("_", "-")
+            all_actions.append((canonical, action, group.title))
+
+    # Find match: exact, then prefix, then substring
+    matches: list[tuple[str, argparse.Action, str]] = []
+    for canonical, action, grp_title in all_actions:
+        if canonical == search:
+            matches = [(canonical, action, grp_title)]
+            break
+        if canonical.startswith(search):
+            matches.append((canonical, action, grp_title))
+
+    if not matches:
+        # Substring search fallback
+        for canonical, action, grp_title in all_actions:
+            if search in canonical:
+                matches.append((canonical, action, grp_title))
+
+    if not matches:
+        print()
+        print(f"  {c.tag_fail()}  No flag found matching '{flag_name}'.")
+        print(
+            f"  {c.dim('  Try:')} {c.flag('hermes_loop --list-flags | grep ' + flag_name)}"
+        )
+        print(f"  {c.dim('  Or:')}  {c.flag('hermes_loop --list-groups')}")
+        print()
+        return
+
+    if len(matches) > 1:
+        print()
+        print(
+            f"  {c.tag_warn()}  Multiple flags match '{flag_name}': "
+            + ", ".join(c.flag(f"--{m[0]}") for m in matches)
+        )
+        print(
+            f"  {c.dim('  Use a more specific name (e.g., --explain')} {c.flag(f'--{matches[0][0]}')}{c.dim(')')}"
+        )
+        print()
+        return
+
+    canonical, action, grp_title = matches[0]
+    flag_str = action.option_strings[0]
+    help_text = action.help or "(no description)"
+
+    # Default value info
+    default = getattr(action, "default", None)
+    is_bool = action.nargs == 0 and action.const is True
+
+    print()
+    print(f"  {c.colorize(flag_str, 'bold', 'white')}")
+    print(f"  {c.dim('=' * (len(flag_str) + 2))}")
+    print()
+    print(f"  {c.value('Group:')}     {c.group_title(grp_title)}")
+    print(f"  {c.value('Type:')}      ", end="")
+    if is_bool:
+        print(f"{c.flag('boolean (on/off)')}")
+    elif action.choices:
+        print(f"{c.flag('choice')} — {', '.join(c.value(ch) for ch in action.choices)}")
+    elif action.type is int:
+        print(f"{c.flag('integer')}")
+    elif action.type is float:
+        print(f"{c.flag('float')}")
+    else:
+        print(f"{c.flag('string')}")
+    if default is not None and default != "" and default != 0 and not is_bool:
+        print(f"  {c.value('Default:')}  {c.dim(str(default))}")
+    elif is_bool:
+        print(f"  {c.value('Default:')}  {c.dim('off (not set)')}")
+    print()
+    # Full help text — word-wrap to 80 chars
+    print(f"  {c.dim('Description:')}")
+    words = help_text.split()
+    line = ""
+    for w in words:
+        if len(line) + len(w) + 1 > 76:
+            print(f"    {c.dim(line)}")
+            line = w
+        else:
+            line = f"{line} {w}" if line else w
+    if line:
+        print(f"    {c.dim(line)}")
+    print()
+
+    # Aliases
+    if len(action.option_strings) > 1:
+        aliases = ", ".join(c.flag(a) for a in action.option_strings)
+        print(f"  {c.value('Aliases:')}   {aliases}")
+        print()
+
+    # Related flags (same group)
+    related = []
+    for other_canon, other_action, other_grp in all_actions:
+        if other_grp == grp_title and other_canon != canonical:
+            related.append(other_action.option_strings[0])
+    if related:
+        print(f"  {c.value('Related:')}   {'  '.join(c.flag(r) for r in related[:10])}")
+        if len(related) > 10:
+            print(
+                f"              {c.dim(f'... and {len(related) - 10} more in this group')}"
+            )
+    print()
+
+    # Usage example based on type
+    print(f"  {c.value('Usage:')}")
+    if is_bool:
+        print(f"    {c.flag(flag_str)}            {c.dim('# enable')}")
+        print(f"    {c.dim('# (omit to leave disabled)')}")
+    elif action.type is int:
+        print(
+            f"    {c.flag(flag_str)} {c.value('N')}       {c.dim('# e.g.')} {c.flag(flag_str)} {c.value('10')}"
+        )
+    elif action.type is float:
+        print(
+            f"    {c.flag(flag_str)} {c.value('N.N')}     {c.dim('# e.g.')} {c.flag(flag_str)} {c.value('2.5')}"
+        )
+    elif action.choices:
+        print(
+            f"    {c.flag(flag_str)} {c.value('{choice}')}  {c.dim('# e.g.')} {c.flag(flag_str)} {c.value(action.choices[0])}"
+        )
+    else:
+        print(
+            f"    {c.flag(flag_str)} {c.value('VALUE')}  {c.dim('# e.g.')} {c.flag(flag_str)} {c.value('my-value')}"
+        )
     print()
 
 
@@ -1073,6 +1235,17 @@ def _create_parser(for_introspection=False):
         "Pre-argparse -- no --goal required. "
         "Example: python3 -m hermes_loop --status",
     )
+    group.add_argument(
+        "--explain",
+        default="",
+        help="Show detailed help for a specific CLI flag. "
+        "Accepts full flag names or unambiguous prefixes (e.g., 'cooldown', "
+        "'convergence-stop', 'use-lib'). "
+        "Displays: group, type, default, full description, aliases, related "
+        "flags, and a usage example. "
+        "Pre-argparse -- no --goal required. "
+        "Example: python3 -m hermes_loop --explain workers",
+    )
 
     return parser
 
@@ -1126,6 +1299,20 @@ def main():
             print(generate_zsh_completion(parser))
         sys.exit(0)
 
+    # Check --explain before argparse to avoid required --goal conflict
+    explain_flag = None
+    for i, arg in enumerate(sys.argv[1:]):
+        if arg == "--explain" and i + 2 < len(sys.argv):
+            explain_flag = sys.argv[i + 2]
+            break
+        if arg.startswith("--explain="):
+            explain_flag = arg.split("=", 1)[1]
+            break
+    if explain_flag:
+        configure_color_mode(color_mode)
+        _explain_flag(explain_flag)
+        sys.exit(0)
+
     # Check --check-env before argparse to avoid required --goal conflict
     if "--check-env" in sys.argv:
         # Detect color mode early
@@ -1160,6 +1347,7 @@ def main():
         "--examples",
         "--check-env",
         "--status",
+        "--explain",
     }
     arg_set = set(sys.argv[1:])
     has_goal = any(

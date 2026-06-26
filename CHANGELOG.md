@@ -54,6 +54,49 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.21.0] — 2026-06-26
+
+### Added
+- **`--explain` flag**: New `hermes_loop --explain <flag>` command that shows
+  detailed help for any single CLI flag. Accepts full flag names or unambiguous
+  prefixes (e.g., `--explain workers`, `--explain converge` for single matches,
+  shows alternatives for ambiguous prefixes). Displays: argument group, type
+  (boolean/integer/float/string/choice), default value, full help text with
+  word-wrapping, aliases, related flags in the same group, and a usage example
+  tailored to the flag type. Pre-argparse — no `--goal` required. Example
+  output:
+  ```
+  --workers
+    ===========
+
+    Group:     Parallelism
+    Type:      integer
+    Default:  1
+
+    Description:
+      Run N concurrent Hermes sessions per iteration
+
+    Related:   (no other flags in this group)
+
+    Usage:
+      --workers N       # e.g. --workers 10
+  ```
+- **`--explain` in `--examples` output**: New "Flag Reference" section with
+  detailed `--explain` usage examples alongside existing `--list-flags` and
+  `--list-groups` commands. Also added `--explain` to the "Help & Diagnostics"
+  section.
+- **`--explain` added to `Standalone_flags` set**: Works without `--goal`.
+
+### Changed
+- `hermes_loop/cli.py` — New `_explain_flag()` function (90 lines) that
+  introspects the argparse parser to find and display detailed flag info.
+  Added `--explain` to Startup & Debug argparse group, pre-argparse handler,
+  introspection flags, and standalone flags set.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.20.0 to 14.21.0.
+- `README.md` — Updated changelog, version in header.
+
+---
+
 ## [14.20.1] — 2026-06-26
 
 ### Changed

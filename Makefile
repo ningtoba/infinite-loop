@@ -33,6 +33,7 @@ help:
 	@echo "    version      Print daemon version and exit"
 	@echo "    check-env    Validate .env file for typos, unknown variables, common mistakes"
 	@echo "    examples     Print categorized real-world usage examples"
+	@echo "    explain      Show detailed help on a single flag (pass FLAG=)"
 	@echo "    list-flags   Print all 90 flags organized by group"
 	@echo "    list-groups  Print compact group names with flag counts"
 	@echo ""
@@ -54,7 +55,8 @@ help:
 	@echo "  make env                      # Create .env from .env.example"
 	@echo "  make dry-run                 # Preview default config"
 	@echo "  make run                      # Run with .env config"
-	@echo "  make run ARGS=\"--goal 'fix lint errors' --workers 2\""
+	@echo "  make examples                  # See usage patterns"
+	@echo "  make explain FLAG=workers      # Help on a specific flag"
 	@echo "  make self-test               # Run tests"
 	@echo "  make status                  # View ledger"
 	@echo "  make stop                    # Stop the daemon"
@@ -99,6 +101,10 @@ check-env:
 .PHONY: examples
 examples:
 	$(RUN_SH) --examples
+
+.PHONY: explain
+explain:
+	$(PYTHON) -m hermes_loop --explain "$(FLAG)"
 
 .PHONY: list-flags
 list-flags:

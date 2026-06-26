@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint for the infinite-loop daemon
+#!/usr/bin/env bash
+# run.sh — One-command entrypoint (v14.2.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
 #
-# For options:
-#   bash run.sh --help            # Pass --help to launch-loop.py
-#   bash run.sh --dry-run         # Show config without starting
-#   bash run.sh --force-reset     # Clear ledger and start fresh
-#   bash run.sh --quiet           # Suppress banner
-#   bash run.sh --goal "..."      # Override goal from .env
+# For more options:
+#   bash run.sh --help       # Show full run.sh help
+#   bash run.sh --dry-run    # Show config without starting
 #
 # All extra args are forwarded to launch-loop.py.
 # ==============================================================================
@@ -22,29 +20,52 @@ LEDGER_PATH="/tmp/infinite-loop-state.json"
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "Usage: bash run.sh [OPTIONS]"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.2.0) ━━━"
   echo ""
-  echo "One-command entrypoint. Reads .env, runs the infinite-loop daemon."
+  echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
-  echo "Options (override .env settings):"
-  echo "  --dry-run                Show config and exit"
-  echo "  --force-reset            Clear existing ledger and start fresh"
-  echo "  --quiet / -q             Suppress banner"
-  echo "  --goal TEXT              Override INFINITE_LOOP_GOAL from .env"
-  echo "  --context TEXT           Override INFINITE_LOOP_CONTEXT"
-  echo "  --max-iterations N       Override max iterations"
-  echo "  --max-turns N            Override max turns per session"
-  echo "  --workers N              Override concurrent workers"
-  echo "  --tag TEXT               Override run tag"
-  echo "  --help / -h              Show this help"
+  echo "The one-command entrypoint. Reads everything from .env and forwards"
+  echo "all settings as CLI flags to launch-loop.py."
   echo ""
-  echo "Any other flag is forwarded directly to launch-loop.py."
+  echo "OVERRIDE OPTIONS (take precedence over .env):"
   echo ""
-  echo "Examples:"
-  echo "  bash run.sh                         # Run with .env config"
-  echo "  bash run.sh --dry-run               # Preview config"
-  echo "  bash run.sh --force-reset --quiet   # Clean start, quiet"
-  echo "  bash run.sh --goal \"Fix tests\"      # Override goal"
+  echo "  General:"
+  echo "    --goal TEXT           Core task description (overrides INFINITE_LOOP_GOAL)"
+  echo "    --context TEXT        Initial context (overrides INFINITE_LOOP_CONTEXT)"
+  echo "    --max-iterations N    Stop after N iterations (default: 0 = infinite)"
+  echo "    --max-turns N         Max turns per session (default: 500)"
+  echo "    --workers N           Concurrent Hermes sessions (default: 1)"
+  echo "    --tag TEXT            Label for the run (e.g. 'fix-auth')"
+  echo "    --quiet / -q          Suppress banner output"
+  echo ""
+  echo "  Actions:"
+  echo "    --dry-run             Print config and exit"
+  echo "    --force-reset         Clear existing ledger, start fresh"
+  echo "    --self-test           Run in-process unit tests and exit"
+  echo ""
+  echo "  Info:"
+  echo "    --help / -h           Show this help message"
+  echo "    --version             Print daemon version and exit"
+  echo ""
+  echo "EXAMPLES:"
+  echo "  bash run.sh                           # Run with .env config"
+  echo "  bash run.sh --dry-run                 # Preview what would run"
+  echo "  bash run.sh --self-test               # Run self-tests"
+  echo "  bash run.sh --goal 'Fix tests'        # Override .env goal"
+  echo "  bash run.sh --force-reset --quiet     # Clean start, no banner"
+  echo "  bash run.sh --git --git-commit        # Enable git auto-commit"
+  echo ""
+  echo "ALL other flags are forwarded directly to launch-loop.py."
+  echo "See: python3 launch-loop.py --help  (for the full flag reference)"
+  echo ""
+  echo "QUICK REFERENCE:"
+  echo "  Ledger:    cat /tmp/infinite-loop-state.json | python3 -m json.tool"
+  echo "  Status:    bash scripts/inspect-ledger.sh"
+  echo "  Stop:      echo 'stop' > /tmp/infinite-loop-stop"
+  echo "  Pause:     echo 'pause' > /tmp/infinite-loop-stop"
+  echo "  Resume:    echo 'resume' > /tmp/infinite-loop-stop"
+  echo "  Dashboard: python3 -m http.server 8080 --directory /tmp/"
+  echo "             → http://localhost:8080/loop-status.html"
   exit 0
 fi
 
@@ -155,7 +176,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run)    DAEMON_ARGS+=("--dry-run"); shift ;;
     --force-reset) DAEMON_ARGS+=("--force-reset"); shift ;;
+    --self-test)  DAEMON_ARGS+=("--self-test"); shift ;;
     --quiet|-q)   QUIET=true; shift ;;
+    --version)    exec python3 "$SCRIPT_DIR/launch-loop.py" "--version" ;;
     --goal)       DAEMON_ARGS+=("--goal" "$2"); shift 2 ;;
     --context)    DAEMON_ARGS+=("--context" "$2"); shift 2 ;;
     --max-iterations) DAEMON_ARGS+=("--max-iterations" "$2"); shift 2 ;;
@@ -170,8 +193,14 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop Daemon                        ║"
+  echo "║  Infinite Loop Daemon v14.2.0                ║"
   echo "║  bash run.sh — one command to start          ║"
+  echo "║                                                ║"
+  echo "║  New in v14.2.0:                              ║"
+  echo "║  • Makefile convenience targets               ║"
+  echo "║  • CONTRIBUTING.md onboarding guide           ║"
+  echo "║  • Improved --help with quick reference       ║"
+  echo "║  • SSE broadcast fix (global var declaration) ║"
   echo "╚══════════════════════════════════════════════╝"
   echo ""
   echo "  Config from: .env"

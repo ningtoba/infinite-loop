@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.1.0
+# Infinite Loop Daemon — v14.2.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -6,6 +6,8 @@ multi-level delegation trees. It iterates autonomously, tracks progress in a
 JSON ledger, and can batch-process hundreds of goals in sequence.
 
 > **Changelog**: See [CHANGELOG.md](./CHANGELOG.md) for the complete version history.
+> **Contributing**: See [CONTRIBUTING.md](./CONTRIBUTING.md) for onboarding and development guide.
+> **Quick reference**: Use `make help` for convenience targets (run, dry-run, self-test, status, stop, clean).
 
 ## Origin
 
@@ -59,6 +61,13 @@ bash run.sh
 bash run.sh --dry-run                           # Preview config, don't run
 bash run.sh --max-iterations 10 --quiet         # Run 10 iterations, no banner
 bash run.sh --goal "Fix lint errors" --force-reset  # Override goal, clean start
+
+# Or use the Makefile:
+make env                                        # Create .env from .env.example
+make dry-run                                    # Preview config
+make run                                        # Run with .env config
+make run ARGS="--goal 'fix lint errors' --git"  # Run with extra flags
+make self-test                                  # Run tests (~40 checks)
 
 # Monitor progress:
 cat /tmp/infinite-loop-state.json | python3 -m json.tool    # full ledger
@@ -133,6 +142,7 @@ The `context` field is critical for iterative work — it tells the NEXT spawned
 |--------|------|---------|
 | **launch-loop.py** | `launch-loop.py` (root) | Main daemon — the primary loop. Spawns Hermes sessions, manages the JSON ledger, handles all flags. **287 KB, 7,557 lines.** |
 | **session-self-loop.py** | `session-self-loop.py` (root) | Lightweight in-session loop tracker for self-enhancement from within your current Hermes session. |
+| **Makefile** | `Makefile` (root) | Convenience targets: `make run`, `make dry-run`, `make self-test`, `make status`, `make stop`, `make clean`. ★ |
 | **run.sh** | `run.sh` (root) | **One-command entrypoint** — sources `.env`, forwards all settings as CLI flags. Just `bash run.sh`. ★ |
 | **run-loop.sh** | `scripts/run-loop.sh` | Unified shell wrapper that forwards all flags to launch-loop.py. |
 | **inspect-ledger.sh** | `scripts/inspect-ledger.sh` | View the JSON ledger formatted: default view, `--watch`, `--summary`, `--json`, `--errors-only`, `--last N`. |
@@ -415,17 +425,16 @@ kill $LOOP_PID
 
 ---
 
-## v14.1.0 Changelog
+## v14.2.0 Changelog
 
 | Feature | Type | Files | Description |
 |---------|------|-------|-------------|
-| Dashboard XSS Fix | Security | `launch-loop.py` | Replaced `innerHTML` string interpolation with `createElement` + `textContent` in SSE dashboard's `addIterationRow()`. Eliminates DOM-based XSS from spawned session output. |
-| Dashboard Error Panel | Enhancement | `launch-loop.py` | Error type count cards (timeout, network, schema, unknown) with color-coded left-border accents. Active mitigations displayed as tags. |
-| Dashboard Performance Metrics | Enhancement | `launch-loop.py` | Avg turns, estimated tokens/iter, cost estimate, iters/goal metric cards on SSE dashboard. |
-| Dashboard Goals Visualization | Enhancement | `launch-loop.py` | Per-goal status with progress bar, ✓/▶/○ indicators, scrollable list. Populated from `goals_specs` + `goals_completed` via SSE payload. |
-| False Convergence Guard | Robustness | `launch-loop.py` | `_detect_convergence()` skips Jaccard similarity check when summary < 20 chars. Prevents false convergence stops from empty/error summaries. |
-| `--quiet` / `-q` mode | Usability | `scripts/run-loop.sh` | Suppresses ASCII banner and startup info in CI/CD and scripted use. |
-|
+| Makefile | Usability | `Makefile` | Convenience targets: run, dry-run, self-test, lint, status, stop, clean, archive, log, version |
+| CONTRIBUTING.md | Documentation | `CONTRIBUTING.md` | Onboarding guide with setup, workflow, code style, troubleshooting |
+| Improved run.sh --help | Usability | `run.sh` | Organized sections, quick reference for ledger/status/stop/dashboard |
+| `--self-test` / `--version` in run.sh | Usability | `run.sh` | New passthrough flags for testing and version info |
+| SSE broadcast fix | Bugfix | `launch-loop.py` | Added missing `global _sse_clients` in `_broadcast_to_sse_clients()` to prevent UnboundLocalError crash |
+
 > **Full changelog**: See [CHANGELOG.md](./CHANGELOG.md) for the complete version history since v1.0.0.
 
 ---
@@ -760,10 +769,13 @@ specs, audits, and synthesis documents.
 infinite-loop/
 ├── README.md                    ← This file
 ├── run.sh                       ← One-command entrypoint (reads .env) ★
+├── Makefile                     ← Convenience targets ★
+├── CONTRIBUTING.md              ← Onboarding & development guide
 ├── LICENSE                      ← MIT
 ├── .gitignore
 ├── .env.example                 ← All config parameters as env vars
 ├── SKILL.md                     ← Original Hermes skill file (83 KB)
+│
 │
 ├── launch-loop.py               ← Main daemon (287 KB, 7,557 lines) ★
 ├── session-self-loop.py         ← In-session loop tracker ★

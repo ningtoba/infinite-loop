@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-session-self-loop.py — In-session infinite loop (v2.11.0)
+session-self-loop.py — In-session infinite loop (v2.12.0)
+
+v2.12.0:
+  - Version bump to align with infinite-loop v14.2.0 release
+  - Makefile, CONTRIBUTING.md, improved --help, SSE fix
 
 v2.11.0:
   - Version bump to align with infinite-loop v14.1.0 release
@@ -8,9 +12,6 @@ v2.11.0:
     Goals Visualization, Convergence Guard parity
 
 v2.10.0:
-  - Version bump to align with infinite-loop v14.0.0 release
-  - Dashboard v3 SSE, Session Self-Healing Heartbeat
-  - Hermes Version Check parity
 
 v2.8.0:
   - Version bump to align with infinite-loop v11.14.0 release

@@ -1,5 +1,5 @@
 #!/bin/bash
-# run-loop.sh — Unified entrypoint (v14.1.0 — New features: Dashboard XSS fix, error panel, metrics, goals visualization, convergence guard, --quiet mode)
+# run-loop.sh — Unified entrypoint (v14.2.0 — New: Makefile, CONTRIBUTING.md, improved --help, SSE fix)
 #
 # THE PRIMARY way to create an autonomous delegation loop. No cron jobs.
 #
@@ -222,18 +222,19 @@ fi
 
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop - v14.1.0                       ║"
-  echo "║  Dashboard v3 SSE, Error Panel,                   ║"
-  echo "║  Performance Metrics, Goals Visualization,        ║"
-  echo "║  XSS Fix, Convergence Guard, Idempotent           ║"
-  echo "║  Goal Execution, Concurrent Library Mode,         ║"
-  echo "║  Auto Error Recovery, In-Process Archiving,       ║"
-  echo "║  Multi-Profile Goals, Self-Test Mode,             ║"
-  echo "║  Progress Classification, AIAgent library,        ║"
-  echo "║  Session Tracking, Pushbullet & ntfy              ║"
-  echo "║  Notifications, Preflight, REST Control,          ║"
-  echo "║  Session Self-Healing Heartbeat, --quiet mode     ║"
-  echo "║  No cron. Real delegation. Real loops.            ║"
+  echo "║  Infinite Loop - v14.2.0                       ║"
+  echo "║  Makefile, CONTRIBUTING.md,                       ║"
+  echo "║  Improved --help, SSE fix, Dashboard v3 SSE,     ║"
+  echo "║  Error Panel, Performance Metrics,               ║"
+  echo "║  Goals Visualization, XSS Fix, Convergence       ║"
+  echo "║  Guard, Idempotent Goal Execution,               ║"
+  echo "║  Concurrent Library Mode, Auto Error Recovery,   ║"
+  echo "║  In-Process Archiving, Multi-Profile Goals,      ║"
+  echo "║  Self-Test Mode, Progress Classification,        ║"
+  echo "║  AIAgent library, Session Tracking,              ║"
+  echo "║  Pushbullet & ntfy Notifications,                ║"
+  echo "║  Preflight, REST Control, Session Self-Healing   ║"
+  echo "║  Heartbeat, --quiet mode, No cron. Real loops.   ║"
   echo "╚══════════════════════════════════════════════╝"
   echo ""
 fi

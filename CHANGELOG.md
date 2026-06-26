@@ -7,6 +7,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [14.2.0] — 2026-06-26
+
+### Added
+- **Makefile**: Convenience targets — `make run`, `make dry-run`, `make self-test`,
+  `make lint`, `make status`, `make stop`/`pause`/`resume`, `make clean`,
+  `make archive`, `make log`, `make version`, `make env`, `make help`.
+- **CONTRIBUTING.md**: Onboarding guide for new contributors covering setup,
+  development workflow, code style, submitting changes, and troubleshooting.
+- **Improved `run.sh --help`**: Organized sections (General, Actions, Info,
+  Examples) with inline quick reference for ledger, status, sentinel, and
+  dashboard commands.
+- **`run.sh --self-test` and `--version`**: New CLI passthrough flags.
+- **`./run.sh` banner**: Now displays v14.2.0 version and new features.
+
+### Fixed
+- **SSE broadcast crash**: Added missing `global _sse_clients` declaration in
+  `_broadcast_to_sse_clients()` to prevent `UnboundLocalError` on first call.
+
+### Changed
+- Bumped `launch-loop.py` from v14.1.0 to v14.2.0
+- Bumped `session-self-loop.py` from v2.11.0 to v2.12.0
+- Bumped `run-loop.sh` banner and header to v14.2.0
+- Updated README: v14.2.0 changelog table, Makefile & CONTRIBUTING.md in
+  header, scripts table, and filesystem tree
+
+---
+
 ## [14.1.0] — 2026-06-26
 
 ### Added

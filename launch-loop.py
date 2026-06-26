@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
-VERSION = "14.1.0"
+VERSION = "14.2.0"
 """
-launch-loop.py — Infinite loop daemon v14.1.0
+launch-loop.py — Infinite loop daemon v14.2.0
+
+v14.2.0 changes:
+  - Makefile — convenience targets (run, dry-run, self-test, lint, status,
+    stop, clean) for faster common operations
+  - CONTRIBUTING.md — onboarding guide for new contributors with setup,
+    workflow, code style, and troubleshooting
+  - Improved run.sh --help — organized sections with quick reference for
+    ledger, status, stop/pause/resume, and dashboard commands
+  - run.sh --self-test and --version support — new CLI passthrough flags
+  - SSE broadcast fix — added missing 'global _sse_clients' declaration in
+    _broadcast_to_sse_clients() to prevent UnboundLocalError crash
+  - Banner and version bumps across all entrypoints to v14.2.0
 
 v14.1.0 changes:
   - P0: Dashboard XSS Fix — Replaced innerHTML string interpolation with
@@ -2437,6 +2449,7 @@ def _broadcast_to_sse_clients(state: dict) -> None:
     Iterates the module-level _sse_clients list under lock and drops
     any queue whose put_nowait() raises queue.Full (dead client).
     """
+    global _sse_clients
     payload = _build_sse_payload(state)
     payload_json = json.dumps(payload, default=str)
     with _sse_clients_lock:
@@ -6861,16 +6874,58 @@ def main():
         result = _run_self_test()
         sys.exit(0 if result["failed"] == 0 else 1)
 
+    # Helpful early exit when --help or -h is passed
+    if "--help" in sys.argv or "-h" in sys.argv:
+        parser = _build_arg_parser()
+        parser.print_help()
+        sys.exit(0)
+
+    # Friendly error if --goal is missing (before argparse dry error)
+    standalone_flags = {"--version", "--self-test", "--dry-run", "--help", "-h"}
+    arg_set = set(sys.argv[1:])
+    has_goal = any(
+        i + 1 < len(sys.argv) and sys.argv[i] == "--goal" for i in range(len(sys.argv))
+    )
+    has_goals_file = any(
+        i + 1 < len(sys.argv) and sys.argv[i] == "--goals-file"
+        for i in range(len(sys.argv))
+    )
+    if not has_goal and not has_goals_file and not arg_set & standalone_flags:
+        parser = _build_arg_parser()
+        print(
+            "ERROR: --goal is required (or use --goals-file for batch mode)\n",
+            file=sys.stderr,
+        )
+        parser.print_usage()
+        print("\nSee 'python3 launch-loop.py --help' for full options", file=sys.stderr)
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(
         description=(
-            f"Infinite loop daemon v{VERSION} — spawns hermes chat -q -t terminal,file,delegation "
-            "(background daemon; spawned sessions have real tools + delegation, "
-            "stay alive for subagent results, multi-line JSON parser, configurable max-turns, "
-            "profile/model/context-file/schema support, HTTP callback, auto-ledger-shrink, "
-            "max-retries, on-error-cmd, tags, prompt-suffix, force-reset, pause/resume sentinel, "
-            "auto-toolsets, failure learning, task-specific prompts, "
-            "multi-goal workers, adaptive cooldown, convergence detection)"
+            f"Infinite Loop Daemon v{VERSION} — Autonomous Hermes Agent Looping Framework\n\n"
+            "Spawns Hermes sessions in a loop with real tools (terminal, file, delegation) + "
+            "multi-level delegate_task() trees. Each iteration spawns a `hermes chat -q` session "
+            "with configurable toolsets, max-turns, and context propagation.\n\n"
+            "Features at a glance:\n"
+            "  Iteration:  evolve, max-iterations, goals-file, convergence detection\n"
+            "  Parallel:   workers, session-timeout, max-retries, cooldown\n"
+            "  Notify:     desktop (Linux), Pushbullet, ntfy, HTTP callback, shell cmd\n"
+            "  Sessions:   use-library, pass-session-id, checkpoints, resume, skills\n"
+            "  Spawn:      profile, model, provider, yolo, safe-mode, worktree\n"
+            "  Debug:      preflight, self-test, dry-run, heartbeat, status-html\n"
+            "  Git:        auto-commit, store-git-diff, max-idle-iterations\n"
+            "  Web:        webhook REST API, SSE dashboard v3, HTTP callback\n\n"
+            "Common usage:\n"
+            '  python3 launch-loop.py --goal "Fix lint errors" --run\n'
+            '  python3 launch-loop.py --goal "Refactor auth" --git --git-commit --evolve --run\n'
+            "  python3 launch-loop.py --goals-file goals.txt --track-goals --workers 5 --run\n"
+            "  python3 launch-loop.py --self-test\n"
+            "  python3 launch-loop.py --dry-run\n\n"
+            "Stop:  echo 'stop' > /tmp/infinite-loop-stop\n"
+            "Pause: echo 'pause' > /tmp/infinite-loop-stop\n"
+            "Status: cat /tmp/infinite-loop-state.json | python3 -m json.tool"
         ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--goal", required=True, help="The core task for spawned sessions"
@@ -7429,22 +7484,14 @@ def main():
                 "[WARN] Some preflight checks failed. Continuing anyway (use --preflight-fail-fast to abort)."
             )
 
-    _log("=" * 60)
-    _log(
-        "  Infinite Loop - "
-        f"v{LAUNCH_LOOP_VERSION} (Function Decomposition Phase 2 & 3, Self-Test Mode, "
-        "Output Progress Classification, Idempotent Goal Execution, "
-        "Concurrent Library Mode, Auto Error Recovery, In-Process Archiving, "
-        "Multi-Profile Goals File, YOLO mode, clean-slate mode, "
-        "AIAgent library, session tracking, checkpoints, session chaining, "
-        "skills preloading, safe-mode, accept-hooks, worktree, continue, "
-        "Pushbullet & ntfy push, preflight, /api/status, REST control, "
-        "dashboard v2, dashboard v3 SSE, session self-healing heartbeat, "
-        "config file, desktop notifications, "
-        "startup delay, error classification, convergence detection, "
-        "adaptive cooldown, context propagation, self-modification awareness)"
-    )
-    _log("=" * 60)
+    _log("═══════════════════════════════════════════════════════════════════")
+    _log(f"  Infinite Loop Daemon v{LAUNCH_LOOP_VERSION}")
+    _log("═══════════════════════════════════════════════════════════════════")
+    _log("  Features: evolve | workers | cooldown | convergence | preflight")
+    _log("            git | goals-file | webhook | SSE dashboard | heartbeat")
+    _log("            desktop/Pushbullet/ntfy | library mode | yolo | safe-mode")
+    _log("            self-test | status-html | checkpoint | resume | archiving")
+    _log("═══════════════════════════════════════════════════════════════════")
 
     # Clean up stale heartbeat files from previous daemon instances
     if args.heartbeat_timeout > 0:

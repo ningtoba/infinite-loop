@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.13.0
+# Infinite Loop Daemon — v14.14.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -355,6 +355,7 @@ Default toolsets: `terminal,file,delegation,web,skills,browser,memory,session_se
 |------|---------|-------------|
 | `--startup-delay` | `0.0` | Wait N seconds before first iteration |
 | `--quiet` | `false` | Suppress verbose startup banner, iteration headers, and config dump. Shows only compact one-line status. Ideal for background runs. |
+| `--color` | `auto` | Colorize output: `auto` (TTY only, default), `always` (force), `never` (disable). Respects `NO_COLOR` env. |
 | `--preflight` | `false` | Run preflight health checks before loop |
 | `--preflight-fail-fast` | `false` | Stop on first preflight failure |
 | `--dry-run` | `false` | Print config and exit (no loop) |
@@ -432,6 +433,16 @@ echo '{"summary": "added feature X", "next_goal": "add feature Y"}' > /tmp/sessi
 echo '{"done": true}' > /tmp/session-loop-state.json
 kill $LOOP_PID
 ```
+
+---
+
+## v14.14.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `--color=[auto\|always\|never]` flag | UX | `color_utils.py`, `cli.py`, `loop.py` | New ANSI color support for CLI output. `auto` (default) colors on TTY, `always` forces colors, `never` disables. Respects `NO_COLOR`. Colorizes `--list-flags`, `--list-groups`, `--examples`, `--summary`, `--suggest` output. |
+| `hermes_loop/color_utils.py` module | New | `color_utils.py` | `Colorizer` class with terminal detection, named color helpers (ok/warn/fail/header/flag/value/dim), tag formatters, and `strip_ansi()`. Module-level singleton usable anywhere. |
+| Colorized iteration output | UX | `loop.py` | `[SUMMARY]` bold cyan on success, `[FAIL]` bold red on errors. `[DONE]` bold green/red. `[SUGGEST]` bold magenta. |
 
 ---
 

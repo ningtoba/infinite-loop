@@ -4,6 +4,36 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.14.0] — 2026-06-26
+
+### Added
+- **`--color=[auto|always|never]` flag**: Choose when ANSI color is applied to CLI output.
+  `auto` (default) enables colors when stdout is a TTY, `always` forces colors even when
+  piped, `never` disables all color. Also respects the `NO_COLOR` environment variable.
+- **Colorized `--list-flags` and `--list-groups` output**: Group titles are now bold magenta,
+  flag names are cyan, descriptions are dimmed — making the 87-flag reference visually scannable.
+  Flag column padded to 38 chars for readability.
+- **Colorized `--examples` output**: Section headers are bold cyan, command examples are yellow,
+  comments are dimmed. Inner helper functions (`_section`, `_cmd`, `_comment`) keep the code tidy.
+- **Colorized iteration output**: `[SUMMARY]` tag is bold cyan on success, `[FAIL]` is bold red
+  on errors. `[DONE]` tag is bold green for OK, bold red for errors. `[SUGGEST]` tag is bold magenta.
+  Error summaries use `[FAIL]` instead of `[SUMMARY]` for immediate visual recognition.
+- **New `hermes_loop/color_utils.py` module**: ANSI `Colorizer` class with terminal detection
+  (TTY + `NO_COLOR`), named color helpers, tag formatters, and `strip_ansi()` utility.
+  Exposes a module-level `colorizer` singleton callable from anywhere in the package.
+- **`--color` pre-argparse detection**: Color mode is detected before argparse parsing so that
+  pre-argparse flags (`--list-flags`, `--examples`, `--self-test`) also benefit from color.
+
+### Changed
+- `hermes_loop/cli.py` — `_list_flags()`, `_list_examples()`, `_create_parser()`, and `main()` 
+  all updated for ANSI color support. `_list_examples()` refactored with helper functions
+  (`_section`, `_cmd`, `_comment`) for cleaner code.
+- `hermes_loop/loop.py` — `[SUMMARY]`, `[DONE]`, and `[SUGGEST]` log lines now use
+  colored tags from `colorizer`.
+- `hermes_loop/config.py` — bumped LAUNCH_LOOP_VERSION from 14.13.0 to 14.14.0.
+
+---
+
 ## [14.13.0] — 2026-06-26
 
 ### Changed

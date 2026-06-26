@@ -32,6 +32,7 @@ from .worker_manager import HermesWorkerManager
 from .hermes_utils import detect_task_type
 from .git_utils import _capture_git_state, _git_auto_commit
 from .system_utils import get_system_usage, get_system_usage_diff
+from .color_utils import colorizer
 from .functions import (
     _load_goals_file,
     _log_startup_banner,
@@ -594,8 +595,11 @@ def run_loop(
 
         status_icon = "✓" if combined_error is None else "✗"
         classification = record.get("classification", "unknown")
+        done_tag = (
+            colorizer.tag_ok() if combined_error is None else colorizer.tag_fail()
+        )
         _log(
-            f"[DONE] {status_icon} Iteration {iteration_count}"
+            f"{done_tag} {status_icon} Iteration {iteration_count}"
             f" ({total_duration}s, {classification})"
             f": {combined_summary[:100]}"
         )
@@ -663,7 +667,10 @@ def run_loop(
                 summary_parts.append(f"ETA={eta_str}")
 
         summary_str = " | ".join(summary_parts)
-        _log(f"[SUMMARY] {status_icon_display}  {summary_str}")
+        if combined_error:
+            _log(f"{colorizer.tag_fail()} {summary_str}")
+        else:
+            _log(f"{colorizer.tag_summary()} {status_icon_display}  {summary_str}")
 
         # Show actionable suggestion for blocked/error iterations
         suggestion = _suggest_actionable_fix(
@@ -676,7 +683,7 @@ def run_loop(
         )
         if suggestion:
             for line in suggestion.split("\n"):
-                _log(f"[SUGGEST] {line}")
+                _log(f"{colorizer.tag_suggest()} {line}")
 
         _handle_notifications(
             notify_desktop=notify_desktop,

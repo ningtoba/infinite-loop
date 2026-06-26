@@ -33,6 +33,7 @@ from .self_test import _run_self_test
 from .heartbeat import _cleanup_stale_heartbeats
 from .notifications import _send_completion_notification
 from .functions import set_max_output_chars
+from .color_utils import colorizer, configure_color_mode
 
 
 def _list_flags(show_help=True):
@@ -73,171 +74,177 @@ def _list_flags(show_help=True):
     }
 
     total_flags = sum(len(v) for v in group_map.values()) + len(introspection_flags)
-    print(f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — CLI Flags Reference")
+    header = f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — CLI Flags Reference"
+    print()
+    print(f"  {colorizer.colorize(header, 'bold', 'white')}")
     print(
-        f"Total: {total_flags} flags in "
-        f"{len(group_map) + (1 if show_help else 0)} groups"
+        f"  {colorizer.dim(f'Total: {total_flags} flags in {len(group_map) + (1 if show_help else 0)} groups')}"
     )
     print()
     if show_help:
         for group_name, entries in group_map.items():
-            print(f"  [{group_name}]")
+            print(f"  {colorizer.group_title(f'[{group_name}]')}")
             for flag, desc in entries:
-                print(f"    {flag:35s}  {desc}")
+                print(f"    {colorizer.flag(flag):38s}  {colorizer.dim(desc)}")
             print()
         # Introspection section only in --list-flags mode
-        print(f"  [Introspection]")
+        print(f"  {colorizer.group_title('[Introspection]')}")
         for flag, desc in introspection_flags.items():
-            print(f"    {flag:35s}  {desc}")
+            print(f"    {colorizer.flag(flag):38s}  {colorizer.dim(desc)}")
         print()
     else:
         for group_name, entries in group_map.items():
-            print(f"  [{group_name}]  ({len(entries)} flags)")
-        print(f"  [Introspection]  ({len(introspection_flags)} flags)")
+            print(
+                f"  {colorizer.group_title(f'[{group_name}]')}  {colorizer.dim(f'({len(entries)} flags)')}"
+            )
+        print(
+            f"  {colorizer.group_title('[Introspection]')}  {colorizer.dim(f'({len(introspection_flags)} flags)')}"
+        )
 
 
 def _list_examples():
     """Print categorized real-world usage examples. Used by --examples flag."""
-    print(f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — Usage Examples")
-    print("=" * 60)
+    header = f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — Usage Examples"
+    print()
+    print(f"  {colorizer.colorize(header, 'bold', 'white')}")
+    print(f"  {colorizer.dim('=' * 58)}")
     print()
 
-    print("  ── Basic Single-Goal Loop ──────────────────────────────────────────")
+    def _section(title: str) -> None:
+        print(f"  {colorizer.header(title)}")
+        print()
+
+    def _cmd(text: str) -> None:
+        print(f"    {colorizer.value(text)}")
+
+    def _comment(text: str) -> None:
+        print(f"    {colorizer.dim(f'# {text}')}")
+
+    _section("Basic Single-Goal Loop")
+    _comment("Run with a single goal — simplest invocation")
+    _cmd('hermes_loop --goal "Fix all ESLint errors" --run')
     print()
-    print("    # Run with a single goal — simplest invocation")
-    print('    hermes_loop --goal "Fix all ESLint errors" --run')
+    _comment("One-shot preview (no loop started)")
+    _cmd('hermes_loop --goal "Fix tests" --dry-run')
     print()
-    print("    # One-shot preview (no loop started)")
-    print('    hermes_loop --goal "Fix tests" --dry-run')
-    print()
-    print("    # Run to completion (10 iterations then stop)")
-    print('    hermes_loop --goal "Refactor auth" --max-iterations 10 --run')
+    _comment("Run to completion (10 iterations then stop)")
+    _cmd('hermes_loop --goal "Refactor auth" --max-iterations 10 --run')
     print()
 
-    print("  ── Git-Integrated Evolution ────────────────────────────────────────")
-    print()
-    print("    # Auto-detect, fix, and commit — ideal for linting/formatting")
-    print(
-        '    hermes_loop --goal "Fix lint errors one at a time" --git --git-commit --evolve --run'
+    _section("Git-Integrated Evolution")
+    _comment("Auto-detect, fix, and commit — ideal for linting/formatting")
+    _cmd(
+        'hermes_loop --goal "Fix lint errors one at a time" --git --git-commit --evolve --run'
     )
     print()
-    print("    # Stop once all changes are made")
-    print(
-        '    hermes_loop --goal "Clean up warnings" --git --git-commit --convergence-stop --run'
+    _comment("Stop once all changes are made")
+    _cmd(
+        'hermes_loop --goal "Clean up warnings" --git --git-commit --convergence-stop --run'
     )
     print()
-    print("    # Store full git diffs in the ledger for review")
-    print(
-        '    hermes_loop --goal "Optimize imports" --git --git-commit --store-git-diff --run'
-    )
-    print()
-
-    print("  ── Batch / Goals-File Processing ───────────────────────────────────")
-    print()
-    print("    # Process a list of goals, one per line")
-    print("    hermes_loop --goals-file goals.txt --run")
-    print()
-    print("    # Batch with 5 parallel workers, stop when done")
-    print(
-        "    hermes_loop --goals-file todos.txt --workers 5 --stop-at-goals-end --run"
-    )
-    print()
-    print("    # Track goals so restarts skip already-finished ones")
-    print("    hermes_loop --goals-file chores.txt --track-goals --run")
-    print()
-
-    print("  ── Notifications & Monitoring ──────────────────────────────────────")
-    print()
-    print("    # Get desktop notifications after each iteration (Linux)")
-    print('    hermes_loop --goal "Fix bugs" --notify-desktop --run')
-    print()
-    print("    # Push to phone via ntfy.sh (self-hosted available)")
-    print('    hermes_loop --goal "Run tests" --notify-ntfy my-alerts --run')
-    print()
-    print("    # Email yourself on errors via shell command")
-    print(
-        '    hermes_loop --goal "Deploy" --on-error-cmd \'mail -s "Loop error" you@x.com\' --run'
-    )
-    print()
-    print("    # Real-time HTML dashboard + JSON status file")
-    print(
-        '    hermes_loop --goal "Refactor" --status-html /tmp/dash.html --status-file /tmp/status.json --run'
+    _comment("Store full git diffs in the ledger for review")
+    _cmd(
+        'hermes_loop --goal "Optimize imports" --git --git-commit --store-git-diff --run'
     )
     print()
 
-    print("  ── Monitoring & Control ────────────────────────────────────────────")
+    _section("Batch / Goals-File Processing")
+    _comment("Process a list of goals, one per line")
+    _cmd("hermes_loop --goals-file goals.txt --run")
     print()
-    print("    # Follow iteration progress in real-time")
-    print("    tail -f /tmp/infinite-loop.log")
+    _comment("Batch with 5 parallel workers, stop when done")
+    _cmd("hermes_loop --goals-file todos.txt --workers 5 --stop-at-goals-end --run")
     print()
-    print("    # Check the full iteration ledger")
-    print("    bash scripts/inspect-ledger.sh")
-    print("    bash scripts/inspect-ledger.sh --summary   # compact one-liner")
-    print("    bash scripts/inspect-ledger.sh --errors    # errors only")
-    print("    cat /tmp/infinite-loop-state.json | python3 -m json.tool")
-    print()
-    print("    # Control a running daemon")
-    print("    echo 'stop'    > /tmp/infinite-loop-stop")
-    print("    echo 'pause'   > /tmp/infinite-loop-stop")
-    print("    echo 'resume'  > /tmp/infinite-loop-stop")
+    _comment("Track goals so restarts skip already-finished ones")
+    _cmd("hermes_loop --goals-file chores.txt --track-goals --run")
     print()
 
-    print("  ── Advanced Patterns ───────────────────────────────────────────────")
+    _section("Notifications & Monitoring")
+    _comment("Get desktop notifications after each iteration (Linux)")
+    _cmd('hermes_loop --goal "Fix bugs" --notify-desktop --run')
     print()
-    print("    # Library mode (in-process AIAgent, no subprocess)")
-    print('    hermes_loop --goal "Analyze logs" --use-library --run')
+    _comment("Push to phone via ntfy.sh (self-hosted available)")
+    _cmd('hermes_loop --goal "Run tests" --notify-ntfy my-alerts --run')
     print()
-    print("    # Multi-worker parallel analysis")
-    print('    hermes_loop --goal "Review all modules" --workers 4 --git --run')
-    print()
-    print("    # File watcher — auto-trigger when files change")
-    print('    hermes_loop --goal "Run on change" --watch-dir src/ --run')
-    print()
-    print("    # Webhook-triggered iteration server")
-    print('    hermes_loop --goal "Trigger me" --webhook-port 9090 --run')
-    print("    # Then POST /webhook to trigger an iteration")
-    print()
-    print("    # Resume a chained session (handoff between iterations)")
-    print(
-        '    hermes_loop --goal "Multi-step refactor" --pass-session-id --resume --run'
+    _comment("Email yourself on errors via shell command")
+    _cmd(
+        'hermes_loop --goal "Deploy" --on-error-cmd \'mail -s "Loop error" you@x.com\' --run'
     )
     print()
-    print("    # Full autonomy: bypass approvals, skip rules, no config")
-    print(
-        '    hermes_loop --goal "Do everything" --yolo --ignore-rules --ignore-user-config --run'
+    _comment("Real-time HTML dashboard + JSON status file")
+    _cmd(
+        'hermes_loop --goal "Refactor" --status-html /tmp/dash.html --status-file /tmp/status.json --run'
     )
-    print()
-    print("    # Troubleshooting: safe mode disables all customizations")
-    print('    hermes_loop --goal "Debug setup" --safe-mode --run')
     print()
 
-    print("  ── Help & Diagnostics ──────────────────────────────────────────────")
+    _section("Monitoring & Control")
+    _comment("Follow iteration progress in real-time")
+    _cmd("tail -f /tmp/infinite-loop.log")
     print()
-    print("    # Quick overview of all flags by category")
-    print("    hermes_loop --list-flags")
+    _comment("Check the full iteration ledger")
+    _cmd("bash scripts/inspect-ledger.sh")
+    _cmd("bash scripts/inspect-ledger.sh --summary   # compact one-liner")
+    _cmd("bash scripts/inspect-ledger.sh --errors    # errors only")
+    _cmd("cat /tmp/infinite-loop-state.json | python3 -m json.tool")
     print()
-    print("    # Compact group overview")
-    print("    hermes_loop --list-groups")
+    _comment("Control a running daemon")
+    _cmd("echo 'stop'    > /tmp/infinite-loop-stop")
+    _cmd("echo 'pause'   > /tmp/infinite-loop-stop")
+    _cmd("echo 'resume'  > /tmp/infinite-loop-stop")
     print()
-    print("    # Full detailed flag reference")
-    print("    hermes_loop --help")
+
+    _section("Advanced Patterns")
+    _comment("Library mode (in-process AIAgent, no subprocess)")
+    _cmd('hermes_loop --goal "Analyze logs" --use-library --run')
     print()
-    print("    # Run self-tests (9 groups, 45 cases)")
-    print("    hermes_loop --self-test")
+    _comment("Multi-worker parallel analysis")
+    _cmd('hermes_loop --goal "Review all modules" --workers 4 --git --run')
     print()
-    print("    # Health check before running")
-    print("    hermes_loop --preflight")
+    _comment("File watcher — auto-trigger when files change")
+    _cmd('hermes_loop --goal "Run on change" --watch-dir src/ --run')
     print()
-    print("    # Save current config for reuse")
-    print('    hermes_loop --goal "Config snapshot" --save-config my-loop.json')
-    print('    hermes_loop --goal "Load config" --config my-loop.json --run')
+    _comment("Webhook-triggered iteration server")
+    _cmd('hermes_loop --goal "Trigger me" --webhook-port 9090 --run')
+    _comment("Then POST /webhook to trigger an iteration")
     print()
-    print("    # Shell tab-completion (one-time setup)")
-    print("    make completion")
+    _comment("Resume a chained session (handoff between iterations)")
+    _cmd('hermes_loop --goal "Multi-step refactor" --pass-session-id --resume --run')
     print()
-    print("    # Quick one-command entrypoint (reads .env)")
-    print("    bash run.sh")
-    print('    bash run.sh --goal "Override" --git --quiet')
+    _comment("Full autonomy: bypass approvals, skip rules, no config")
+    _cmd(
+        'hermes_loop --goal "Do everything" --yolo --ignore-rules --ignore-user-config --run'
+    )
+    print()
+    _comment("Troubleshooting: safe mode disables all customizations")
+    _cmd('hermes_loop --goal "Debug setup" --safe-mode --run')
+    print()
+
+    _section("Help & Diagnostics")
+    _comment("Quick overview of all flags by category")
+    _cmd("hermes_loop --list-flags")
+    print()
+    _comment("Compact group overview")
+    _cmd("hermes_loop --list-groups")
+    print()
+    _comment("Full detailed flag reference")
+    _cmd("hermes_loop --help")
+    print()
+    _comment("Run self-tests (9 groups, 45 cases)")
+    _cmd("hermes_loop --self-test")
+    print()
+    _comment("Health check before running")
+    _cmd("hermes_loop --preflight")
+    print()
+    _comment("Save current config for reuse")
+    _cmd('hermes_loop --goal "Config snapshot" --save-config my-loop.json')
+    _cmd('hermes_loop --goal "Load config" --config my-loop.json --run')
+    print()
+    _comment("Shell tab-completion (one-time setup)")
+    _cmd("make completion")
+    print()
+    _comment("Quick one-command entrypoint (reads .env)")
+    _cmd("bash run.sh")
+    _cmd('bash run.sh --goal "Override" --git --quiet')
     print()
 
 
@@ -873,11 +880,31 @@ def _create_parser(for_introspection=False):
         default="",
         help="Load configuration from a JSON file. Overrides default values, command-line flags take precedence.",
     )
+    group.add_argument(
+        "--color",
+        default="auto",
+        choices=["auto", "always", "never"],
+        help="Colorize CLI output: 'auto' (default, uses ANSI when stdout is a TTY), "
+        "'always' (force colors even when piped), "
+        "'never' (disable all color). "
+        "Also respects the NO_COLOR environment variable.",
+    )
 
     return parser
 
 
 def main():
+    # Check --color before argparse so pre-argparse flags respect it too
+    color_mode = "auto"
+    for i, arg in enumerate(sys.argv[1:]):
+        if arg == "--color" and i + 2 < len(sys.argv):
+            color_mode = sys.argv[i + 2]
+            break
+        if arg.startswith("--color="):
+            color_mode = arg.split("=", 1)[1]
+            break
+    configure_color_mode(color_mode)
+
     # Check --version before argparse to avoid required-arg conflicts
     if "--version" in sys.argv:
         print(f"infinite-loop daemon v{LAUNCH_LOOP_VERSION}")

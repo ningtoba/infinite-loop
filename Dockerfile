@@ -35,11 +35,12 @@ RUN chown -R hermes:hermes /app
 
 USER hermes
 
-EXPOSE 8080
-
+ENV WEB_PORT=8090
 ENV PYTHONUNBUFFERED=1
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -fs http://localhost:8080/api/health || exit 1
+EXPOSE ${WEB_PORT}
 
-ENTRYPOINT ["python", "-m", "web_app", "--host", "0.0.0.0", "--port", "8080"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -fs http://localhost:${WEB_PORT}/api/health || exit 1
+
+ENTRYPOINT ["sh", "-c", "exec python -m web_app --host 0.0.0.0 --port ${WEB_PORT:-8090}"]

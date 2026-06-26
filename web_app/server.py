@@ -301,12 +301,15 @@ def main():
 
     import argparse
 
+    default_port = int(os.environ.get("WEB_PORT", "8090"))
+
     parser = argparse.ArgumentParser(description="Hermes Loop Web UI Server")
     parser.add_argument(
         "--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)"
     )
     parser.add_argument(
-        "--port", type=int, default=8080, help="Port to bind to (default: 8080)"
+        "--port", type=int, default=default_port,
+        help=f"Port to bind to (default: {default_port})"
     )
     parser.add_argument(
         "--env",

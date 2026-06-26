@@ -1,11 +1,12 @@
-version: "3.9"
-
 services:
   hermes-loop:
     build: .
     container_name: hermes-loop
-    ports:
-      - "8080:8080"
+    # Use host networking to avoid bridge pool exhaustion.
+    # The web UI will be accessible at http://localhost:8080 directly.
+    network_mode: host
+    environment:
+      - WEB_PORT=8090
     volumes:
       # Mount the host's hermes binary — no need to bundle another instance
       - /usr/local/bin/hermes:/usr/local/bin/hermes:ro

@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.12.0
+# Infinite Loop Daemon — v14.13.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -432,6 +432,14 @@ echo '{"summary": "added feature X", "next_goal": "add feature Y"}' > /tmp/sessi
 echo '{"done": true}' > /tmp/session-loop-state.json
 kill $LOOP_PID
 ```
+
+---
+
+## v14.13.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Auto-generated `--list-flags` from argparse | Refactor | `cli.py`, `config.py` | Replaced 134-line hardcoded flag dict with live introspection of argparse parser. `--list-flags` and `--list-groups` now read directly from `add_argument()` calls — zero drift. Extracted `_create_parser()` for shared use. New `[Introspection]` section for pre-argparse flags. |
 
 ---
 

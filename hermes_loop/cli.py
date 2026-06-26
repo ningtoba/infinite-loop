@@ -36,154 +36,64 @@ from .functions import set_max_output_chars
 
 
 def _list_flags(show_help=True):
-    """Print all CLI flags organized by group. Used by --list-flags / --list-groups."""
-    flags_by_group = {
-        "Core Task": {
-            "--goal": "The core task for spawned sessions",
-            "--context": "Initial context (paths, constraints, language)",
-            "--context-file": "Read context from a file (alternative to --context)",
-            "--workdir": "Working directory",
-            "--prompt-suffix": "Extra text appended to every spawned prompt",
-            "--task-type": "Force a specific task type (auto-detect by default)",
-        },
-        "Toolsets": {
-            "--toolsets": "Comma-separated toolsets for spawned Hermes sessions",
-            "--no-auto-toolsets": "Disable automatic toolset enrichment",
-            "--no-failure-learning": "Disable injection of past failure context",
-        },
-        "Iteration Control": {
-            "--max-iterations": "Auto-stop after N iterations (0=infinite)",
-            "--max-turns": "Max turns per spawned Hermes session (default: 500)",
-            "--compact-every": "Compact context every N iters",
-            "--evolve": "Let iterations propose the next goal (self-directing)",
-            "--run": "Start the actual loop",
-        },
-        "Parallelism": {
-            "--workers": "Run N concurrent Hermes sessions per iteration",
-        },
-        "Timeouts & Retries": {
-            "--session-timeout": "Max seconds per Hermes session (default: 7200)",
-            "--retry-delay": "Backoff delay on error",
-            "--max-retries": "Retry a failed iteration up to N times",
-            "--heartbeat-timeout": "Enable heartbeat-based session health monitoring",
-        },
-        "Git Integration": {
-            "--git": "Capture git diff stats per iteration",
-            "--git-commit": "Auto-commit changes per iteration (implies --git)",
-            "--store-git-diff": "Store the actual git diff (capped at 10KB) in the ledger",
-            "--max-idle-iterations": "Stop after N consecutive iterations with no git changes",
-        },
-        "Goals File (Batch)": {
-            "--goals-file": "Path to file with one goal per line",
-            "--stop-at-goals-end": "Stop when all goals are exhausted",
-            "--track-goals": "Track completed goals so restarts skip finished ones",
-            "--reset-goals": "Clear goals_completed tracking for a fresh run",
-        },
-        "Rate Limiting": {
-            "--cooldown": "Wait N seconds between iterations",
-            "--cooldown-mode": "Cooldown mode: 'fixed' or 'adaptive'",
-        },
-        "Convergence Detection": {
-            "--convergence-stop": "Auto-stop when iterations produce similar summaries",
-            "--convergence-threshold": "Similarity threshold (0.0-1.0, default: 0.9)",
-            "--convergence-window": "Number of recent iterations to compare (default: 5)",
-        },
-        "Structured Output": {
-            "--output-schema": "Inline JSON Schema as JSON string",
-            "--output-schema-file": "Path to a JSON Schema file",
-            "--max-output-chars": "Max chars of spawned output to store (0=unlimited)",
-        },
-        "Shutdown": {
-            "--shutdown-sentinel": "Sentinel file path",
-        },
-        "Profile / Model": {
-            "--profile": "Hermes profile for spawned sessions (e.g. 'work')",
-            "--model": "Model override for spawned sessions",
-            "--provider": "Provider override for spawned sessions",
-            "--spawn-source": "Source tag for spawned sessions",
-        },
-        "Webhook / HTTP": {
-            "--webhook-port": "Port for HTTP webhook server (0=disabled)",
-            "--http-callback": "HTTP POST URL for iteration JSON",
-        },
-        "Notifications": {
-            "--notify-cmd": "Shell command to run after each iteration",
-            "--on-error-cmd": "Shell command when an iteration fails",
-            "--notify-desktop": "Send desktop notifications via notify-send (Linux)",
-            "--notify-on-completion": "Send a summary notification when the daemon finishes",
-            "--notify-pushbullet": "Pushbullet API access token for mobile notifications",
-            "--notify-ntfy": "ntfy topic name for push notifications",
-            "--notify-ntfy-server": "ntfy server URL (default: https://ntfy.sh)",
-        },
-        "Logging": {
-            "--log-file": "Path to daemon log file",
-            "--log-max-mb": "Max log file size in MB before rotation",
-        },
-        "Status & Dashboard": {
-            "--status-html": "Path to self-contained HTML status dashboard",
-            "--status-file": "Path to write one-line JSON status file",
-        },
-        "Ledger Management": {
-            "--keep-iterations": "Auto-shrink ledger to keep last N iterations",
-            "--force-reset": "Clear existing ledger and start fresh",
-            "--tag": "Label/identifier for the run",
-        },
-        "Archiving": {
-            "--archive-dir": "Directory to store archived iteration files",
-            "--archive-retention": "Days to keep archived iterations",
-            "--archive-max-size": "Max total size of archive directory in MB",
-        },
-        "File Watcher": {
-            "--watch-dir": "Watch a directory/file for changes to trigger iterations",
-            "--watch-poll": "File watcher poll interval in seconds",
-        },
-        "Hermes Worker": {
-            "--worker-url": "Hermes worker URL ('auto', 'http://...', or '' for direct)",
-        },
-        "Spawned Session Flags": {
-            "--use-library": "Use AIAgent.run_conversation() in-process",
-            "--pass-session-id": "Pass session ID to spawned sessions",
-            "--checkpoints": "Enable file checkpoints in spawned sessions",
-            "--resume": "Chain spawned sessions across iterations",
-            "--skills": "Skills to preload in spawned Hermes sessions",
-            "--ignore-rules": "Clean-slate mode (no AGENTS.md, memory, or rules)",
-            "--ignore-user-config": "Skip ~/.hermes/config.yaml in spawned sessions",
-            "--yolo": "Bypass all dangerous command approval prompts",
-            "--safe-mode": "Troubleshooting mode (disable ALL customizations)",
-            "--accept-hooks": "Auto-approve shell hooks in spawned sessions",
-            "--worktree": "Run in an isolated git worktree",
-            "--continue": "Resume the most recent session",
-        },
-        "Startup & Debug": {
-            "--quiet": "Suppress verbose startup banner and iteration headers",
-            "--startup-delay": "Wait N seconds before the first iteration",
-            "--preflight": "Run preflight health checks and exit",
-            "--preflight-fail-fast": "Exit immediately on first preflight failure",
-            "--dry-run": "Print what would happen without spawning sessions",
-            "--self-test": "Run self-test suite and exit",
-            "--save-config": "Save current configuration to a JSON file and exit",
-            "--config": "Load configuration from a JSON file",
-            "--list-flags": "Print this organized flag listing with help text",
-            "--list-groups": "Print group names only (compact overview)",
-            "--examples": "Print categorized real-world usage examples",
-            "--version": "Print daemon version and exit",
-            "--help": "Show the full detailed help with all 80+ flags and examples",
-        },
+    """Print all CLI flags organized by group. Used by --list-flags / --list-groups.
+
+    Introspects the argparse parser's action groups to build the output,
+    eliminating the need for a separate hardcoded flag dictionary that
+    would drift from the actual argparse definitions.
+    """
+    parser = _create_parser(for_introspection=True)
+    group_map = {}  # group_title -> [(flag_str, help_text)]
+    for group in parser._action_groups:
+        title = group.title
+        if title in ("positional arguments", "optional arguments", "options"):
+            continue  # skip argparse defaults
+        entries = []
+        for action in group._group_actions:
+            if action.option_strings:
+                flag = action.option_strings[0]
+                help_text = action.help or ""
+                # Truncate help to first sentence/line for compact display
+                help_short = help_text.split(".")[0].strip()
+                if help_short:
+                    help_short = help_short[:80]  # cap at 80 chars
+                else:
+                    help_short = help_text[:80] if help_text else ""
+                entries.append((flag, help_short))
+        if entries:
+            group_map[title] = entries
+
+    # Pre-argparse introspection flags that argparse itself defines
+    introspection_flags = {
+        "--help": "Show the full detailed help with all 80+ flags and examples",
+        "--list-flags": "Print all flags organized by group with help text (this view)",
+        "--list-groups": "Print compact group names with flag counts",
+        "--examples": "Print categorized real-world usage examples",
+        "--version": "Print daemon version and exit",
     }
+
+    total_flags = sum(len(v) for v in group_map.values()) + len(introspection_flags)
     print(f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — CLI Flags Reference")
     print(
-        f"Total: {sum(len(v) for v in flags_by_group.values())} flags in {len(flags_by_group)} groups"
+        f"Total: {total_flags} flags in "
+        f"{len(group_map) + (1 if show_help else 0)} groups"
     )
     print()
-    for group_name, flags in flags_by_group.items():
-        if show_help:
+    if show_help:
+        for group_name, entries in group_map.items():
             print(f"  [{group_name}]")
-            for flag, desc in flags.items():
+            for flag, desc in entries:
                 print(f"    {flag:35s}  {desc}")
             print()
-        else:
-            # --list-groups: just group names with flag counts
-            print(f"  [{group_name}]  ({len(flags)} flags)")
+        # Introspection section only in --list-flags mode
+        print(f"  [Introspection]")
+        for flag, desc in introspection_flags.items():
+            print(f"    {flag:35s}  {desc}")
+        print()
+    else:
+        for group_name, entries in group_map.items():
+            print(f"  [{group_name}]  ({len(entries)} flags)")
+        print(f"  [Introspection]  ({len(introspection_flags)} flags)")
 
 
 def _list_examples():
@@ -331,66 +241,13 @@ def _list_examples():
     print()
 
 
-def main():
-    # Check --version before argparse to avoid required-arg conflicts
-    if "--version" in sys.argv:
-        print(f"infinite-loop daemon v{LAUNCH_LOOP_VERSION}")
-        sys.exit(0)
+def _create_parser(for_introspection=False):
+    """Build and return the argparse parser with all argument groups.
 
-    # Check --self-test before argparse to avoid required --goal conflict
-    if "--self-test" in sys.argv:
-        result = _run_self_test()
-        sys.exit(0 if result["failed"] == 0 else 1)
-
-    # Check --list-flags / --list-groups before argparse to avoid required --goal conflict
-    if "--list-flags" in sys.argv or "--list-groups" in sys.argv:
-        _list_flags(show_help=("--list-flags" in sys.argv))
-        sys.exit(0)
-
-    # Check --examples before argparse to avoid required --goal conflict
-    if "--examples" in sys.argv:
-        _list_examples()
-        sys.exit(0)
-
-    # Friendly error if --goal is missing (before argparse dry error)
-    standalone_flags = {
-        "--version",
-        "--self-test",
-        "--dry-run",
-        "--help",
-        "-h",
-        "--list-flags",
-        "--list-groups",
-        "--examples",
-    }
-    arg_set = set(sys.argv[1:])
-    has_goal = any(
-        i + 1 < len(sys.argv) and sys.argv[i] == "--goal" for i in range(len(sys.argv))
-    )
-    has_goals_file = any(
-        i + 1 < len(sys.argv) and sys.argv[i] == "--goals-file"
-        for i in range(len(sys.argv))
-    )
-    if not has_goal and not has_goals_file and not arg_set & standalone_flags:
-        parser = argparse.ArgumentParser(
-            description=f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION}",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
-        print(
-            "ERROR: --goal is required (or use --goals-file for batch mode)\n",
-            file=sys.stderr,
-        )
-        parser.print_usage()
-        print(
-            "\nSee 'python3 -m hermes_loop --help' for full options",
-            file=sys.stderr,
-        )
-        print(
-            "See 'python3 -m hermes_loop --examples' for usage patterns",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
+    Args:
+        for_introspection: If True, --goal is made non-required so the parser
+            can be constructed without a --goal argument (useful for --list-flags).
+    """
     parser = argparse.ArgumentParser(
         description=(
             f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — Autonomous Hermes Agent Looping Framework\n\n"
@@ -425,7 +282,9 @@ def main():
         "Core Task", "The primary task definition for the loop"
     )
     group.add_argument(
-        "--goal", required=True, help="The core task for spawned sessions"
+        "--goal",
+        required=not for_introspection,
+        help="The core task for spawned sessions",
     )
     group.add_argument(
         "--context", default="", help="Initial context (paths, constraints, language)"
@@ -444,7 +303,8 @@ def main():
     group.add_argument(
         "--task-type",
         default="auto",
-        help="Force a specific task type (research|code-fix|code-build|system-admin|data-processing|content|general). "
+        help="Force a specific task type (research|code-fix|code-build|system-admin|"
+        "data-processing|content|general). "
         "Default: auto-detect from --goal.",
     )
 
@@ -780,22 +640,25 @@ def main():
         "--log-max-mb",
         type=int,
         default=10,
-        help="Max log file size in MB before rotation (default: 10, only used with --log-file)",
+        help="Max log file size in MB before rotation (default: 10). Only used with --log-file.",
     )
 
-    # ── 16. Status & Dashboard ──────────────────────────────────────────────
+    # ── 16. Status / Dashboard ──────────────────────────────────────────────
     group = parser.add_argument_group(
-        "Status & Dashboard", "Real-time status file and self-contained HTML dashboard"
+        "Status & Dashboard",
+        "JSON status file and self-contained HTML dashboard for monitoring",
     )
     group.add_argument(
         "--status-html",
         default="",
-        help="Path to self-contained HTML status dashboard (e.g. /tmp/loop-status.html). Updated after each iteration.",
+        help="Path to self-contained HTML status dashboard (e.g. /tmp/loop-status.html). "
+        "Updated after each iteration. Auto-refreshes every 30s in the browser.",
     )
     group.add_argument(
         "--status-file",
-        default=STATUS_FILE_DEFAULT,
-        help="Path to write one-line JSON status file for external monitoring",
+        default="",
+        help="Path to write one-line JSON status file for external monitoring "
+        "(e.g. /tmp/loop-status.json). Updated after each iteration.",
     )
 
     # ── 17. Ledger Management ───────────────────────────────────────────────
@@ -1011,6 +874,70 @@ def main():
         help="Load configuration from a JSON file. Overrides default values, command-line flags take precedence.",
     )
 
+    return parser
+
+
+def main():
+    # Check --version before argparse to avoid required-arg conflicts
+    if "--version" in sys.argv:
+        print(f"infinite-loop daemon v{LAUNCH_LOOP_VERSION}")
+        sys.exit(0)
+
+    # Check --self-test before argparse to avoid required --goal conflict
+    if "--self-test" in sys.argv:
+        result = _run_self_test()
+        sys.exit(0 if result["failed"] == 0 else 1)
+
+    # Check --list-flags / --list-groups before argparse to avoid required --goal conflict
+    if "--list-flags" in sys.argv or "--list-groups" in sys.argv:
+        _list_flags(show_help=("--list-flags" in sys.argv))
+        sys.exit(0)
+
+    # Check --examples before argparse to avoid required --goal conflict
+    if "--examples" in sys.argv:
+        _list_examples()
+        sys.exit(0)
+
+    # Friendly error if --goal is missing (before argparse dry error)
+    standalone_flags = {
+        "--version",
+        "--self-test",
+        "--dry-run",
+        "--help",
+        "-h",
+        "--list-flags",
+        "--list-groups",
+        "--examples",
+    }
+    arg_set = set(sys.argv[1:])
+    has_goal = any(
+        i + 1 < len(sys.argv) and sys.argv[i] == "--goal" for i in range(len(sys.argv))
+    )
+    has_goals_file = any(
+        i + 1 < len(sys.argv) and sys.argv[i] == "--goals-file"
+        for i in range(len(sys.argv))
+    )
+    if not has_goal and not has_goals_file and not arg_set & standalone_flags:
+        parser = argparse.ArgumentParser(
+            description=f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION}",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+        print(
+            "ERROR: --goal is required (or use --goals-file for batch mode)\n",
+            file=sys.stderr,
+        )
+        parser.print_usage()
+        print(
+            "\nSee 'python3 -m hermes_loop --help' for full options",
+            file=sys.stderr,
+        )
+        print(
+            "See 'python3 -m hermes_loop --examples' for usage patterns",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    parser = _create_parser()
     args = parser.parse_args()
     toolsets_list = [t.strip() for t in args.toolsets.split(",") if t.strip()]
 

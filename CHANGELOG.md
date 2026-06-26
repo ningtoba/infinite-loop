@@ -4,6 +4,19 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.13.0] — 2026-06-26
+
+### Changed
+- **`--list-flags` and `--list-groups` now auto-generate from argparse**: Replaced the 134-line hardcoded dictionary of flag help text with live introspection of the argparse parser via `_create_parser()` and `parser._action_groups`. Every flag's help text now comes directly from `add_argument(help=...)` — no more drift between `--help` and `--list-flags`. New flags added to argparse appear in `--list-flags` automatically.
+- **Extracted `_create_parser()` from `main()`**: The full argument parser setup is now a standalone function callable from both `main()` and `_list_flags()`. It accepts `for_introspection=True` to make `--goal` non-required (needed for pre-argparse flag listing).
+- **New `[Introspection]` section in `--list-flags`**: Pre-argparse flags (`--help`, `--list-flags`, `--list-groups`, `--examples`, `--version`) now appear in a dedicated group at the end of the output, separate from the 22 argparse groups.
+- **Auto-generated flag count**: The "87 flags in 23 groups" summary is now computed from the actual parser, ensuring it stays accurate as flags change.
+
+### Removed
+- **Hardcoded `flags_by_group` dictionary**: The 134-line hardcoded dict in `_list_flags()` is gone. No more manual maintenance of a separate flag catalog.
+
+---
+
 ## [14.12.0] — 2026-06-26
 
 ### Added

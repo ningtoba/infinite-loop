@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.25.0
+# Infinite Loop Daemon — v14.26.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -75,8 +75,10 @@ make run                                        # Run with .env config
 make run ARGS="--goal 'fix lint errors' --git"  # Run with extra flags
 make self-test                                  # Run self-tests (count auto-detected at runtime)
 make examples                                   # Print categorized usage examples
-make list-flags                                 # Print all 90 flags organized by group
+make list-flags                                 # Print all flags organized by group
 make list-groups                                # Print group names with flag counts
+make explain FLAG=workers                       # Help on a specific flag
+make help-topic TOPIC=notifications             # Flags in a group
 make check                                      # Full pre-commit gate (lint + test + check-env + completions)
 make pre-commit                                 # Quick pre-commit gate (lint + self-test, no .env needed)
 
@@ -468,7 +470,17 @@ kill $LOOP_PID
 
 ---
 
+## v14.26.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `--help-topic` flag | UX | `cli.py`, `Makefile` | Show all flags in a single argument group (notifications, git, toolsets, etc.). Accepts group names (case-insensitive, prefix match). Pre-argparse, no `--goal` required. |
+| `make help-topic` | DX | `Makefile` | New convenience target: `make help-topic TOPIC=notifications`. |
+
+---
+
 ## v14.23.0 Changelog
+
 
 | Feature | Type | Files | Description |
 |---------|------|-------|-------------|

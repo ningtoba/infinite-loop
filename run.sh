@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.25.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.26.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -205,19 +205,18 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo '╔══════════════════════════════════════════════╗'
-  echo '║  Infinite Loop Daemon v14.25.0               ║'
+  echo '║  Infinite Loop Daemon v14.26.0               ║'
   echo '║  run.sh — one command to start               ║'
   echo '║                                                ║'
-  echo '║  What's new ⚡                                ║'
-  echo '║  • --init wizard: 2x more config options      ║'
-  echo '║  • Now asks about model, convergence, logs    ║'
-  echo '║  • Heartbeat, toolsets, and more              ║'
+  echo '║  What is new ⚡                              ║'
+  echo '║  • --help-topic: group-filtered flag help     ║'
+  echo '║  • --doctor: comprehensive self-diagnosis    ║'
+  echo '║  • --init wizard: 13 config steps            ║'
   echo '║                                                ║'
   echo '║  Also available:                              ║'
   echo '║  • --status: compact ledger overview          ║'
   echo '║  • Shutdown summary with next-steps           ║'
-  echo '║  • Auto-colorized _log() tags (24+ patterns)  ║'
-  echo '║  • Colorized startup banner & feature list    ║'
+  echo '║  • Colorized log tags and startup banner     ║'
   echo '║  • [SUMMARY] with ETA/progress bar             ║'
   echo '║  • Shows git changes, CPU/mem per iteration   ║'
   echo '║  • Worker breakdown for multi-worker runs     ║'

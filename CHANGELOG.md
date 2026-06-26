@@ -4,6 +4,38 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.26.0] — 2026-06-26
+
+### Added
+- **`--help-topic <group>` flag**: New `hermes_loop --help-topic notifications`
+  command that shows all flags and descriptions for a single argument group.
+  Accepts group names (case-insensitive, prefix match) — e.g., 'notifications',
+  'git', 'toolsets', 'introspection'. Shows available groups if no match is
+  found, or lists ambiguous matches. Pre-argparse — no `--goal` required.
+  Examples:
+  ```
+  hermes_loop --help-topic notifications    # all notification flags
+  hermes_loop --help-topic git              # git integration flags
+  hermes_loop --help-topic introspection    # pre-argparse flags
+  make help-topic TOPIC=toolsets            # via Makefile
+  ```
+- **`make help-topic` target**: New Makefile convenience target (pass `TOPIC=`).
+  Listed in `make help` under "Run" and in the examples section.
+
+### Changed
+- `hermes_loop/cli.py` — New `_help_topic()` function (~140 lines) that
+  introspects the argparse parser to display flags for a single group with
+  type annotations, default values, aliases, full word-wrapped descriptions,
+  and a "related groups" footer. Added `--help-topic` to: Startup & Debug
+  argparse group, introspection_flags dict, standalone_flags set, pre-argparse
+  handler (after `--explain`), and both the "Help & Diagnostics" and "Flag
+  Reference" sections of `--examples` output.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.25.0 to 14.26.0.
+- `Makefile` — Added `help-topic` target, added entry to help section and
+  examples section. Removed stale "90 flags" hardcoded count in `make help`.
+
+---
+
 ## [14.25.0] — 2026-06-26
 
 ### Added

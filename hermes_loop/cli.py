@@ -82,6 +82,7 @@ def _list_flags(show_help=True):
         "--completion-script": "Generate shell completion script for bash or zsh from live argparse",
         "--status": "Read the ledger and display a compact status summary (no --goal required)",
         "--explain": "Show detailed help for a specific CLI flag (no --goal required)",
+        "--help-topic": "Show all flags in a single argument group (no --goal required)",
         "--init": "Interactive setup wizard — walks you through configuration step by step",
         "--wizard": "Alias for --init (interactive setup wizard)",
     }
@@ -247,6 +248,10 @@ def _list_examples():
     _cmd("hermes_loop --explain cooldown")
     _cmd('hermes_loop --explain "max-iterations"')
     print()
+    _comment("Help on a specific argument group (notifications, git, toolsets, etc.)")
+    _cmd("hermes_loop --help-topic notifications")
+    _cmd("hermes_loop --help-topic introspection")
+    print()
     _comment("Run self-tests (auto-detected at runtime)")
     _cmd("hermes_loop --self-test")
     print()
@@ -278,6 +283,10 @@ def _list_examples():
     _cmd("hermes_loop --explain converge")
     _cmd("hermes_loop --explain workers")
     _cmd("hermes_loop --explain use-library")
+    _comment("Help for a specific argument group")
+    _cmd("hermes_loop --help-topic notifications")
+    _cmd("hermes_loop --help-topic git")
+    _cmd("hermes_loop --help-topic introspection")
     _comment("List all flags")
     _cmd("hermes_loop --list-flags")
     _cmd("hermes_loop --list-groups")
@@ -440,6 +449,187 @@ def _explain_flag(flag_name: str) -> None:
         print(
             f"    {c.flag(flag_str)} {c.value('VALUE')}  {c.dim('# e.g.')} {c.flag(flag_str)} {c.value('my-value')}"
         )
+    print()
+
+
+def _help_topic(topic: str) -> None:
+    """Print flags for a single argument group. Used by --help-topic flag.
+
+    Searches all argparse groups by title (case-insensitive, prefix match),
+    then prints only the flags in that group with their full help text.
+    Shows available groups if no match is found.
+    """
+    parser = _create_parser(for_introspection=True)
+    c = colorizer
+
+    # Collect all groups
+    search = topic.lower().strip()
+    groups: list[tuple[str, list[tuple[str, argparse.Action]]]] = []
+    for group in parser._action_groups:
+        title = group.title
+        if title in ("positional arguments", "optional arguments", "options"):
+            continue
+        if not group._group_actions:
+            continue
+        entries = [
+            (a.option_strings[0], a) for a in group._group_actions if a.option_strings
+        ]
+        groups.append((title, entries))
+
+    # Add introspection group (not in parser groups)
+    introspection_flags_list = [
+        ("--help", "Show the full detailed help with all flags and examples"),
+        ("--list-flags", "Print all flags organized by group with help text"),
+        ("--list-groups", "Print compact group names with flag counts"),
+        ("--examples", "Print categorized real-world usage examples"),
+        ("--version", "Print daemon version and exit"),
+        (
+            "--completion-script",
+            "Generate shell completion script for bash or zsh from live argparse",
+        ),
+        ("--status", "Read the ledger and display a compact status summary"),
+        ("--explain", "Show detailed help for a specific CLI flag"),
+        ("--help-topic", "Show flags for a specific argument group (this command)"),
+        ("--init", "Interactive setup wizard"),
+        ("--wizard", "Alias for --init"),
+        ("--doctor", "Run comprehensive self-diagnosis"),
+        ("--check-env", "Validate .env file for typos and mistakes"),
+    ]
+
+    # Find matching group
+    exact_match = None
+    prefix_matches = []
+    subtitle_matches = []
+
+    for title, entries in groups:
+        if title.lower() == search:
+            exact_match = (title, entries)
+            break
+        if title.lower().startswith(search):
+            prefix_matches.append((title, entries))
+        # Also check common abbreviations in the search against group flags
+        if len(search) >= 3:
+            if search in title.lower():
+                subtitle_matches.append((title, entries))
+
+    # Also check if the search matches part of the introspection group title
+    if search in "introspection" or "intro".startswith(search):
+        match_list = introspection_flags_list
+        print()
+        print(f"  {c.colorize('[Introspection]', 'bold', 'magenta')}")
+        print(f"  {c.dim('=' * 48)}")
+        print(f"  {c.dim('Pre-argparse flags — no --goal required')}")
+        print()
+        for flag, desc in match_list:
+            help_short = desc.split(".")[0].strip()[:80]
+            print(f"    {c.flag(flag):38s}  {c.dim(help_short)}")
+        print()
+        print(
+            f"  {c.dim('Tip: use')} {c.flag('--help')} {c.dim('for the full flag reference.')}"
+        )
+        print()
+        return
+
+    if exact_match:
+        title, entries = exact_match
+    elif len(prefix_matches) == 1:
+        title, entries = prefix_matches[0]
+    elif len(prefix_matches) > 1:
+        print()
+        print(f"  {c.tag_warn()}  Multiple groups match '{topic}':")
+        for t, _ in prefix_matches:
+            print(f"    {c.flag(t)}")
+        print()
+        return
+    elif len(subtitle_matches) == 1:
+        title, entries = subtitle_matches[0]
+    else:
+        print()
+        print(f"  {c.tag_fail()}  No argument group found matching '{topic}'.")
+        print(f"  {c.dim('  Available groups:')}")
+        for t, _ in groups:
+            print(f"    {c.flag(t)}")
+        print(
+            f"  {c.dim('  Also:')} {c.flag('Introspection')} {c.dim('(pre-argparse flags)')}"
+        )
+        print(f"  {c.dim('  Use:')} {c.flag('hermes_loop --help-topic notifications')}")
+        print()
+        return
+
+    print()
+    print(f"  {c.colorize(f'[{title}]', 'bold', 'magenta')}")
+    group_summary = parser._action_groups
+    desc_text = ""
+    for grp in group_summary:
+        if grp.title == title:
+            desc_text = grp.description or ""
+            break
+    if desc_text:
+        print(f"  {c.dim('=' * 48)}")
+        print(f"  {c.dim(desc_text)}")
+    print()
+
+    for flag_str, action in entries:
+        help_text = action.help or "(no description)"
+        # Type info
+        is_bool = action.nargs == 0 and action.const is True
+        type_str = ""
+        if is_bool:
+            type_str = " [bool]"
+        elif action.choices:
+            type_str = f" [{', '.join(action.choices)}]"
+        elif action.type is int:
+            type_str = " [int]"
+        elif action.type is float:
+            type_str = " [float]"
+
+        # Default info
+        default = getattr(action, "default", None)
+        default_str = ""
+        if default is not None and default != "" and default != 0 and not is_bool:
+            default_str = f" (default: {default})"
+        elif is_bool:
+            default_str = " (default: off)"
+
+        # Word-wrap help to 72 chars
+        words = help_text.split()
+        line = ""
+        first = True
+        for w in words:
+            if len(line) + len(w) + 1 > 72:
+                label = (
+                    f"    {c.flag(flag_str + type_str):38s}"
+                    if first
+                    else "    " + " " * 38
+                )
+                print(f"{label}  {c.dim(line)}")
+                line = w
+                first = False
+            else:
+                line = f"{line} {w}" if line else w
+        if line:
+            label = (
+                f"    {c.flag(flag_str + type_str):38s}" if first else "    " + " " * 38
+            )
+            print(f"{label}  {c.dim(line)}")
+
+        # Aliases on a second line
+        if len(action.option_strings) > 1:
+            aliases = ", ".join(c.dim(a) for a in action.option_strings[1:])
+            print(f"    {'':38s}  {c.dim('aliases:')} {aliases}")
+
+        if default_str:
+            print(f"    {'':38s}  {c.dim(default_str)}")
+        print()
+
+    # Show related groups
+    all_group_titles = [t for t, _ in groups if t.lower() != title.lower()]
+    print(
+        f"  {c.dim('Other groups:')}  {' | '.join(c.flag(g) for g in all_group_titles[:5])}"
+    )
+    if len(all_group_titles) > 5:
+        print(f"    {'':14s}{c.dim(f'... and {len(all_group_titles) - 5} more')}")
+    print(f"  {c.dim('See all groups:')} {c.flag('hermes_loop --list-groups')}")
     print()
 
 
@@ -1257,6 +1447,16 @@ def _create_parser(for_introspection=False):
         "Example: python3 -m hermes_loop --explain workers",
     )
     group.add_argument(
+        "--help-topic",
+        default="",
+        help="Show all flags and descriptions for a single argument group. "
+        "Accepts group names (case-insensitive, prefix match) — e.g., "
+        "'notifications', 'git', 'toolsets'. "
+        "Shows available groups if no match is found. "
+        "Pre-argparse — no --goal required. "
+        "Example: python3 -m hermes_loop --help-topic notifications",
+    )
+    group.add_argument(
         "--init",
         action="store_true",
         help="Interactive setup wizard — walks you through the most common "
@@ -1352,6 +1552,20 @@ def main():
         _explain_flag(explain_flag)
         sys.exit(0)
 
+    # Check --help-topic before argparse to avoid required --goal conflict
+    help_topic = None
+    for i, arg in enumerate(sys.argv[1:]):
+        if arg == "--help-topic" and i + 2 < len(sys.argv):
+            help_topic = sys.argv[i + 2]
+            break
+        if arg.startswith("--help-topic="):
+            help_topic = arg.split("=", 1)[1]
+            break
+    if help_topic:
+        configure_color_mode(color_mode)
+        _help_topic(help_topic)
+        sys.exit(0)
+
     # Check --check-env before argparse to avoid required --goal conflict
     if "--check-env" in sys.argv:
         # Detect color mode early
@@ -1400,6 +1614,7 @@ def main():
         "--check-env",
         "--status",
         "--explain",
+        "--help-topic",
         "--init",
         "--wizard",
         "--doctor",

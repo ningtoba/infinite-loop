@@ -73,6 +73,7 @@ value_flags=(
     '--goal:The core task for spawned sessions'
     '--goals-file:Path to file with one goal per line'
     '--heartbeat-timeout:Enable heartbeat-based session health monitoring'
+    '--help-topic:Show all flags and descriptions for a single argument group'
     '--http-callback:HTTP POST URL for iteration JSON (like --notify-cmd but via HTTP)'
     '--keep-iterations:Auto-shrink ledger to keep only last N iterations (0=keep all)'
     '--log-file:Path to daemon log file (e'

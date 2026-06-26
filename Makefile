@@ -37,7 +37,8 @@ help:
 	@echo "    doctor       Run comprehensive self-diagnosis (hermes, PATH, .env, git)"
 	@echo "    examples     Print categorized real-world usage examples"
 	@echo "    explain      Show detailed help on a single flag (pass FLAG=)"
-	@echo "    list-flags   Print all 90 flags organized by group"
+	@echo "    help-topic   Show flags for a specific argument group (pass TOPIC=)"
+	@echo "    list-flags   Print all flags organized by group"
 	@echo "    list-groups  Print compact group names with flag counts"
 	@echo ""
 	@echo "  Monitoring:"
@@ -64,6 +65,7 @@ help:
 	@echo "  make run                      # Run with .env config"
 	@echo "  make examples                  # See usage patterns"
 	@echo "  make explain FLAG=workers      # Help on a specific flag"
+	@echo "  make help-topic TOPIC=notifications  # Flags in a group"
 	@echo "  make check                   # Full pre-commit gate"
 	@echo "  make self-test               # Run tests"
 	@echo "  make status                  # View ledger"
@@ -123,6 +125,10 @@ doctor:
 .PHONY: explain
 explain:
 	$(PYTHON) -m hermes_loop --explain "$(FLAG)"
+
+.PHONY: help-topic
+help-topic:
+	$(PYTHON) -m hermes_loop --help-topic "$(TOPIC)"
 
 .PHONY: list-flags
 list-flags:

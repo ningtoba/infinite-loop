@@ -1034,18 +1034,36 @@ def main():
                 "[WARN] Some preflight checks failed. Continuing anyway (use --preflight-fail-fast to abort)."
             )
 
-    _log("═══════════════════════════════════════════════════════════════════")
-    _log(f"  Infinite Loop Daemon v{LAUNCH_LOOP_VERSION}")
-    _log("═══════════════════════════════════════════════════════════════════")
-    _log("  Passing through to run_loop()...")
+    _log(
+        colorizer.subheader(
+            "═══════════════════════════════════════════════════════════════════"
+        )
+    )
+    _log(f"  {colorizer.header(f'Infinite Loop Daemon v{LAUNCH_LOOP_VERSION}')}")
+    _log(
+        colorizer.subheader(
+            "═══════════════════════════════════════════════════════════════════"
+        )
+    )
+    _log(
+        f"  {colorizer.dim('Passing through to')} {colorizer.flag('run_loop()')}{colorizer.dim('...')}"
+    )
 
     if not args.quiet:
-        _log("  Features: evolve | workers | cooldown | convergence | preflight")
-        _log("            git | goals-file | webhook | SSE dashboard | heartbeat")
-        _log("            desktop/Pushbullet/ntfy | library mode | yolo | safe-mode")
-        _log("            self-test | status-html | checkpoint | resume | archiving")
         _log(
-            "            [SUMMARY] summary | [SUGGEST] smart fixes | --examples | --quiet"
+            f"  {colorizer.dim('Features:')} evolve | workers | cooldown | convergence | preflight"
+        )
+        _log(
+            f"            {colorizer.dim('git | goals-file | webhook | SSE dashboard | heartbeat')}"
+        )
+        _log(
+            f"            {colorizer.dim('desktop/Pushbullet/ntfy | library mode | yolo | safe-mode')}"
+        )
+        _log(
+            f"            {colorizer.dim('self-test | status-html | checkpoint | resume | archiving')}"
+        )
+        _log(
+            f"            {colorizer.tag_summary()} {colorizer.dim('summary')} | {colorizer.tag_suggest()} {colorizer.dim('smart fixes')} | {colorizer.flag('--examples')} | {colorizer.flag('--quiet')}"
         )
         _log("═══════════════════════════════════════════════════════════════════")
 
@@ -1271,8 +1289,10 @@ def main():
                 f"[AUTO-RELOAD] Monitoring {len(_startup_file_snapshots)} source files for hot-reload"
             )
 
-        _log("  Starting loop...")
-        _log(f"  Sentinel: echo 'stop' > {args.shutdown_sentinel}")
+        _log(f"  {colorizer.ok('Starting loop...')}")
+        _log(
+            f"  {colorizer.dim('Sentinel:')} {colorizer.flag('echo stop >')} {colorizer.value(args.shutdown_sentinel)}"
+        )
         _log("")
         run_loop(
             goal=args.goal,

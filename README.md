@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.14.0
+# Infinite Loop Daemon — v14.15.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -433,6 +433,15 @@ echo '{"summary": "added feature X", "next_goal": "add feature Y"}' > /tmp/sessi
 echo '{"done": true}' > /tmp/session-loop-state.json
 kill $LOOP_PID
 ```
+
+---
+
+## v14.15.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Auto-colorized `_log()` tags | UX | `file_utils.py`, `cli.py` | Every structured log tag (`[INFO]`, `[WARN]`, `[ERROR]`, `[DAEMON]`, `[GOALS]`, `[PREFLIGHT]`, `[COOLDOWN]`, `[BEAT]`, `[NOTE]`, `[SUGGEST]`, `[OK]`, `[DONE]`, `[SUMMARY]`, `[AUTO-RELOAD]`, `[CONFIG]`, `[STATUS]`, `[ARCHIVE]`, `[COMPACT]`, `[LOG]`, `[CONTEXT]`, `[OUTPUT]`, `[HEARTBEAT]`, `[MODE]`) is now automatically colorized by `_log()` — no per-call changes needed. Centralized 24-pattern mapping in `_colorize_log_tags()`. Respects `--color` and `NO_COLOR`. |
+| Colorized startup banner | UX | `cli.py` | Separators bold blue, version bold cyan, "Starting loop..." bold green, colored `[SUMMARY]`/`[SUGGEST]` tags and `--examples`/`--quiet` in feature list. |
 
 ---
 

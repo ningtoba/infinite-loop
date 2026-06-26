@@ -4,6 +4,36 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.15.0] — 2026-06-26
+
+### Added
+- **Auto-colorized `_log()` tags**: Every structured log tag (`[INFO]`, `[WARN]`,
+  `[ERROR]`, `[DAEMON]`, `[GOALS]`, `[PREFLIGHT]`, `[COOLDOWN]`, `[BEAT]`,
+  `[NOTE]`, `[SUGGEST]`, `[OK]`, `[DONE]`, `[SUMMARY]`, `[AUTO-RELOAD]`,
+  `[CONFIG]`, `[STATUS]`, `[ARCHIVE]`, `[COMPACT]`, `[LOG]`, `[CONTEXT]`,
+  `[OUTPUT]`, `[HEARTBEAT]`, `[MODE]`) is now automatically colorized in the
+  `_log()` function — no per-call changes needed. Tags are bold-red (error),
+  bold-yellow (warn/cooldown), bold-green (ok/done), bold-cyan (summary),
+  bold-blue (daemon/preflight/config/auto-reload), bold-magenta (suggest/goals),
+  and dimmed (beat/status/archive/log/context/output/compact/heartbeat).
+  Respects `--color=auto|always|never` and `NO_COLOR` automatically.
+  This means every module that calls `_log()` gets colorized output for free.
+- **Colorized startup banner** in `cli.py` `main()`: Header separator lines are
+  now bold blue, the version header is bold cyan, and feature descriptions use
+  dimmed text with colored `[SUMMARY]`, `[SUGGEST]` tags and `--examples`/`--quiet`
+  flags. The "Starting loop..." message is bold green with a colored sentinel path.
+- **New `_colorize_log_tags()` function** in `file_utils.py`: Centralized tag
+  pattern → colorizer mapping with 24 tag patterns. Clean fallback when color
+  is disabled — no string allocations when color is off.
+
+### Changed
+- `hermes_loop/file_utils.py` — `_log()` now auto-colorizes known log tags.
+- `hermes_loop/cli.py` — startup banner sections, feature lines, and
+  "Starting loop..." message use colorizer for richer output.
+- `hermes_loop/config.py` — bumped LAUNCH_LOOP_VERSION from 14.14.0 to 14.15.0.
+
+---
+
 ## [14.14.0] — 2026-06-26
 
 ### Added

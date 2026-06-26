@@ -10,6 +10,7 @@ import time
 from datetime import datetime, timezone
 
 from .config import LOCK_PATH, LEDGER_PATH, LOG_FORMAT, LOG_DATE_FORMAT
+from .color_utils import colorizer
 
 # Module-level logger reference
 _daemon_logger: logging.Logger | None = None
@@ -54,9 +55,58 @@ class FileLock:
 # ---------------------------------------------------------------------------
 
 
+def _colorize_log_tags(msg: str) -> str:
+    """Auto-colorize known log tags like [INFO], [WARN], [ERROR], etc.
+
+    Uses the global colorizer singleton. If color is disabled, returns
+    the original message unchanged.
+    """
+    from .color_utils import colorizer as _cu
+
+    if not _cu._enabled():
+        return msg
+
+    # Map tag patterns to colorizer helper methods
+    _tag_color_map = [
+        (r"\[ERROR\]", _cu.fail),
+        (r"\[FAIL\]", _cu.fail),
+        (r"\[WARN\]", _cu.warn),
+        (r"\[SUGGEST\]", _cu.group_title),
+        (r"\[OK\]", _cu.ok),
+        (r"\[SUMMARY\]", _cu.tag_summary),
+        (r"\[DONE\]", _cu.ok),
+        (r"\[BEAT\]", _cu.dim),
+        (r"\[DAEMON\]", _cu.subheader),
+        (r"\[PREFLIGHT\]", _cu.subheader),
+        (r"\[GOALS\]", _cu.header),
+        (r"\[COOLDOWN\]", _cu.warn),
+        (r"\[COMPACT\]", _cu.dim),
+        (r"\[ARCHIVE\]", _cu.dim),
+        (r"\[STATUS\]", _cu.dim),
+        (r"\[LOG\]", _cu.dim),
+        (r"\[CONFIG\]", _cu.subheader),
+        (r"\[CONTEXT\]", _cu.dim),
+        (r"\[OUTPUT\]", _cu.dim),
+        (r"\[HEARTBEAT\]", _cu.dim),
+        (r"\[AUTO-RELOAD\]", _cu.subheader),
+        (r"\[MODE\]", _cu.header),
+        (r"\[NOTE\]", _cu.warn),
+    ]
+    import re
+
+    for pattern, formatter in _tag_color_map:
+        if formatter in (_cu.tag_summary, _cu.tag_suggest):
+            # tag helpers take no text arg — replace the entire match
+            msg = re.sub(pattern, formatter(), msg)
+        else:
+            msg = re.sub(pattern, lambda m, f=formatter: f(m.group(0)), msg)
+    return msg
+
+
 def _log(msg: str, level: str = "INFO") -> None:
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
-    print(f"[{ts}] {msg}", flush=True)
+    colored_msg = _colorize_log_tags(msg)
+    print(f"[{ts}] {colored_msg}", flush=True)
     if _daemon_logger is not None:
         log_level = getattr(logging, level.upper(), logging.INFO)
         _daemon_logger.log(log_level, msg)

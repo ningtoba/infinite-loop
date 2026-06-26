@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.11.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.12.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -19,7 +19,7 @@ LEDGER_PATH="/tmp/infinite-loop-state.json"
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.11.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.12.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
@@ -45,8 +45,9 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "  Info:"
   echo "    --help / -h           Show this help message"
   echo "    --version             Print daemon version and exit"
-  echo "    --list-flags          Print organized flag listing"
-  echo "    --examples            Print categorized real-world usage examples"
+  echo "    --list-flags          Print all 87 flags organized by group with help text"
+  echo "    --list-groups         Print compact group names with flag counts"
+  echo "    --examples            Print categorized real-world usage examples (7 categories)"
   echo ""
   echo "EXAMPLES:"
   echo "  bash run.sh                           # Run with .env config"
@@ -197,7 +198,7 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop Daemon v14.11.0               ║"
+  echo "║  Infinite Loop Daemon v14.12.0               ║"
   echo "║  run.sh — one command to start               ║"
   echo "║                                                ║"
   echo "║  What's new ⚡                                ║"
@@ -210,6 +211,7 @@ if [ "$QUIET" = false ]; then
   echo "║  • [SUGGEST] smart fixes on errors/stuck      ║"
   echo "║  • --quiet mode: compact per-iteration output ║"
   echo "║  • [BEAT] heartbeat during long iterations    ║"
+  echo "║  • Docs now consistent: "9 groups, 45 cases"   ║"
   echo "╚══════════════════════════════════════════════╝"
   echo ""
   echo "  Config: .env"

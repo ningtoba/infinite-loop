@@ -4,6 +4,20 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.12.0] — 2026-06-26
+
+### Added
+- **`make examples`, `make list-flags`, `make list-groups` Makefile targets**: Three new convenience targets for the Makefile, alongside existing `make self-test` / `make version`. Users can now run `make examples` to see categorized usage patterns, `make list-flags` for the full organized flag listing, and `make list-groups` for compact group overviews — all without remembering the underlying CLI flag names.
+- **`run.sh --help` now documents `--list-groups` and `--examples`**: The info section of `run.sh --help` now explicitly lists all three introspection flags (`--list-flags`, `--list-groups`, `--examples`) with updated descriptions showing flag counts and category counts. Previously only `--list-flags` and `--examples` were listed.
+- **`run.sh` banner mentions v14.11.0 docs consistency fix**: Added "Docs now consistent: '9 groups, 45 cases'" to the "What's new" banner section so users immediately see the latest documentation improvement.
+
+### Changed
+- **`CONTRIBUTING.md` Common Commands table**: Expanded with `make examples`, `make list-flags`, `make list-groups`, `make status`, `make log`, and `make stop` entries. Removed duplicate rows for `make status` and `make stop` that had conflicting descriptions.
+- **`README.md` Quick Start Makefile section**: Added `make examples`, `make list-flags`, and `make list-groups` to the Makefile usage examples in the Quick Start section.
+- **`run.sh --help` descriptions**: Updated `--list-flags` description from "Print organized flag listing" to "Print all 87 flags organized by group with help text" and added missing `--list-groups` entry with "Print compact group names with flag counts".
+
+---
+
 ## [14.11.0] — 2026-06-26
 
 ### Fixed

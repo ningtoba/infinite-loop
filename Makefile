@@ -31,6 +31,9 @@ help:
 	@echo "    dry-run      Show config without starting (ARGS supported)"
 	@echo "    self-test    Run in-process self-tests (9 groups, 45 cases)"
 	@echo "    version      Print daemon version and exit"
+	@echo "    examples     Print categorized real-world usage examples"
+	@echo "    list-flags   Print all 87 flags organized by group"
+	@echo "    list-groups  Print compact group names with flag counts"
 	@echo ""
 	@echo "  Monitoring:"
 	@echo "    status       Show formatted ledger via inspect-ledger.sh"
@@ -86,6 +89,18 @@ self-test:
 version:
 	$(RUN_SH) --version
 
+.PHONY: examples
+examples:
+	$(RUN_SH) --examples
+
+.PHONY: list-flags
+list-flags:
+	$(RUN_SH) --list-flags
+
+.PHONY: list-groups
+list-groups:
+	$(RUN_SH) --list-groups
+
 # ── Monitoring ────────────────────────────────────────────────────────────────
 
 .PHONY: status
@@ -99,7 +114,7 @@ status:
 
 .PHONY: log
 log:
-	@LOG_FILE="$$(grep INFINITE_LOOP_LOG_FILE .env 2>/dev/null | cut -d= -f2 | tr -d '\"\"')"; \
+	@LOG_FILE="$$(grep INFINITE_LOOP_LOG_FILE .env 2>/dev/null | cut -d= -f2 | tr -d '\"')"; \
 	if [ -n "$$LOG_FILE" ] && [ -f "$$LOG_FILE" ]; then \
 		echo "Tailing $$LOG_FILE ..."; \
 		tail -f "$$LOG_FILE"; \

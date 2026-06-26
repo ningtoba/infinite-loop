@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.11.0
+# Infinite Loop Daemon — v14.12.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -70,6 +70,9 @@ make dry-run                                    # Preview config
 make run                                        # Run with .env config
 make run ARGS="--goal 'fix lint errors' --git"  # Run with extra flags
 make self-test                                  # Run self-tests (9 groups, 45 cases)
+make examples                                   # Print categorized usage examples
+make list-flags                                 # Print all 87 flags organized by group
+make list-groups                                # Print group names with flag counts
 
 # Monitor progress:
 cat /tmp/infinite-loop-state.json | python3 -m json.tool    # full ledger
@@ -429,6 +432,16 @@ echo '{"summary": "added feature X", "next_goal": "add feature Y"}' > /tmp/sessi
 echo '{"done": true}' > /tmp/session-loop-state.json
 kill $LOOP_PID
 ```
+
+---
+
+## v14.12.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `make examples` / `list-flags` / `list-groups` targets | Usability | `Makefile` | Three new convenience targets: `make examples` (categorized usage patterns), `make list-flags` (all 87 flags by group), `make list-groups` (compact group overview). No need to remember CLI flag names. |
+| `run.sh --help` documents all introspection flags | Docs | `run.sh` | Added missing `--list-groups` entry, updated `--list-flags` and `--examples` descriptions with counts. Banner now mentions v14.11.0 docs consistency fix. |
+| CONTRIBUTING.md `make` targets expanded | Docs | `CONTRIBUTING.md` | Added `make examples/list-flags/list-groups/status/log/stop` to Common Commands table, removed duplicate rows. |
 
 ---
 

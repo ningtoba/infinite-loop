@@ -197,8 +197,12 @@ kill <PID>
 | `make run` | Run with .env config (convenience) |
 | `make dry-run` | Preview config (convenience) |
 | `make self-test` | Run tests (convenience) |
-| `make status` | Quick status check |
-| `make stop` | Stop the daemon via sentinel |
+| `make examples` | Print categorized usage examples |
+| `make list-flags` | Print all 87 flags organized by group |
+| `make list-groups` | Print group names with flag counts |
+| `make status` | Show formatted one-line ledger status |
+| `make log` | Tail the daemon log file |
+| `make stop` | Send stop signal to the daemon |
 | `make clean` | Clear all temp/ledger files |
 | `echo stop > /tmp/infinite-loop-stop` | Graceful shutdown |
 

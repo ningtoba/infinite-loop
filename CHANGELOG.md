@@ -4,6 +4,25 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.22.0] — 2026-06-26
+
+### Added
+- **`make check` target**: New `make check` full pre-commit gate that runs
+  `lint` + `self-test` + `check-env` + `update-completions` in sequence with
+  clear step-by-step output. Exits on the first failure for fast feedback.
+  Example: `make check` before every commit.
+- **`make pre-commit` target**: Quick pre-commit gate that runs `self-test` +
+  `lint` in sequence. No `.env` file needed — works in any state.
+  Example: `make pre-commit` for a fast syntax + test check.
+
+### Changed
+- `Makefile` — Added `check` and `pre-commit` targets, updated `help` section
+  with a new "Pre-Commit / CI" subsection showing both targets with descriptions.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.21.0 to 14.22.0.
+- `run.sh` — Banner version updated to v14.22.0.
+
+---
+
 ## [14.20.0] — 2026-06-26
 
 ### Added

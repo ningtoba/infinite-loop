@@ -44,6 +44,10 @@ help:
 	@echo "    pause        Write 'pause' to the sentinel file"
 	@echo "    resume       Write 'resume' to the sentinel file"
 	@echo ""
+	@echo "  Pre-Commit / CI:"
+	@echo "    check        Full pre-commit gate: lint + self-test + check-env + regenerate completions"
+	@echo "    pre-commit   Quick pre-commit gate: lint + self-test (no .env needed)"
+	@echo ""
 	@echo "  Maintenance:"
 	@echo "    clean            Remove ledger, sentinel, and temp files"
 	@echo "    lint             Run Python syntax checks on all .py files"
@@ -57,6 +61,7 @@ help:
 	@echo "  make run                      # Run with .env config"
 	@echo "  make examples                  # See usage patterns"
 	@echo "  make explain FLAG=workers      # Help on a specific flag"
+	@echo "  make check                   # Full pre-commit gate"
 	@echo "  make self-test               # Run tests"
 	@echo "  make status                  # View ledger"
 	@echo "  make stop                    # Stop the daemon"
@@ -158,6 +163,38 @@ pause:
 resume:
 	@echo "resume" > $(SENTINEL)
 	@echo "Sent 'resume' to $(SENTINEL)"
+
+# ── Pre-Commit / CI ────────────────────────────────────────────────────────────
+
+.PHONY: check
+check:
+	@echo "━━━ make check — full pre-commit gate ━━━"
+	@echo ""
+	@echo "  Step 1/4 — Python + shell syntax check..."
+	@$(MAKE) lint || exit 1
+	@echo ""
+	@echo "  Step 2/4 — Self-tests..."
+	@$(MAKE) self-test 2>&1 || exit 1
+	@echo ""
+	@echo "  Step 3/4 — .env validation..."
+	@$(MAKE) check-env 2>&1 || true
+	@echo ""
+	@echo "  Step 4/4 — Regenerate completion scripts from argparse..."
+	@$(MAKE) update-completions 2>&1 || true
+	@echo ""
+	@echo "  ═══════════════════════════════════════════════════════════════════"
+	@echo "   All checks passed! Ready to commit."
+	@echo "  ═══════════════════════════════════════════════════════════════════"
+
+.PHONY: pre-commit
+pre-commit:
+	@echo "━━━ make pre-commit — fast pre-commit gate (no .env needed) ━━━"
+	@$(MAKE) self-test 2>&1
+	@$(MAKE) lint 2>&1
+	@echo ""
+	@echo "  ═══════════════════════════════════════════════════════════════════"
+	@echo "   All checks passed! Ready to commit."
+	@echo "  ═══════════════════════════════════════════════════════════════════"
 
 # ── Maintenance ───────────────────────────────────────────────────────────────
 

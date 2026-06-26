@@ -45,6 +45,7 @@ _hermes_loop_completions()
         --run
         --safe-mode
         --self-test
+        --status
         --stop-at-goals-end
         --store-git-diff
         --track-goals
@@ -68,6 +69,7 @@ _hermes_loop_completions()
         --convergence-window
         --cooldown
         --cooldown-mode
+        --explain
         --goal
         --goals-file
         --heartbeat-timeout
@@ -135,7 +137,7 @@ _hermes_loop_completions()
             return 0
             ;;
 
-        --archive-max-size|--archive-retention|--compact-every|--context|--convergence-threshold|--convergence-window|--cooldown|--goal|--heartbeat-timeout|--http-callback|--keep-iterations|--log-max-mb|--max-idle-iterations|--max-iterations|--max-output-chars|--max-retries|--max-turns|--model|--notify-cmd|--notify-ntfy|--notify-ntfy-server|--notify-pushbullet|--on-error-cmd|--output-schema|--profile|--prompt-suffix|--provider|--retry-delay|--session-timeout|--shutdown-sentinel|--skills|--spawn-source|--startup-delay|--tag|--task-type|--toolsets|--watch-poll|--webhook-port|--worker-url|--workers)
+        --archive-max-size|--archive-retention|--compact-every|--context|--convergence-threshold|--convergence-window|--cooldown|--explain|--goal|--heartbeat-timeout|--http-callback|--keep-iterations|--log-max-mb|--max-idle-iterations|--max-iterations|--max-output-chars|--max-retries|--max-turns|--model|--notify-cmd|--notify-ntfy|--notify-ntfy-server|--notify-pushbullet|--on-error-cmd|--output-schema|--profile|--prompt-suffix|--provider|--retry-delay|--session-timeout|--shutdown-sentinel|--skills|--spawn-source|--startup-delay|--tag|--task-type|--toolsets|--watch-poll|--webhook-port|--worker-url|--workers)
             return 0
             ;;
     esac

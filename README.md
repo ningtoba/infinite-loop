@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.21.0
+# Infinite Loop Daemon — v14.22.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -7,7 +7,7 @@ JSON ledger, and can batch-process hundreds of goals in sequence.
 
 > **Changelog**: See [CHANGELOG.md](./CHANGELOG.md) for the complete version history.
 > **Contributing**: See [CONTRIBUTING.md](./CONTRIBUTING.md) for onboarding and development guide.
-> **Quick reference**: Use `make help` for convenience targets (run, dry-run, self-test, status, stop, clean).
+> **Quick reference**: Use `make help` for convenience targets (run, dry-run, self-test, check, pre-commit, status, stop, clean).
 
 ## Origin
 
@@ -73,6 +73,8 @@ make self-test                                  # Run self-tests (count auto-det
 make examples                                   # Print categorized usage examples
 make list-flags                                 # Print all 90 flags organized by group
 make list-groups                                # Print group names with flag counts
+make check                                      # Full pre-commit gate (lint + test + check-env + completions)
+make pre-commit                                 # Quick pre-commit gate (lint + self-test, no .env needed)
 
 # Monitor progress:
 python3 -m hermes_loop --status                         # compact built-in status
@@ -451,6 +453,15 @@ kill $LOOP_PID
 | Feature | Type | Files | Description |
 |---------|------|-------|-------------|
 | `--explain` flag | UX | `cli.py` | Detailed help on any single CLI flag. Accepts full names or unambiguous prefixes. Shows: group, type, default, full description, aliases, related flags, and usage example. Pre-argparse, no `--goal` required. |
+
+---
+
+## v14.22.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `make check` target | DX | `Makefile` | Full pre-commit gate: `lint` + `self-test` + `check-env` + `update-completions` in sequence. Exits on first failure. |
+| `make pre-commit` target | DX | `Makefile` | Quick pre-commit gate: `self-test` + `lint` in sequence. No `.env` file needed. |
 
 ---
 

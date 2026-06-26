@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .config_manager import build_cli_args, read_env_file
+from .config_manager import build_cli_args, get_raw_config
 
 # Paths
 LEDGER_PATH = "/tmp/infinite-loop-state.json"
@@ -21,14 +21,11 @@ STATUS_FILE = "/tmp/loop-status.json"
 class LoopManager:
     """Manages the infinite-loop daemon as a subprocess."""
 
-    def __init__(self, env_path: str | None = None):
+    def __init__(self):
         self._process: asyncio.subprocess.Process | None = None
         self._status: str = "stopped"
         self._logs: list[dict[str, Any]] = []
         self._max_logs = 500
-        self._env_path = env_path or os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"
-        )
         self._log_file = "/tmp/infinite-loop-web.log"
         self._log_fp = None
 
@@ -70,8 +67,8 @@ class LoopManager:
         if self.is_running:
             return {"success": False, "error": "Loop is already running"}
 
-        # Read current config
-        config = read_env_file(self._env_path)
+        # Read current config from JSON
+        config = get_raw_config()
 
         # Build CLI args
         cli_args = build_cli_args(config)
@@ -264,9 +261,9 @@ class LoopManager:
 _loop_manager: LoopManager | None = None
 
 
-def get_loop_manager(env_path: str | None = None) -> LoopManager:
+def get_loop_manager() -> LoopManager:
     """Get or create the global loop manager instance."""
     global _loop_manager
     if _loop_manager is None:
-        _loop_manager = LoopManager(env_path)
+        _loop_manager = LoopManager()
     return _loop_manager

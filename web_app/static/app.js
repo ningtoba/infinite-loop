@@ -20,6 +20,8 @@ const API = {
 let currentTab = 'dashboard';
 let configData = null;
 let configGroups = [];
+let configValues = {};    // persistent values across group switches
+let activeConfigGroup = null;
 let loopStatus = 'stopped';
 let pollInterval = null;
 let sseSource = null;
@@ -316,8 +318,19 @@ function renderConfigGroups() {
     </button>`
   ).join('');
 
+  // Init persistent values from loaded config
+  if (configData) {
+    Object.entries(configData).forEach(([key, meta]) => {
+      if (!(key in configValues)) {
+        configValues[key] = meta.value || meta.default || '';
+      }
+    });
+  }
+
   container.querySelectorAll('.config-group-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      // Flush current group's DOM values before switching
+      flushConfigGroup();
       container.querySelectorAll('.config-group-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       renderConfigPanel(btn.dataset.group);
@@ -326,8 +339,18 @@ function renderConfigGroups() {
 
   // Render first group
   if (configGroups.length > 0) {
+    activeConfigGroup = configGroups[0].id;
     renderConfigPanel(configGroups[0].id);
   }
+}
+
+function flushConfigGroup() {
+  // Read all currently rendered fields into configValues
+  const fields = document.querySelectorAll('#config-panel [id^="cfg-"]');
+  fields.forEach(field => {
+    const key = field.name || field.id.replace('cfg-', '');
+    if (key) configValues[key] = field.value;
+  });
 }
 
 function renderConfigPanel(groupId) {
@@ -336,6 +359,8 @@ function renderConfigPanel(groupId) {
     panel.innerHTML = '<div class="config-empty">Loading configuration...</div>';
     return;
   }
+
+  activeConfigGroup = groupId;
 
   const groupFields = Object.entries(configData)
     .filter(([, meta]) => meta.group === groupId);
@@ -346,7 +371,8 @@ function renderConfigPanel(groupId) {
   }
 
   panel.innerHTML = groupFields.map(([key, meta]) => {
-    const value = meta.value || meta.default || '';
+    // Use persisted value if available, otherwise fall back to default
+    const value = key in configValues ? configValues[key] : (meta.value || meta.default || '');
     const required = meta.required ? '<span class="required-mark">*</span>' : '';
     const desc = meta.description || '';
     let input;
@@ -377,23 +403,11 @@ function renderConfigPanel(groupId) {
 }
 
 async function saveConfig() {
-  // Collect all config values from the DOM
-  const allFields = document.querySelectorAll('#config-panel [id^="cfg-"]');
-  const config = {};
+  // Flush current group's DOM values into configValues
+  flushConfigGroup();
 
-  allFields.forEach(field => {
-    const key = field.name || field.id.replace('cfg-', '');
-    if (key) config[key] = field.value;
-  });
-
-  // Also include fields from other groups that aren't in the DOM
-  if (configData) {
-    Object.entries(configData).forEach(([key, meta]) => {
-      if (!(key in config)) {
-        config[key] = meta.value || meta.default || '';
-      }
-    });
-  }
+  // Use the persistent configValues dict which has all groups' edits
+  const config = { ...configValues };
 
   try {
     const res = await fetch(API.config, {
@@ -405,7 +419,7 @@ async function saveConfig() {
     if (data.success) {
       showSavedMsg('Saved!');
     } else {
-      alert('Failed to save configuration');
+      alert('Failed to save configuration: ' + (data.message || 'unknown error'));
     }
   } catch (err) {
     alert(`Error saving config: ${err.message}`);

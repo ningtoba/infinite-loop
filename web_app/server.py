@@ -20,9 +20,11 @@ from fastapi.staticfiles import StaticFiles
 from .config_manager import (
     CONFIG_DEFAULTS,
     CONFIG_GROUPS,
+    CONFIG_PATH,
     get_config_with_defaults,
-    read_env_file,
-    write_env_file,
+    get_raw_config,
+    read_json_config,
+    write_json_config,
     build_cli_args,
 )
 from .loop_manager import LoopManager, get_loop_manager
@@ -44,12 +46,6 @@ if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-def _get_env_path() -> str:
-    """Get the .env file path."""
-    project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(project_dir, ".env")
-
-
 @app.get("/", response_class=HTMLResponse)
 async def index():
     """Serve the main web UI."""
@@ -65,11 +61,11 @@ async def index():
 @app.get("/api/config")
 async def get_config():
     """Get the full configuration with current values."""
-    env_path = _get_env_path()
-    config = get_config_with_defaults(env_path)
+    config = get_config_with_defaults()
     return {
         "groups": CONFIG_GROUPS,
         "config": config,
+        "config_path": CONFIG_PATH,
     }
 
 
@@ -80,30 +76,27 @@ async def get_config_groups():
 
 
 @app.get("/api/config/raw")
-async def get_raw_config():
-    """Get raw .env key-value pairs."""
-    env_path = _get_env_path()
-    return {"config": read_env_file(env_path)}
+async def get_raw_config_api():
+    """Get raw key-value config."""
+    return {"config": get_raw_config()}
 
 
 @app.post("/api/config")
 async def save_config(request: Request):
-    """Save configuration values to .env file."""
+    """Save configuration values to JSON config file."""
     try:
         data = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body")
 
-    env_path = _get_env_path()
-    write_env_file(env_path, data)
-    return {"success": True, "message": "Configuration saved"}
+    write_json_config(data)
+    return {"success": True, "message": "Configuration saved", "path": CONFIG_PATH}
 
 
 @app.get("/api/config/cli-preview")
 async def preview_cli_args():
     """Preview the CLI arguments that would be used to start the daemon."""
-    env_path = _get_env_path()
-    config = read_env_file(env_path)
+    config = get_raw_config()
     cli_args = build_cli_args(config)
     return {"args": cli_args, "command": "python3 -m hermes_loop " + " ".join(cli_args)}
 
@@ -113,7 +106,7 @@ async def preview_cli_args():
 @app.post("/api/loop/start")
 async def start_loop():
     """Start the infinite loop daemon."""
-    manager = get_loop_manager(_get_env_path())
+    manager = get_loop_manager()
     result = await manager.start()
     if result.get("success"):
         # Broadcast status update

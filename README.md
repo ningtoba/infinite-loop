@@ -164,9 +164,11 @@ standalone daemon).
 
 ### Configuration Persistence
 
-The web UI reads and writes the `.env` file. Changes are saved immediately
-and will be used the next time the loop starts. You can also use the raw
-`.env` file directly — the web UI just provides a friendlier interface.
+Configuration is managed entirely through the web UI — **no `.env` file needed**.
+Settings are persisted as JSON at `/tmp/hermes-loop/config.json` and survive
+container restarts via the `hermes-loop-data` Docker volume. The first time you
+launch the web UI, all settings start at their documented defaults — just
+configure what you need and click **Start**.
 
 ---
 
@@ -184,18 +186,14 @@ No need to bundle another Hermes agent instance.
 ### Quick Start
 
 ```bash
-# Clone and configure
-cp .env.example .env
-# Edit .env with your settings (or skip — configure via web UI later)
-
-# Build and start
+# Build and start (no .env needed — configure everything from the web UI)
 docker compose up -d
 
 # View logs
 docker compose logs -f
 
-# Open the web UI
-open http://localhost:8080
+# Open the web UI (default port: 8090)
+open http://localhost:8090
 ```
 
 ### What Gets Mounted
@@ -205,9 +203,8 @@ open http://localhost:8080
 | `/usr/local/bin/hermes` | `/usr/local/bin/hermes` (ro) | Host's Hermes binary |
 | `~/.hermes/` | `/home/hermes/.hermes/` | Hermes profiles, config, plugins |
 | `~/.claude/` | `/home/hermes/.claude/` (ro) | Claude Code config (if using Claude as provider) |
-| `./.env` | `/app/.env` | Loop configuration |
 | Your workdir | `/workdir` | Target project directory |
-| Docker volume | `/tmp` | Ledger data persistence |
+| Docker volume | `/tmp` | Ledger + config persistence |
 
 ### Customizing Mounts
 
@@ -225,12 +222,14 @@ INFINITE_LOOP_WORKDIR=/home/you/Projects/myapp \
 docker build -t hermes-loop .
 docker run -d \
   --name hermes-loop \
-  -p 8080:8080 \
+  --network host \
   -v /usr/local/bin/hermes:/usr/local/bin/hermes:ro \
   -v $HOME/.hermes:/home/hermes/.hermes \
-  -v $(pwd)/.env:/app/.env \
+  -v $HOME/.claude:/home/hermes/.claude:ro \
   -v /your/project:/workdir \
+  -v hermes-loop-data:/tmp \
   -e INFINITE_LOOP_WORKDIR=/workdir \
+  -e WEB_PORT=8090 \
   hermes-loop
 ```
 

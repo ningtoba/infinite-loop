@@ -11,8 +11,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash hermes && \
+# Create non-root user (UID/GID overridable via build args to match host user)
+ARG UID=1000
+ARG GID=1000
+RUN groupadd -g ${GID} hermes 2>/dev/null || groupmod -g ${GID} hermes 2>/dev/null || true && \
+    useradd --create-home --shell /bin/bash --uid ${UID} -g hermes hermes 2>/dev/null || \
+    (usermod -u ${UID} -g ${GID} hermes 2>/dev/null) && \
     mkdir -p /app /data /tmp/hermes-loop && \
     chown -R hermes:hermes /app /data /tmp/hermes-loop
 

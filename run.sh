@@ -105,7 +105,10 @@ declare -a DAEMON_ARGS=()
 [ -n "${INFINITE_LOOP_NOTIFY_NTFY_SERVER:-}" ] && DAEMON_ARGS+=("--notify-ntfy-server" "$INFINITE_LOOP_NOTIFY_NTFY_SERVER")
 [ "${INFINITE_LOOP_NOTIFY_DESKTOP:-false}" == "true" ]   && DAEMON_ARGS+=("--notify-desktop")
 [ "${INFINITE_LOOP_NOTIFY_ON_COMPLETION:-false}" == "true" ] && DAEMON_ARGS+=("--notify-on-completion")
-[ "${INFINITE_LOOP_PREFLIGHT:-false}" == "true" ]        && DAEMON_ARGS+=("--preflight")
+# Only add --preflight from .env if --run is NOT also set (--run already triggers checks)
+if [ "${INFINITE_LOOP_RUN:-false}" != "true" ]; then
+  [ "${INFINITE_LOOP_PREFLIGHT:-false}" == "true" ]        && DAEMON_ARGS+=("--preflight")
+fi
 [ "${INFINITE_LOOP_PREFLIGHT_FAIL_FAST:-false}" == "true" ] && DAEMON_ARGS+=("--preflight-fail-fast")
 [ -n "${INFINITE_LOOP_SKILLS:-}" ]          && DAEMON_ARGS+=("--skills" "$INFINITE_LOOP_SKILLS")
 [ "${INFINITE_LOOP_CONVERGENCE_STOP:-false}" == "true" ] && DAEMON_ARGS+=("--convergence-stop")

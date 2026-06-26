@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.28.0
+# Infinite Loop Daemon — v14.30.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -164,13 +164,13 @@ The `context` field is critical for iterative work — it tells the NEXT spawned
 
 | Script | Path | Purpose |
 |--------|------|---------|
-| **hermes_loop** | `hermes_loop` (console command) | Installed via `make install`. Invokes `hermes_loop.cli:main`. Alternative to `python3 launch-loop.py`. |
+| **hermes_loop** | `hermes_loop` (console command) | Installed via `make install`. Invokes `hermes_loop.cli:main`. Primary way to run the daemon (the old `python3 launch-loop.py` is now a thin backward-compatible shim). |
 | **launch-loop.py** | `launch-loop.py` (root) | Thin backward-compatible shim (18 lines). Imports `main()` from the `hermes_loop/` package. All real code lives in the package. |
 | **hermes_loop/** | `hermes_loop/` (directory) | **Main daemon package** (36 modules). Contains all daemon logic: CLI, loop, functions, iteration, webhook, dashboard, preflight, notifications, and more. See [project structure](#files--structure) for the full module list. |
 | **session-self-loop.py** | `session-self-loop.py` (root) | Lightweight in-session loop tracker for self-enhancement from within your current Hermes session. |
 | **Makefile** | `Makefile` (root) | Convenience targets: `make run`, `make dry-run`, `make self-test`, `make status`, `make stop`, `make clean`. ★ |
 | **run.sh** | `run.sh` (root) | **One-command entrypoint** — sources `.env`, forwards all settings as CLI flags. Just `bash run.sh`. ★ |
-| **run-loop.sh** | `scripts/run-loop.sh` | Unified shell wrapper that forwards all flags to launch-loop.py. |
+| **run-loop.sh** | `scripts/run-loop.sh` | Unified shell wrapper that forwards all flags to the hermes_loop command. |
 | **inspect-ledger.sh** | `scripts/inspect-ledger.sh` | View the JSON ledger formatted: default view, `--watch`, `--summary`, `--json`, `--errors-only`, `--last N`. |
 | **archive-state.sh** | `scripts/archive-state.sh` | Archive old iterations to JSONL or Markdown. `--auto` mode with optional `--gzip`. |
 | **replay-ledger.sh** | `scripts/replay-ledger.sh` | Re-run archived iterations from JSONL files. Supports `--from`, `--to`, `--dry-run`, `--goal` prefix. |
@@ -771,7 +771,7 @@ Run ~40 in-process unit tests across 8 core daemon functions without
 spawning any child Hermes sessions:
 
 ```bash
-python3 launch-loop.py --self-test
+hermes_loop --self-test
 ```
 
 Tests cover: JSON extraction (6 edge cases), error classification (5 error
@@ -802,11 +802,11 @@ are stuck in a loop producing essentially the same output:
 
 ```bash
 # Stop if 5 consecutive iterations have >90% similar summaries
-python3 launch-loop.py --goal "Refactor auth" \
+hermes_loop --goal "Refactor auth" \
   --convergence-stop --run
 
 # More sensitive
-python3 launch-loop.py --goal "Fix lint errors" \
+hermes_loop --goal "Fix lint errors" \
   --convergence-stop --convergence-window 3 \
   --convergence-threshold 0.7 --run
 ```
@@ -821,7 +821,7 @@ Dynamically adjusts the delay between iterations based on average duration:
 - Iterations > 300s → 2s cooldown (minimal delay)
 
 ```bash
-python3 launch-loop.py --goal "Fix lint errors" \
+hermes_loop --goal "Fix lint errors" \
   --cooldown-mode adaptive --max-iterations 50 --run
 ```
 
@@ -853,17 +853,17 @@ plugins. The daemon never needs to restart for config/skill/plugin changes.
 
 ```bash
 # auto mode (default) — embedded worker, no extra management
-python3 launch-loop.py --goal "..." --run
+hermes_loop --goal "..." --run
 
 # External worker — worker survives daemon restarts
 # Terminal 1:
 python3 ~/.hermes/plugins/hermes-mcp-worker/main.py --port 8124
 # Terminal 2:
-python3 launch-loop.py --goal "..." \
+hermes_loop --goal "..." \
   --worker-url http://localhost:8124 --run
 
 # Disable worker mode entirely
-python3 launch-loop.py --goal "..." --worker-url '' --run
+hermes_loop --goal "..." --worker-url '' --run
 ```
 
 ### Webhook & REST Control
@@ -882,7 +882,7 @@ that runs alongside the main loop:
 | `/webhook` | POST | Trigger next iteration (optional JSON body) |
 
 ```bash
-python3 launch-loop.py --goal "Fix lint errors" \
+hermes_loop --goal "Fix lint errors" \
   --webhook-port 8080 --run
 
 # Trigger from another process
@@ -911,7 +911,7 @@ features:
 - Response to POST /control endpoints on the webhook port
 
 ```bash
-python3 launch-loop.py --goal "..." \
+hermes_loop --goal "..." \
   --status-html /tmp/loop-status.html --run
 
 # Serve it
@@ -936,7 +936,7 @@ output at least once every N seconds:
 | **Stale cleanup** | On startup, stale heartbeat tracking files from previous daemon instances are cleaned up automatically. |
 
 ```bash
-python3 launch-loop.py --goal "Refactor auth" \
+hermes_loop --goal "Refactor auth" \
   --heartbeat-timeout 300 --run
 ```
 
@@ -946,15 +946,15 @@ Mobile notifications for iteration results:
 
 ```bash
 # Pushbullet
-python3 launch-loop.py --goal "..." \
+hermes_loop --goal "..." \
   --notify-pushbullet "YOUR_ACCESS_TOKEN" --run
 
 # ntfy (public)
-python3 launch-loop.py --goal "..." \
+hermes_loop --goal "..." \
   --notify-ntfy "my-loop-alerts" --run
 
 # ntfy (self-hosted)
-python3 launch-loop.py --goal "..." \
+hermes_loop --goal "..." \
   --notify-ntfy "my-loop-alerts" \
   --notify-ntfy-server "https://ntfy.example.com" --run
 ```
@@ -976,7 +976,7 @@ iteration:
 | `disk_space` | At least 0.5 GB free |
 
 ```bash
-python3 launch-loop.py --goal "Fix lint errors" \
+hermes_loop --goal "Fix lint errors" \
   --preflight --preflight-fail-fast --run
 ```
 
@@ -986,7 +986,7 @@ With `--keep-iterations N`, the ledger auto-shrinks. Trimmed iterations
 are saved to gzip-compressed JSONL files before discarding:
 
 ```bash
-python3 launch-loop.py --goal "..." \
+hermes_loop --goal "..." \
   --keep-iterations 50 --archive-dir /tmp/loop-archives \
   --archive-retention 30 --archive-max-size 100 \
   --run
@@ -1017,7 +1017,7 @@ Instead of spawning `hermes chat -q` as a subprocess, the daemon can import
 `AIAgent` from `run_agent` and run the conversation in-process:
 
 ```bash
-python3 launch-loop.py --goal "..." \
+hermes_loop --goal "..." \
   --use-library --pass-session-id --checkpoints --run
 ```
 
@@ -1040,11 +1040,11 @@ always up-to-date and never needs manual maintenance:
 
 ```bash
 # Bash: use directly
-source <(python3 launch-loop.py --completion-script bash)
+source <(hermes_loop --completion-script bash)
 
 # Zsh: save to completions directory
 mkdir -p ~/.zsh/completion
-python3 launch-loop.py --completion-script zsh > ~/.zsh/completion/_hermes_loop
+hermes_loop --completion-script zsh > ~/.zsh/completion/_hermes_loop
 # Then add to ~/.zshrc:
 #   fpath=(~/.zsh/completion $fpath)
 #   autoload -Uz compinit && compinit
@@ -1067,7 +1067,7 @@ manual integration:
 
 ```bash
 # View all flags with their short form, long form, and description
-python3 launch-loop.py --list-flags | head -20
+hermes_loop --list-flags | head -20
 ```
 
 **Usage from a completion script:**
@@ -1076,9 +1076,9 @@ python3 launch-loop.py --list-flags | head -20
 # Bash: generate completions by parsing --list-flags output
 _list_loop_flags() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
-    COMPREPLY=($(compgen -W "$(python3 launch-loop.py --list-flags 2>/dev/null | cut -f2)" -- "$cur"))
+    COMPREPLY=($(compgen -W "$(hermes_loop --list-flags 2>/dev/null | cut -f2)" -- "$cur"))
 }
-complete -F _list_loop_flags launch-loop.py
+complete -F _list_loop_flags hermes_loop
 ```
 
 **Makefile convenience target:**
@@ -1086,9 +1086,9 @@ complete -F _list_loop_flags launch-loop.py
 ```makefile
 completion:
     @echo "Generating shell completion scripts..."
-    @python3 launch-loop.py --list-flags 2>/dev/null | cut -f2 > /tmp/loop-flags.txt
+    @hermes_loop --list-flags 2>/dev/null | cut -f2 > /tmp/loop-flags.txt
     @echo "  ✓ Written to /tmp/loop-flags.txt"
-    @echo "Source this in your .bashrc or .zshrc to enable tab-completion for launch-loop.py flags."
+    @echo "Source this in your .bashrc or .zshrc to enable tab-completion for hermes_loop flags."
 ```
 
 Run it with:
@@ -1178,7 +1178,7 @@ infinite-loop/
 ├── launch-loop.py               ← Thin backward-compatible shim (18 lines) ★
 ├── session-self-loop.py         ← In-session loop tracker ★
 │
-├── hermes_loop/                 ← Main daemon package (35 modules) ★
+├── hermes_loop/                 ← Main daemon package (36 modules) ★
 │   ├── __init__.py
 │   ├── __main__.py              ← `python3 -m hermes_loop` entry point
 │   ├── cli.py                   ← Argparse + main() entry point

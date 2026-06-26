@@ -4,6 +4,32 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.30.0] — 2026-06-26
+
+### Added
+- **Unified `hermes_loop` CLI command in all help output**: Replaced all 21
+  `python3 -m hermes_loop` references in `hermes_loop/cli.py` with the installed
+  `hermes_loop` console command. The `--help`, `--examples`, `--status`,
+  `--doctor`, `--check-env`, `--init`, and error messages now all show
+  `hermes_loop` as the primary invocation, since `make install` makes it
+  available on PATH. The `python3 -m hermes_loop` fallback still works but is
+  no longer the primary documented form.
+
+### Changed
+- `hermes_loop/cli.py` — All help text, arguments, and error messages now use
+  `hermes_loop` instead of `python3 -m hermes_loop` (21 references updated).
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.29.0 to 14.30.0.
+
+### Fixed
+- **Stale `python3 -m hermes_loop` in CLI output**: After v14.29.0 added the
+  `hermes_loop` console command, the daemon's own `--help` still showed
+  `python3 -m hermes_loop` examples. Now consistently uses `hermes_loop`.
+- **Stale README version**: Title said v14.28.0 — bumped to v14.30.0.
+- **Stale CONTRIBUTING.md module count**: Said \"35 modules\" — updated to
+  \"36 modules\" (all 4 occurrences).
+
+---
+
 ## [14.29.0] — 2026-06-26
 
 ### Added

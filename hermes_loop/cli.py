@@ -1041,9 +1041,7 @@ def _display_status():
     if ledger is None:
         print(f"  {c.tag_warn()}  No ledger found at {LEDGER_PATH}")
         print(f"  {c.dim('  The daemon may not be running.')}")
-        print(
-            f"  {c.dim('  Start with:')} {c.flag('python3 -m hermes_loop --goal ... --run')}"
-        )
+        print(f"  {c.dim('  Start with:')} {c.flag('hermes_loop --goal ... --run')}")
         print()
         return
 
@@ -1179,16 +1177,16 @@ def _create_parser(for_introspection=False):
             "  Git:        auto-commit, store-git-diff, max-idle-iterations\n"
             "  Web:        webhook REST API, SSE dashboard v3, HTTP callback\n\n"
             "Common usage:\n"
-            '  python3 -m hermes_loop --goal "Fix lint errors" --run\n'
-            '  python3 -m hermes_loop --goal "Refactor auth" --git --git-commit --evolve --run\n'
-            "  python3 -m hermes_loop --goals-file goals.txt --track-goals --workers 5 --run\n"
-            "  python3 -m hermes_loop --self-test\n"
-            "  python3 -m hermes_loop --dry-run\n"
-            "  python3 -m hermes_loop --examples\n"
-            "  python3 -m hermes_loop --status\n\n"
+            '  hermes_loop --goal "Fix lint errors" --run\n'
+            '  hermes_loop --goal "Refactor auth" --git --git-commit --evolve --run\n'
+            "  hermes_loop --goals-file goals.txt --track-goals --workers 5 --run\n"
+            "  hermes_loop --self-test\n"
+            "  hermes_loop --dry-run\n"
+            "  hermes_loop --examples\n"
+            "  hermes_loop --status\n\n"
             "Stop:  echo 'stop' > /tmp/infinite-loop-stop\n"
             "Pause: echo 'pause' > /tmp/infinite-loop-stop\n"
-            "Status: python3 -m hermes_loop --status"
+            "Status: hermes_loop --status"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -1814,7 +1812,7 @@ def _create_parser(for_introspection=False):
         "Checks every INFINITE_LOOP_* variable against the canonical list of recognized "
         "variables and suggests corrections for misspelled names. "
         "Pre-argparse -- no --goal required. "
-        "Example: python3 -m hermes_loop --check-env",
+        "Example: hermes_loop --check-env",
     )
     group.add_argument(
         "--status",
@@ -1823,7 +1821,7 @@ def _create_parser(for_introspection=False):
         "Shows daemon status, iteration count, success/error counts, duration, "
         "goal, last iteration summary, and quick stop/pause/log commands. "
         "Pre-argparse -- no --goal required. "
-        "Example: python3 -m hermes_loop --status",
+        "Example: hermes_loop --status",
     )
     group.add_argument(
         "--explain",
@@ -1834,7 +1832,7 @@ def _create_parser(for_introspection=False):
         "Displays: group, type, default, full description, aliases, related "
         "flags, and a usage example. "
         "Pre-argparse -- no --goal required. "
-        "Example: python3 -m hermes_loop --explain workers",
+        "Example: hermes_loop --explain workers",
     )
     group.add_argument(
         "--help-topic",
@@ -1844,7 +1842,7 @@ def _create_parser(for_introspection=False):
         "'notifications', 'git', 'toolsets'. "
         "Shows available groups if no match is found. "
         "Pre-argparse — no --goal required. "
-        "Example: python3 -m hermes_loop --help-topic notifications",
+        "Example: hermes_loop --help-topic notifications",
     )
     group.add_argument(
         "--init",
@@ -1854,7 +1852,7 @@ def _create_parser(for_introspection=False):
         "Ideal for first-time users. "
         "Alias: --wizard. "
         "Pre-argparse -- no --goal required. "
-        "Example: python3 -m hermes_loop --init",
+        "Example: hermes_loop --init",
     )
     group.add_argument(
         "--wizard",
@@ -1863,7 +1861,7 @@ def _create_parser(for_introspection=False):
         "a .env file by asking about goal, workers, git, notifications, "
         "and other common settings. "
         "Pre-argparse -- no --goal required. "
-        "Example: python3 -m hermes_loop --wizard",
+        "Example: hermes_loop --wizard",
     )
     group.add_argument(
         "--doctor",
@@ -1873,7 +1871,7 @@ def _create_parser(for_introspection=False):
         "required scripts, shell completion, and gateway connectivity. "
         "Reports pass/warn/fail per check with actionable suggestions. "
         "Pre-argparse -- no --goal required. "
-        "Example: python3 -m hermes_loop --doctor",
+        "Example: hermes_loop --doctor",
     )
     group.add_argument(
         "--demo",
@@ -2057,23 +2055,23 @@ def main():
         )
         parser.print_usage()
         print(
-            "See 'python3 -m hermes_loop --help' for full options",
+            "See 'hermes_loop --help' for full options",
             file=sys.stderr,
         )
         print(
-            "See 'python3 -m hermes_loop --examples' for usage patterns",
+            "See 'hermes_loop --examples' for usage patterns",
             file=sys.stderr,
         )
         print(
-            "See 'python3 -m hermes_loop --init' for interactive setup wizard",
+            "See 'hermes_loop --init' for interactive setup wizard",
             file=sys.stderr,
         )
         print(
-            "See 'python3 -m hermes_loop --doctor' for self-diagnosis",
+            "See 'hermes_loop --doctor' for self-diagnosis",
             file=sys.stderr,
         )
         print(
-            "See 'python3 -m hermes_loop --demo' for a walkthrough of the daemon lifecycle",
+            "See 'hermes_loop --demo' for a walkthrough of the daemon lifecycle",
             file=sys.stderr,
         )
         if env_hint:

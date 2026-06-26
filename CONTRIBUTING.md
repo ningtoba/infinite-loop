@@ -31,7 +31,7 @@ is met.
 
 **Key architecture points:**
 
-- **`hermes_loop/`** — Main package (35 modules). Contains all daemon logic:
+- **`hermes_loop/`** — Main package (36 modules). Contains all daemon logic:
   `cli.py` (argparse + entry point), `loop.py` (iteration loop),
   `functions.py` (helper functions), `iteration.py` (spawned session execution),
   `error_utils.py` (error classification + actionable suggestions),
@@ -148,11 +148,11 @@ bash run.sh
 # After installing via `make install`:
 hermes_loop --goal "Refactor auth module" --run
 
-# Direct invocation with launch-loop.py shim (always works, no install needed)
+# Or via the backward-compatible launch-loop.py shim (always works, no install needed)
 python3 launch-loop.py --goal "Refactor auth module" --run
 
 # With common flags
-python3 launch-loop.py \
+hermes_loop \
   --goal "Fix all TypeScript errors in src/" \
   --git \
   --git-commit \
@@ -161,7 +161,7 @@ python3 launch-loop.py \
 
 # As a background process (e.g., in tmux)
 tmux new -s loop
-python3 launch-loop.py --goal "..." --run
+hermes_loop --goal "..." --run
 # Ctrl+B, D to detach
 ```
 
@@ -251,7 +251,7 @@ git checkout -b feature/describe-your-change
 
 Make your changes. A few guidelines:
 
-- **`hermes_loop/` is a package (35 modules)** — find the right module before
+- **`hermes_loop/` is a package (36 modules)** — find the right module before
   adding code. The `cli.py` module has the argparse setup and `main()` entry
   point. `loop.py` has `run_loop()`. `functions.py` has helper functions like
   `_execute_iteration()`, `_build_iteration_record()`,
@@ -275,7 +275,7 @@ Make your changes. A few guidelines:
 Run the self-tests before committing:
 
 ```bash
-python3 launch-loop.py --self-test
+hermes_loop --self-test
 ```
 
 This runs 10 self-test groups (all cases auto-detected at runtime) without spawning any
@@ -315,10 +315,10 @@ bash -n scripts/inspect-ledger.sh
 bash -n run.sh
 
 # Dry run still parses correctly
-python3 launch-loop.py --dry-run
+hermes_loop --dry-run
 
 # Help output is well-formed
-python3 launch-loop.py --help | head -5
+hermes_loop --help | head -5
 ```
 
 ### 4. Commit
@@ -425,7 +425,7 @@ def _classify_progress(summary: str, has_git_changes: bool, error: str | None) -
 
 ### Pull Request Process
 
-1. **Ensure all self-tests pass** — `python3 launch-loop.py --self-test`
+1. **Ensure all self-tests pass** — `hermes_loop --self-test`
 2. **Update the CHANGELOG** — Add an entry under a new `## [Unreleased]`
    section at the top of `CHANGELOG.md`. Follow the existing format
    (Keep a Changelog + SemVer).
@@ -448,7 +448,7 @@ git push origin feature/your-feature
 
 ### PR Checklist
 
-- [ ] Self-tests pass (`python3 launch-loop.py --self-test`)
+- [ ] Self-tests pass (`hermes_loop --self-test`)
 - [ ] CHANGELOG updated
 - [ ] Version bumped (if applicable)
 - [ ] README / docs updated (if applicable)
@@ -474,7 +474,7 @@ git push origin feature/your-feature
 
 When filing a bug report, please include:
 
-1. **Version** — `python3 launch-loop.py --version`
+1. **Version** — `hermes_loop --version`
 2. **Command used** — The exact command you ran
 3. **Expected behavior** — What you expected to happen
 4. **Actual behavior** — What actually happened (include error output)
@@ -495,7 +495,7 @@ it. Examples of good feature requests:
 
 ```
 **Version**: 14.1.0
-**Command**: python3 launch-loop.py --goal "fix tests" --run
+**Command**: hermes_loop --goal "fix tests" --run
 **Expected**: Loop starts and spawns Hermes sessions
 **Actual**: TypeError: _classify_progress() missing 1 required positional argument: 'error'
 **Ledger**: [paste relevant portion]
@@ -521,7 +521,7 @@ hermes-loop/
 ├── .env                        # Your local configuration (git-ignored)
 ├── .env.example                # Documented config template
 ├── .gitignore
-├── hermes_loop/                # Main package (35 modules) ★
+├── hermes_loop/                # Main package (36 modules) ★
 │   ├── __init__.py
 │   ├── __main__.py
 │   ├── cli.py                  # Argparse + main() entry point

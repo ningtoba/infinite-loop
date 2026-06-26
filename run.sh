@@ -25,7 +25,7 @@ if [[ "${1:-}" == "--version" ]]; then
   exec python3 "$SCRIPT_DIR/launch-loop.py" "--version"
 fi
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.29.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.30.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""

@@ -7,10 +7,9 @@ JSON ledger, and can batch-process hundreds of goals in sequence.
 
 ## Origin
 
-This is the **infinite-loop skill** from the Hermes Agent skills repository,
-extracted into a standalone project. It lives inside `~/.hermes/skills/software-development/infinite-loop/`
-when installed as a Hermes skill, and is mirrored here for independent use,
-development, and documentation.
+This is the **infinite-loop skill** from the [Hermes Agent](https://hermes-agent.nousresearch.com)
+skills repository, extracted into a standalone project. It mirrors the original
+skill for independent use, development, and documentation.
 
 **Author**: Hermes Agent (Nous Research) — MIT license.
 
@@ -54,13 +53,13 @@ development, and documentation.
 # Basic loop — one goal, infinite iterations
 python3 launch-loop.py \
   --goal "Refactor the auth module to use JWT tokens" \
-  --workdir /home/nekophobia/Projects/myapp \
+  --workdir /path/to/your/project \
   --run
 
 # Batch — read goals from a file
 python3 launch-loop.py \
   --goals-file /tmp/goals.txt \
-  --workdir /home/nekophobia/Projects/myapp \
+  --workdir /path/to/your/project \
   --git --max-iterations 50 \
   --run
 
@@ -143,15 +142,15 @@ The `context` field is critical for iterative work — it tells the NEXT spawned
 
 ## Scripts
 
-|| Script | Path | Purpose |
-||--------|------|---------|
-|| **launch-loop.py** | `launch-loop.py` (root) | Main daemon — the primary loop. Spawns Hermes sessions, manages the JSON ledger, handles all flags. **287 KB, 7,557 lines.** |
-|| **session-self-loop.py** | `session-self-loop.py` (root) | Lightweight in-session loop tracker for self-enhancement from within your current Hermes session. |
-|| **run-loop.sh** | `scripts/run-loop.sh` | Unified shell wrapper that forwards all flags to launch-loop.py. |
-|| **inspect-ledger.sh** | `scripts/inspect-ledger.sh` | View the JSON ledger formatted: default view, `--watch`, `--summary`, `--json`, `--errors-only`, `--last N`. |
-|| **archive-state.sh** | `scripts/archive-state.sh` | Archive old iterations to JSONL or Markdown. `--auto` mode with optional `--gzip`. |
-|| **replay-ledger.sh** | `scripts/replay-ledger.sh` | Re-run archived iterations from JSONL files. Supports `--from`, `--to`, `--dry-run`, `--goal` prefix. |
-|| **verify-delegation-config.sh** | `scripts/verify-delegation-config.sh` | Check Hermes delegation config (historical reference). |
+| Script | Path | Purpose |
+|--------|------|---------|
+| **launch-loop.py** | `launch-loop.py` (root) | Main daemon — the primary loop. Spawns Hermes sessions, manages the JSON ledger, handles all flags. **287 KB, 7,557 lines.** |
+| **session-self-loop.py** | `session-self-loop.py` (root) | Lightweight in-session loop tracker for self-enhancement from within your current Hermes session. |
+| **run-loop.sh** | `scripts/run-loop.sh` | Unified shell wrapper that forwards all flags to launch-loop.py. |
+| **inspect-ledger.sh** | `scripts/inspect-ledger.sh` | View the JSON ledger formatted: default view, `--watch`, `--summary`, `--json`, `--errors-only`, `--last N`. |
+| **archive-state.sh** | `scripts/archive-state.sh` | Archive old iterations to JSONL or Markdown. `--auto` mode with optional `--gzip`. |
+| **replay-ledger.sh** | `scripts/replay-ledger.sh` | Re-run archived iterations from JSONL files. Supports `--from`, `--to`, `--dry-run`, `--goal` prefix. |
+| **verify-delegation-config.sh** | `scripts/verify-delegation-config.sh` | Check Hermes delegation config (historical reference). |
 
 ### Hermes Worker Server (external)
 
@@ -711,7 +710,7 @@ decisions, edge cases, and troubleshooting:
 | `stdlib-daemon-patterns.md` | stdlib-only patterns for the daemon |
 | `yaml-null-pitfall.md` | `hermes config set` quirk with null values |
 
-The root-level `research-*.md` files document the design process behind
+The `research/` directory documents the design process behind
 each major version — from v11.11.0 through v14.1.0, including feature
 specs, audits, and synthesis documents.
 
@@ -789,7 +788,4 @@ infinite-loop/
 │   ├── v14.0.0-features.md
 │   ├── ... (20+ research documents)
 │   └── aiagent-vs-subprocess-analysis.md
-│
-└── references/                  ← Design docs
-    └── ...
 ```

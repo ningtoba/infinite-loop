@@ -5,6 +5,8 @@ A self-looping background daemon that spawns Hermes sessions with **real tools**
 multi-level delegation trees. It iterates autonomously, tracks progress in a
 JSON ledger, and can batch-process hundreds of goals in sequence.
 
+> **Changelog**: See [CHANGELOG.md](./CHANGELOG.md) for the complete version history.
+
 ## Origin
 
 This is the **infinite-loop skill** from the [Hermes Agent](https://hermes-agent.nousresearch.com)
@@ -437,6 +439,8 @@ kill $LOOP_PID
 | Dashboard Goals Visualization | Enhancement | `launch-loop.py` | Per-goal status with progress bar, ✓/▶/○ indicators, scrollable list. Populated from `goals_specs` + `goals_completed` via SSE payload. |
 | False Convergence Guard | Robustness | `launch-loop.py` | `_detect_convergence()` skips Jaccard similarity check when summary < 20 chars. Prevents false convergence stops from empty/error summaries. |
 | `--quiet` / `-q` mode | Usability | `scripts/run-loop.sh` | Suppresses ASCII banner and startup info in CI/CD and scripted use. |
+|
+> **Full changelog**: See [CHANGELOG.md](./CHANGELOG.md) for the complete version history since v1.0.0.
 
 ---
 

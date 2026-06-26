@@ -1,5 +1,5 @@
 #!/bin/bash
-# run-loop.sh — Unified entrypoint (v14.0.0 — New features: Dashboard v3 SSE, Session Self-Healing Heartbeat, Hermes Version Check)
+# run-loop.sh — Unified entrypoint (v14.1.0 — New features: Dashboard XSS fix, error panel, metrics, goals visualization, convergence guard, --quiet mode)
 #
 # THE PRIMARY way to create an autonomous delegation loop. No cron jobs.
 #
@@ -222,20 +222,18 @@ fi
 
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop - v14.0.0                       ║"
-  echo "║  Dashboard v3 SSE, Session                       ║"
-  echo "║  Self-Healing Heartbeat, Hermes                  ║"
-  echo "║  Version Check, Idempotent Goal Execution,       ║"
-  echo "║  Concurrent Library Mode, Auto Error Recovery,   ║"
-  echo "║  In-Process Archiving, Multi-Profile Goals       ║"
-  echo "║  Function Decomposition Phase 2 & 3,             ║"
-  echo "║  Self-Test Mode, Output Progress                 ║"
-  echo "║  Classification, File, YOLO mode,                ║"
-  echo "║  clean-slate mode, AIAgent library,              ║"
-  echo "║  session tracking, Pushbullet & ntfy             ║"
-  echo "║  notifications, preflight health checks,         ║"
-  echo "║  /api/status, REST control, dashboard v2,        ║"
-  echo "║  No cron. Real delegation. Real loops.           ║"
+  echo "║  Infinite Loop - v14.1.0                       ║"
+  echo "║  Dashboard v3 SSE, Error Panel,                   ║"
+  echo "║  Performance Metrics, Goals Visualization,        ║"
+  echo "║  XSS Fix, Convergence Guard, Idempotent           ║"
+  echo "║  Goal Execution, Concurrent Library Mode,         ║"
+  echo "║  Auto Error Recovery, In-Process Archiving,       ║"
+  echo "║  Multi-Profile Goals, Self-Test Mode,             ║"
+  echo "║  Progress Classification, AIAgent library,        ║"
+  echo "║  Session Tracking, Pushbullet & ntfy              ║"
+  echo "║  Notifications, Preflight, REST Control,          ║"
+  echo "║  Session Self-Healing Heartbeat, --quiet mode     ║"
+  echo "║  No cron. Real delegation. Real loops.            ║"
   echo "╚══════════════════════════════════════════════╝"
   echo ""
 fi

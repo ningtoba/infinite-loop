@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
-session-self-loop.py — In-session infinite loop (v2.10.0)
+session-self-loop.py — In-session infinite loop (v2.11.0)
+
+v2.11.0:
+  - Version bump to align with infinite-loop v14.1.0 release
+  - Dashboard XSS fix, Error Panel, Performance Metrics,
+    Goals Visualization, Convergence Guard parity
 
 v2.10.0:
   - Version bump to align with infinite-loop v14.0.0 release

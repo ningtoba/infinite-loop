@@ -71,7 +71,7 @@ make run                                        # Run with .env config
 make run ARGS="--goal 'fix lint errors' --git"  # Run with extra flags
 make self-test                                  # Run self-tests (9 groups, 45 cases)
 make examples                                   # Print categorized usage examples
-make list-flags                                 # Print all 87 flags organized by group
+make list-flags                                 # Print all 90 flags organized by group
 make list-groups                                # Print group names with flag counts
 
 # Monitor progress:
@@ -360,11 +360,12 @@ Default toolsets: `terminal,file,delegation,web,skills,browser,memory,session_se
 | `--preflight-fail-fast` | `false` | Stop on first preflight failure |
 | `--dry-run` | `false` | Print config and exit (no loop) |
 | `--self-test` | `false` | Run in-process self-tests (9 groups, 45 cases) and exit |
-| `--list-flags` | *(n/a)* | Print all 87 flags organized by group with help text. Pre-argparse (no `--goal` required) |
+| `--list-flags` | *(n/a)* | Print all 90 flags organized by group with help text. Pre-argparse (no `--goal` required) |
 | `--list-groups` | *(n/a)* | Print only group names with flag counts (compact overview) |
 | `--examples` | *(n/a)* | Print categorized real-world usage examples across 7 categories |
 | `--save-config` | `""` | Save config to JSON file and exit |
 | `--config` | `""` | Load config from JSON file |
+| `--completion-script` | *(n/a)* | Generate shell completion for bash/zsh from live argparse. `--completion-script bash | source /dev/stdin` |
 | `--version` | *(n/a)* | Print version and exit |
 | `--help` | *(n/a)* | Print full help |
 
@@ -918,10 +919,38 @@ Since v12.0.0, `--use-library` works with `--workers > 1` via
 
 ### Shell Completion
 
-The daemon ships with a `--list-flags` flag that prints every supported CLI flag
-as a tab-separated triple (`short-flag`, `long-flag`, `description`) — one per
-line — making it straightforward to wire up shell autocompletion for bash, zsh,
-or fish:
+The daemon provides two approaches for shell completion:
+
+**Auto-generated (recommended):** Use `--completion-script` to generate a
+complete bash or zsh completion script from the live argparse parser —
+always up-to-date and never needs manual maintenance:
+
+```bash
+# Bash: use directly
+source <(python3 launch-loop.py --completion-script bash)
+
+# Zsh: save to completions directory
+mkdir -p ~/.zsh/completion
+python3 launch-loop.py --completion-script zsh > ~/.zsh/completion/_hermes_loop
+# Then add to ~/.zshrc:
+#   fpath=(~/.zsh/completion $fpath)
+#   autoload -Uz compinit && compinit
+
+# One-time install via Makefile:
+make completion    # installs completion script for your shell
+```
+
+**Regenerate from argparse:** After adding/removing flags, update the
+static completion scripts:
+
+```bash
+make update-completions   # regenerates scripts/completion/{bash,zsh}
+make completion            # reinstall them
+```
+
+**Legacy `--list-flags` approach:** Each CLI flag is also available as a
+tab-separated triple (`short-flag`, `long-flag`, `description`) for
+manual integration:
 
 ```bash
 # View all flags with their short form, long form, and description

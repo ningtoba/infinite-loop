@@ -33,6 +33,7 @@ from .self_test import _run_self_test
 from .heartbeat import _cleanup_stale_heartbeats
 from .notifications import _send_completion_notification
 from .functions import set_max_output_chars
+from .completions import generate_bash_completion, generate_zsh_completion
 from .color_utils import colorizer, configure_color_mode
 
 
@@ -71,6 +72,7 @@ def _list_flags(show_help=True):
         "--list-groups": "Print compact group names with flag counts",
         "--examples": "Print categorized real-world usage examples",
         "--version": "Print daemon version and exit",
+        "--completion-script": "Generate shell completion script for bash or zsh from live argparse",
     }
 
     total_flags = sum(len(v) for v in group_map.values()) + len(introspection_flags)
@@ -889,6 +891,15 @@ def _create_parser(for_introspection=False):
         "'never' (disable all color). "
         "Also respects the NO_COLOR environment variable.",
     )
+    group.add_argument(
+        "--completion-script",
+        default="",
+        choices=["bash", "zsh"],
+        help="Generate and print a shell completion script for bash or zsh "
+        "by introspecting the live argparse parser. "
+        "Always up-to-date — never manually edit completion scripts again. "
+        "Example: --completion-script bash | source /dev/stdin",
+    )
 
     return parser
 
@@ -923,6 +934,23 @@ def main():
     # Check --examples before argparse to avoid required --goal conflict
     if "--examples" in sys.argv:
         _list_examples()
+        sys.exit(0)
+
+    # Check --completion-script before argparse to avoid required --goal conflict
+    comp_script = None
+    for i, arg in enumerate(sys.argv[1:]):
+        if arg == "--completion-script" and i + 2 < len(sys.argv):
+            comp_script = sys.argv[i + 2]
+            break
+        if arg.startswith("--completion-script="):
+            comp_script = arg.split("=", 1)[1]
+            break
+    if comp_script:
+        parser = _create_parser(for_introspection=True)
+        if comp_script == "bash":
+            print(generate_bash_completion(parser))
+        elif comp_script == "zsh":
+            print(generate_zsh_completion(parser))
         sys.exit(0)
 
     # Friendly error if --goal is missing (before argparse dry error)

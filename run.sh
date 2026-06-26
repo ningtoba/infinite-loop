@@ -45,9 +45,10 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "  Info:"
   echo "    --help / -h           Show this help message"
   echo "    --version             Print daemon version and exit"
-  echo "    --list-flags          Print all 87 flags organized by group with help text"
+  echo "    --list-flags          Print all 90 flags organized by group with help text"
   echo "    --list-groups         Print compact group names with flag counts"
   echo "    --examples            Print categorized real-world usage examples (7 categories)"
+  echo "    --completion-script {bash|zsh}  Generate shell completion (pipe to source)"
   echo ""
   echo "EXAMPLES:"
   echo "  bash run.sh                           # Run with .env config"
@@ -191,6 +192,7 @@ while [[ $# -gt 0 ]]; do
     --tag)        DAEMON_ARGS+=("--tag" "$2"); shift 2 ;;
     --help|-h)    echo "See 'bash run.sh --help' for usage."; exit 0 ;;
     --list-flags|--list-groups|--examples) DAEMON_ARGS+=("$1"); shift ;;
+    --completion-script) DAEMON_ARGS+=("$1" "$2"); shift 2 ;;
     *)            EXTRA_ARGS+=("$1"); shift ;;
   esac
 done

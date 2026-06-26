@@ -4,6 +4,39 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.16.0] — 2026-06-26
+
+### Added
+- **`--completion-script {bash|zsh}` flag**: Generate shell completion scripts
+  directly from the live argparse parser, eliminating the need for manually
+  maintained static completion files. Never worry about flag drift again.
+  Examples:
+  ```bash
+  python3 -m hermes_loop --completion-script bash    # print bash completions
+  python3 -m hermes_loop --completion-script zsh     # print zsh completions
+  python3 -m hermes_loop --completion-script bash | source /dev/stdin
+  ```
+- **`hermes_loop/completions.py`** — New module with `generate_bash_completion()`
+  and `generate_zsh_completion()` functions that introspect an argparse parser
+  and emit ready-to-use completion scripts. Both scripts pass `bash -n` / `zsh -n`
+  syntax checking. Covers boolean flags, value flags, and choice-constrained flags.
+- **`make update-completions`** — New Makefile target that regenerates the
+  completion scripts at `scripts/completion/bash` and `scripts/completion/zsh`
+  from the live argparse definitions. Run after adding/removing flags.
+
+### Changed
+- `hermes_loop/cli.py` — `main()` now checks for `--completion-script` before
+  argparse (similar to `--examples` / `--list-flags`), so it works without
+  requiring `--goal`. Added `--completion-script` to the Introspection section
+  in `--list-flags` output. Added the flag to the Startup & Debug argument group.
+- `Makefile` — `make lint` now also checks shell syntax of the completion scripts
+  via `bash -n` and `zsh -n`. New `update-completions` target regenerates from
+  `--completion-script`.
+- `run.sh` — Added `--completion-script` to the `--help` info section and the
+  while-loop for direct pass-through to launch-loop.py.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.15.0 to 14.16.0.
+
+---
 ## [14.15.0] — 2026-06-26
 
 ### Added

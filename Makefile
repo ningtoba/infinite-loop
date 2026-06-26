@@ -32,7 +32,7 @@ help:
 	@echo "    self-test    Run in-process self-tests (9 groups, 45 cases)"
 	@echo "    version      Print daemon version and exit"
 	@echo "    examples     Print categorized real-world usage examples"
-	@echo "    list-flags   Print all 87 flags organized by group"
+	@echo "    list-flags   Print all 90 flags organized by group"
 	@echo "    list-groups  Print compact group names with flag counts"
 	@echo ""
 	@echo "  Monitoring:"
@@ -43,9 +43,11 @@ help:
 	@echo "    resume       Write 'resume' to the sentinel file"
 	@echo ""
 	@echo "  Maintenance:"
-	@echo "    clean        Remove ledger, sentinel, and temp files"
-	@echo "    lint         Run Python syntax checks on launch-loop.py"
-	@echo "    archive      Archive old iterations from ledger"
+	@echo "    clean            Remove ledger, sentinel, and temp files"
+	@echo "    lint             Run Python syntax checks on all .py files"
+	@echo "    completion       Install shell tab-completion (bash/zsh)"
+	@echo "    update-completions  Regenerate completion scripts from argparse"
+	@echo "    archive          Archive old iterations from ledger"
 	@echo ""
 	@echo "EXAMPLES:"
 	@echo "  make env                      # Create .env from .env.example"
@@ -159,22 +161,44 @@ clean:
 	@echo "  ✓ /tmp/loop-status.{html,json}"
 	@echo "Done. Next: make run"
 
+.PHONY: update-completions
+update-completions:
+	@echo "Regenerating bash/zsh completion scripts from live argparse..."
+	@$(PYTHON) -m hermes_loop --completion-script bash > scripts/completion/bash
+	@$(PYTHON) -m hermes_loop --completion-script zsh > scripts/completion/zsh
+	@echo "  ✓ scripts/completion/bash"
+	@echo "  ✓ scripts/completion/zsh"
+	@echo "Done. The scripts now reflect the current argparse definitions."
+	@echo "Reinstall: make completion"
+
 .PHONY: lint
 lint:
 	@echo "Checking Python syntax..."
 	@ERRORS=0; \
 	for f in hermes_loop/*.py session-self-loop.py launch-loop.py; do \
 		if $(PYTHON) -m py_compile "$$f" 2>/dev/null; then \
-			echo "  ✓ $$f"; \
+			echo "  [OK] $$f"; \
 		else \
-			echo "  ✗ $$f — syntax error"; \
+			echo "  [FAIL] $$f - syntax error"; \
 			ERRORS=$$((ERRORS + 1)); \
 		fi; \
 	done; \
 	if [ "$$ERRORS" -eq 0 ]; then \
-		echo "Syntax OK — all files pass"; \
+		echo "Python syntax OK - all files pass"; \
 	else \
 		echo "$$ERRORS file(s) have syntax errors"; \
+		exit 1; \
+	fi; \
+	if command -v bash >/dev/null 2>&1; then \
+		bash -n scripts/completion/bash 2>/dev/null && echo "  [OK] scripts/completion/bash" || { echo "  [FAIL] scripts/completion/bash - syntax error"; ERRORS=$$((ERRORS + 1)); }; \
+	fi; \
+	if command -v zsh >/dev/null 2>&1; then \
+		zsh -n scripts/completion/zsh 2>/dev/null && echo "  [OK] scripts/completion/zsh" || { echo "  [FAIL] scripts/completion/zsh - syntax error"; ERRORS=$$((ERRORS + 1)); }; \
+	fi; \
+	if [ "$$ERRORS" -eq 0 ]; then \
+		echo "All checks pass"; \
+	else \
+		echo "$$ERRORS file(s) have errors"; \
 		exit 1; \
 	fi
 

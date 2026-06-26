@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-VERSION = "14.3.0"
+VERSION = "14.4.0"
 """
 launch-loop.py — Infinite loop daemon v14.3.0
 
@@ -257,6 +257,7 @@ _shutdown_requested = False
 _daemon_logger = None  # Set during init
 # References to current state for signal-safe ledger write
 _shutdown_state_ref: dict | None = None
+_hermes_worker_ref: object | None = None
 
 # SSE (Server-Sent Events) client tracking for live dashboard
 _sse_clients: list[queue.Queue] = []
@@ -264,14 +265,20 @@ _sse_clients_lock = threading.Lock()
 
 
 def _handle_shutdown(signum, frame):
+    """Handle SIGINT/Ctrl+C and SIGTERM by cleaning up child processes and exiting."""
     global _shutdown_requested
+    if _shutdown_requested:
+        return  # Already shutting down
     _shutdown_requested = True
+
+    signame = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
+
     # Signal-safe write: immediately persist the current ledger state so
     # mid-subprocess SIGTERM/SIGINT doesn't lose data. We write to a
     # temporary file then atomically rename, which is signal-safe on POSIX.
     state = _shutdown_state_ref
     if state is not None:
-        state["status"] = f"stopped: signal-{signum}"
+        state["status"] = f"stopped: {signame}"
         state["last_updated"] = datetime.now(timezone.utc).isoformat()
         try:
             tmp_path = LEDGER_PATH + ".sigterm.tmp"
@@ -280,6 +287,92 @@ def _handle_shutdown(signum, frame):
             os.replace(tmp_path, LEDGER_PATH)
         except Exception:
             pass  # Best-effort in signal handler
+
+    # Kill the Hermes Worker process if running
+    worker = _hermes_worker_ref
+    if worker is not None:
+        try:
+            worker.stop()
+        except Exception:
+            pass
+
+    # Kill all spawned hermes chat subprocesses
+    try:
+        import subprocess
+
+        subprocess.run(
+            ["pkill", "-9", "-f", "hermes.*chat -q"], capture_output=True, timeout=5
+        )
+    except Exception:
+        pass
+
+    _log(f"[STOP] {signame} received. Worker and child processes cleaned up. Exiting.")
+    sys.exit(128 + signum)
+
+
+# Module-level cache: store file mtime and size at daemon startup
+_startup_file_snapshots: dict[str, tuple[float, int]] = {}
+
+
+def _snapshot_file(path: str) -> tuple[float, int] | None:
+    """Return (mtime, size) for a file, or None if it doesn't exist."""
+    try:
+        s = os.stat(path)
+        return (s.st_mtime, s.st_size)
+    except (FileNotFoundError, OSError):
+        return None
+
+
+def _check_auto_reload(
+    workdir: str | None,
+    state: dict,
+    worker_manager: object | None,
+    status_file: str,
+    iteration_count: int,
+) -> None:
+    """Check if daemon source files changed on disk and restart if so.
+
+    Compares current file mtime/size against snapshots taken at daemon
+    startup. If any monitored file changed, persists the ledger and
+    calls os.execv() to restart with updated code.
+    """
+    global _startup_file_snapshots
+    if not _startup_file_snapshots or not workdir:
+        return  # Startup snapshots not initialized yet
+
+    files_to_check = [
+        os.path.join(workdir, "launch-loop.py"),
+        os.path.join(workdir, "run.sh"),
+        os.path.join(workdir, ".env"),
+    ]
+
+    changed = []
+    for fpath in files_to_check:
+        current = _snapshot_file(fpath)
+        cached = _startup_file_snapshots.get(fpath)
+        if current is not None and cached is not None:
+            if current != cached:
+                changed.append(os.path.basename(fpath))
+                # Update snapshot so we don't trigger repeatedly
+                _startup_file_snapshots[fpath] = current
+
+    if not changed:
+        return
+
+    _log(
+        f"[AUTO-RELOAD] Detected changes in: {', '.join(changed)}. Restarting daemon..."
+    )
+    state["status"] = "reloading"
+    state["last_updated"] = datetime.now(timezone.utc).isoformat()
+    write_ledger(state)
+    write_status_file(status_file, state, iteration_count, "reloading")
+    if worker_manager is not None:
+        try:
+            worker_manager.stop()
+        except Exception:
+            pass
+    _log("[AUTO-RELOAD] Executing os.execv() with updated code...")
+    os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
 signal.signal(signal.SIGTERM, _handle_shutdown)
@@ -444,6 +537,7 @@ def _log_startup_banner(
     task_type_desc: str,
     profile: str,
     model: str,
+    max_iterations: int,
     max_retries: int,
     max_turns: int,
     tag: str,
@@ -469,59 +563,84 @@ def _log_startup_banner(
     reset_goals: bool = False,
     heartbeat_timeout: int = 0,
 ) -> None:
-    """Log the startup banner (35 lines of DAEMON status info)."""
+    """Log a readable, categorized startup banner showing what's actually active."""
     _log(f"[DAEMON] PID={os.getpid()}")
     _log(f"[DAEMON] ledger={LEDGER_PATH}")
     _log(f"[DAEMON] sentinel={SENTINEL_PATH_DEFAULT}")
     _log(f"[DAEMON] workdir={os.getcwd()}")
+    # ── Header ────────────────────────────────────────────────────────────────
+    _log(f"[DAEMON] ═════ v{LAUNCH_LOOP_VERSION} Configuration Overview ═════")
+    # ── Category: Iteration ──────────────────────────────────────────────────
+    parts = []
+    if max_iterations > 0:
+        parts.append(f"max={max_iterations}")
+    if evolve:
+        parts.append("evolve")
+    if track_goals:
+        parts.append("track-goals")
+    if convergence_stop:
+        parts.append(f"converge({convergence_window}×{convergence_threshold})")
     _log(
-        f"[DAEMON] v{LAUNCH_LOOP_VERSION} -- Dashboard XSS Fix, Error Panel, "
-        "Performance Metrics, Goals Visualization, "
-        "Function Decomposition Phase 2 & 3, "
-        "Self-Test Mode, Output Progress Classification, "
-        "Idempotent Goal Execution, Concurrent Library Mode, "
-        "Automatic Error Recovery, In-Process Archiving, "
-        "Multi-Profile Goals File, GoalSpec pipe syntax, YOLO mode, "
-        "clean-slate mode, AIAgent library, session tracking, checkpoints, "
-        "session chaining, skills preloading, safe-mode, accept-hooks, "
-        "worktree, continue, Pushbullet & ntfy push, preflight, "
-        "/api/status, REST control, dashboard v2, dashboard v3 SSE, "
-        "session self-healing heartbeat, config file, "
-        "desktop notifications, startup delay, error classification, "
-        "convergence detection, adaptive cooldown, "
-        "context propagation, self-modification awareness"
+        f"[DAEMON]   Iteration: {' | '.join(parts) if parts else '(unlimited, no auto-stop)'}"
     )
-    _log(f"[DAEMON] Task type: {task_type} ({task_type_desc})")
-    _log(f"[DAEMON] Profile: {profile or '(default)'}, Model: {model or '(default)'}")
+
+    # ── Category: Parallel ───────────────────────────────────────────────────
+    parts = [f"workers={workers}", f"timeout={session_timeout}s"]
+    if max_retries > 0:
+        parts.append(f"retries={max_retries}")
+    cooldown_str = f"adaptive" if cooldown_mode == "adaptive" else f"{cooldown}s"
+    parts.append(f"cooldown={cooldown_str}")
+    if heartbeat_timeout > 0:
+        parts.append(f"heartbeat={heartbeat_timeout}s")
+    _log(f"[DAEMON]   Parallel:   {' | '.join(parts)}")
+
+    # ── Category: Notifications ──────────────────────────────────────────────
+    parts = []
+    if notify_cmd:
+        parts.append("shell-cmd")
+    if use_library and pass_session_id:
+        parts.append("session-id")
+    _log(f"[DAEMON]   Notify:     {notify_cmd or 'none'}")
+    parts = []
+    if notify_cmd:
+        parts.append("shell-cmd")
+    if pass_session_id:
+        parts.append("session-id")
+    if checkpoints:
+        parts.append("checkpoints")
     _log(
-        f"[DAEMON] Max retries: {max_retries}, Max turns: {max_turns}, Tag: {tag or '(none)'}"
+        f"[DAEMON]   Sessions:   {' | '.join(parts) if parts else '(direct subprocess)'}"
     )
+
+    # ── Category: Spawn ──────────────────────────────────────────────────────
+    parts = []
+    if profile:
+        parts.append(f"profile={profile}")
+    if model:
+        parts.append(f"model={model}")
+    _log(
+        f"[DAEMON]   Spawn:      profile={profile or '(default)'}, model={model or '(default)'}"
+    )
+
+    # ── Category: Git ────────────────────────────────────────────────────────
+    if git:
+        parts = ["capture"]
+        if git_commit:
+            parts.append("auto-commit")
+        if store_git_diff:
+            parts.append("store-diff")
+        _log(f"[DAEMON]   Git:        {' | '.join(parts)}")
+    elif git_commit or store_git_diff:
+        _log("[DAEMON]   Git:        (flags set but --git not enabled — ignored)")
+
+    # ── Category: Output ─────────────────────────────────────────────────────
+    _log(
+        f"[DAEMON]   Output:     max-chars={max_output_chars}, schema={'yes' if output_schema else 'no'}"
+    )
+    _log(f"[DAEMON] ══════════════════════════════════════════════════")
     _log(f"[DAEMON] Goal: {goal}")
     _log(f"[DAEMON] Toolsets: {toolsets}")
-    _log(f"[DAEMON] Evolve: {evolve}, Git: {git}, Git-commit: {git_commit}")
-    _log(f"[DAEMON] Workers: {workers}, Session timeout: {session_timeout}s")
-    _log(f"[DAEMON] Notify: {notify_cmd or 'none'}")
-    _log(
-        f"[DAEMON] Library mode: {'yes' if use_library else 'no'}, "
-        f"Session ID: {'yes' if pass_session_id else 'no'}, "
-        f"Checkpoints: {'yes' if checkpoints else 'no'}"
-    )
-    if output_schema:
-        _log(
-            f"[DAEMON] Output schema: {len(json.dumps(output_schema))} bytes, "
-            "validating spawned output"
-        )
-    if cooldown_mode == "adaptive":
-        _log("[DAEMON] Cooldown: adaptive (auto-calculated from iteration duration)")
-    else:
-        _log(f"[DAEMON] Cooldown: {cooldown}s ({cooldown_mode})")
-    if convergence_stop:
-        _log(
-            f"[DAEMON] Convergence: stop if {convergence_window} consecutive "
-            f"similar iterations (threshold={convergence_threshold})"
-        )
-    if store_git_diff:
-        _log("[DAEMON] Git diff storage: enabled (capped at 10KB)")
+    _log(f"[DAEMON] Task type: {task_type} ({task_type_desc})")
     if track_goals:
         _log(
             f"[DAEMON] Goal tracking: enabled (reset={reset_goals}) — "
@@ -5666,8 +5785,9 @@ def run_loop(
         )
 
     # Wire up signal-safe state reference for graceful shutdown
-    global _shutdown_state_ref
+    global _shutdown_state_ref, _hermes_worker_ref
     _shutdown_state_ref = state
+    _hermes_worker_ref = worker_manager
 
     iteration_count = state["total_iterations"]
     existing_summaries = [it.get("summary", "") for it in state.get("iterations", [])]
@@ -5726,6 +5846,7 @@ def run_loop(
         task_type_desc=task_type_desc,
         profile=profile,
         model=model,
+        max_iterations=max_iterations,
         max_retries=max_retries,
         max_turns=max_turns,
         tag=tag,
@@ -5895,12 +6016,21 @@ def run_loop(
         iterations: list[dict] = state.setdefault("iterations", [])
         iteration_start_time = datetime.now(timezone.utc).isoformat()
 
-        _log(f"\n{'=' * 60}")
-        _log(f"  Iteration {iteration_count}")
+        _log(f"{'=' * 60}")
+        _log(f"    Iteration {iteration_count}")
         if max_iterations > 0:
-            _log(f"  Progress: {iteration_count}/{max_iterations}")
-        if workers > 1:
-            _log(f"  Workers: {workers} concurrent sessions")
+            pct = min(100.0 * iteration_count / max_iterations, 100.0)
+            bar_width = 25
+            filled = int(pct / 100.0 * bar_width)
+            bar = "█" * filled + "░" * (bar_width - filled)
+            _log(f"    [{bar}] {iteration_count}/{max_iterations} — {pct:.0f}%")
+        _log(f"    Goal: {goal[:100]}{'...' if len(goal) > 100 else ''}")
+        parts = [f"workers={workers}"]
+        if max_turns:
+            parts.append(f"turns={max_turns}")
+        _log(f"    {' | '.join(parts)}")
+        if len(goals_list) > 1:
+            _log(f"    Goals-file: {len(goals_list)} goals loaded")
         _log(f"{'=' * 60}")
 
         # Cycle goals from goals_file if provided
@@ -6130,7 +6260,13 @@ def run_loop(
         write_ledger(state)
         write_status_file(status_file, state, iteration_count, "running")
 
-        _log(f"[DONE] Iteration {iteration_count}: {combined_summary[:120]}")
+        status_icon = "✓" if combined_error is None else "✗"
+        classification = record.get("classification", "unknown")
+        _log(
+            f"[DONE] {status_icon} Iteration {iteration_count}"
+            f" ({total_duration}s, {classification})"
+            f": {combined_summary[:100]}"
+        )
 
         # Notifications on each iteration (desktop, pushbullet, ntfy)
         _handle_notifications(
@@ -6172,6 +6308,12 @@ def run_loop(
 
         # Broadcast iteration state to SSE live dashboard clients
         _broadcast_to_sse_clients(state)
+
+        # --- Auto-reload on source code changes ---
+        # After each iteration, check if daemon source files (.py, .sh, .env)
+        # changed on disk. If so, persist state and restart via os.execv()
+        # so the next iteration runs with updated code.
+        _check_auto_reload(workdir, state, worker_manager, status_file, iteration_count)
 
         if (
             keep_iterations > 0
@@ -7784,6 +7926,19 @@ def main():
         # Initialize daemon log file before the loop
         if args.log_file:
             _init_daemon_log(args.log_file, args.log_max_mb)
+
+        # Take startup snapshots of source files for auto-reload detection
+        global _startup_file_snapshots
+        workdir_for_snapshots = args.workdir or os.getcwd()
+        for fname in ("launch-loop.py", "run.sh", ".env"):
+            fpath = os.path.join(workdir_for_snapshots, fname)
+            snap = _snapshot_file(fpath)
+            if snap is not None:
+                _startup_file_snapshots[fpath] = snap
+        if _startup_file_snapshots:
+            _log(
+                f"[AUTO-RELOAD] Monitoring {len(_startup_file_snapshots)} source files for hot-reload"
+            )
 
         _log("  Starting loop...")
         _log(f"  Sentinel: echo 'stop' > {args.shutdown_sentinel}")

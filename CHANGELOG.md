@@ -2,6 +2,22 @@
 
 All notable changes to the **Infinite Loop Daemon** project are documented here.
 
+---
+
+## [14.10.0] — 2026-06-26
+
+### Added
+- **Rich post-iteration summary (`[SUMMARY]`)**: Replaces the plain `[DONE]` / `[PROGRESS]` / `[STATS]` lines with a single consolidated summary showing iteration count, task type, duration, classification, git changes (if enabled), system resource usage (CPU seconds and memory), worker breakdown (success/fail counts), progress bar with percentage, and ETA. Error iterations include the error type. Normal iterations show classification (completed/progress/partial/stuck).
+
+### Removed
+- **Separate `[PROGRESS]` and `[STATS]` log lines**: Merged into the new `[SUMMARY]` line for a cleaner, more scannable log output.
+
+### Changed
+- `hermes_loop/loop.py` — replaced the 3-line [DONE]/[PROGRESS]/[STATS] block with a unified rich summary function that conditionally displays git diffs, system CPU/memory usage, worker breakdowns, and ETA/progress bar.
+- `hermes_loop/config.py` — bumped LAUNCH_LOOP_VERSION from 14.9.0 to 14.10.0.
+
+---
+
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 

@@ -429,6 +429,14 @@ kill $LOOP_PID
 
 ---
 
+## v14.10.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Rich `[SUMMARY]` line | Usability | `loop.py` | Consolidated post-iteration summary replacing separate [DONE]/[PROGRESS]/[STATS] lines. Shows iteration count, task type, duration, classification, git changes, CPU/memory, worker breakdown, progress bar, and ETA. |
+
+---
+
 ## v14.9.0 Changelog
 
 | Feature | Type | Files | Description |

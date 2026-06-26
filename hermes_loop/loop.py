@@ -31,7 +31,7 @@ from .dashboard import _write_status_html, _broadcast_to_sse_clients
 from .worker_manager import HermesWorkerManager
 from .hermes_utils import detect_task_type
 from .git_utils import _capture_git_state, _git_auto_commit
-from .system_utils import get_system_usage
+from .system_utils import get_system_usage, get_system_usage_diff
 from .functions import (
     _load_goals_file,
     _log_startup_banner,
@@ -600,6 +600,71 @@ def run_loop(
             f": {combined_summary[:100]}"
         )
 
+        # ── Rich post-iteration summary banner ────────────────────────────────
+        status_icon_display = "✔" if combined_error is None else "✘"
+        summary_parts: list[str] = [f"Iteration {iteration_count}"]
+        summary_parts.append(f"({total_duration}s)")
+
+        if combined_error:
+            summary_parts.append(f"error={combined_error[:60]}")
+        else:
+            summary_parts.append(classification)
+
+        # Git changes
+        if git:
+            before_ds = git_before.get("diff_stat", "")
+            after_ds = git_after.get("diff_stat", "")
+            if before_ds != after_ds:
+                summary_parts.append(f"git: {before_ds} → {after_ds}")
+            elif git_commit_hash:
+                summary_parts.append(f"git: committed {git_commit_hash[:8]}")
+
+        # System resource usage
+        sys_after = get_system_usage()
+        sys_diff = {}
+        if sys_before and sys_after:
+            sys_diff = get_system_usage_diff(sys_before, sys_after)
+        if sys_diff:
+            cpu = sys_diff.get("cpu_seconds_used", 0)
+            mem = sys_diff.get("memory_rss_mb", 0)
+            mem_peak = sys_diff.get("memory_peak_mb", 0)
+            if cpu > 0:
+                summary_parts.append(f"cpu={cpu:.1f}s")
+            if mem > 0:
+                summary_parts.append(f"mem={mem:.0f}MB")
+            if mem_peak > 0 and mem_peak > mem:
+                summary_parts.append(f"peak={mem_peak:.0f}MB")
+
+        # Worker breakdown
+        if workers > 1 and all_results:
+            ok_count = sum(1 for r in all_results if not r.get("error"))
+            fail_count = len(all_results) - ok_count
+            summary_parts.append(f"workers={ok_count}/{len(all_results)}")
+
+        # Task type
+        if task_type:
+            summary_parts.insert(1, f"{task_type}")
+
+        # ETA
+        eta_str = ""
+        if max_iterations > 0 and iteration_count > 0:
+            eta_rem = eta_tracker.estimate_remaining(
+                task_type, iteration_count, max_iterations
+            )
+            eta_str = eta_tracker.format_eta(eta_rem)
+            pct = min(100.0 * iteration_count / max_iterations, 100.0)
+            bar_w = 15
+            filled = int(pct / 100.0 * bar_w)
+            bar = "█" * filled + "░" * (bar_w - filled)
+            summary_parts.append(
+                f"[{bar}] {iteration_count}/{max_iterations} {pct:.0f}%"
+            )
+            if eta_str and eta_str != "N/A":
+                summary_parts.append(f"ETA={eta_str}")
+
+        summary_str = " | ".join(summary_parts)
+        _log(f"[SUMMARY] {status_icon_display}  {summary_str}")
+
         # Show actionable suggestion for blocked/error iterations
         suggestion = _suggest_actionable_fix(
             error_type=primary_error_type,
@@ -622,18 +687,6 @@ def run_loop(
             combined_error=combined_error,
             notify_ntfy_server=notify_ntfy_server,
         )
-
-        eta_str = ""
-        if max_iterations > 0:
-            eta_str = f" | ETA: {eta_tracker.format_eta(eta_tracker.estimate_remaining(task_type, iteration_count, max_iterations))}"
-            pct = min(100.0 * iteration_count / max_iterations, 100.0)
-            bar_width = 20
-            filled = int(pct / 100.0 * bar_width)
-            bar = "█" * filled + "░" * (bar_width - filled)
-            _log(
-                f"[PROGRESS] [{bar}] {iteration_count}/{max_iterations} ({pct:.0f}%){eta_str}"
-            )
-        _log(f"[STATS] {task_type} | {total_duration}s{eta_str}")
 
         if html_dashboard:
             _write_status_html(html_dashboard, state)

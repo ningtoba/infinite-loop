@@ -52,30 +52,15 @@ skill for independent use, development, and documentation.
 ## Quick Start
 
 ```bash
-# Basic loop — one goal, infinite iterations
-python3 launch-loop.py \
-  --goal "Refactor the auth module to use JWT tokens" \
-  --workdir /path/to/your/project \
-  --run
+# One command — reads everything from .env
+bash run.sh
 
-# Batch — read goals from a file
-python3 launch-loop.py \
-  --goals-file /tmp/goals.txt \
-  --workdir /path/to/your/project \
-  --git --max-iterations 50 \
-  --run
+# Or with overrides:
+bash run.sh --dry-run                           # Preview config, don't run
+bash run.sh --max-iterations 10 --quiet         # Run 10 iterations, no banner
+bash run.sh --goal "Fix lint errors" --force-reset  # Override goal, clean start
 
-# With status dashboard + webhook
-python3 launch-loop.py \
-  --goal "Fix lint errors" \
-  --status-html /tmp/loop-status.html \
-  --webhook-port 8080 \
-  --git-commit \
-  --run
-```
-
-**Monitor progress**:
-```bash
+# Monitor progress:
 cat /tmp/infinite-loop-state.json | python3 -m json.tool    # full ledger
 bash scripts/inspect-ledger.sh                               # formatted view
 bash scripts/inspect-ledger.sh --watch                       # auto-refresh
@@ -148,6 +133,7 @@ The `context` field is critical for iterative work — it tells the NEXT spawned
 |--------|------|---------|
 | **launch-loop.py** | `launch-loop.py` (root) | Main daemon — the primary loop. Spawns Hermes sessions, manages the JSON ledger, handles all flags. **287 KB, 7,557 lines.** |
 | **session-self-loop.py** | `session-self-loop.py` (root) | Lightweight in-session loop tracker for self-enhancement from within your current Hermes session. |
+| **run.sh** | `run.sh` (root) | **One-command entrypoint** — sources `.env`, forwards all settings as CLI flags. Just `bash run.sh`. ★ |
 | **run-loop.sh** | `scripts/run-loop.sh` | Unified shell wrapper that forwards all flags to launch-loop.py. |
 | **inspect-ledger.sh** | `scripts/inspect-ledger.sh` | View the JSON ledger formatted: default view, `--watch`, `--summary`, `--json`, `--errors-only`, `--last N`. |
 | **archive-state.sh** | `scripts/archive-state.sh` | Archive old iterations to JSONL or Markdown. `--auto` mode with optional `--gzip`. |
@@ -773,6 +759,7 @@ specs, audits, and synthesis documents.
 ```
 infinite-loop/
 ├── README.md                    ← This file
+├── run.sh                       ← One-command entrypoint (reads .env) ★
 ├── LICENSE                      ← MIT
 ├── .gitignore
 ├── .env.example                 ← All config parameters as env vars

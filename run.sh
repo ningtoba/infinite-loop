@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# run.sh — One-command entrypoint for the infinite-loop daemon
+#
+# Reads everything from .env, so you just run:
+#   bash run.sh
+#
+# For options:
+#   bash run.sh --help            # Pass --help to launch-loop.py
+#   bash run.sh --dry-run         # Show config without starting
+#   bash run.sh --force-reset     # Clear ledger and start fresh
+#   bash run.sh --quiet           # Suppress banner
+#   bash run.sh --goal "..."      # Override goal from .env
+#
+# All extra args are forwarded to launch-loop.py.
+# ==============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
+LEDGER_PATH="/tmp/infinite-loop-state.json"
+
+# ── Help ──────────────────────────────────────────────────────────────────────
+if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+  echo "Usage: bash run.sh [OPTIONS]"
+  echo ""
+  echo "One-command entrypoint. Reads .env, runs the infinite-loop daemon."
+  echo ""
+  echo "Options (override .env settings):"
+  echo "  --dry-run                Show config and exit"
+  echo "  --force-reset            Clear existing ledger and start fresh"
+  echo "  --quiet / -q             Suppress banner"
+  echo "  --goal TEXT              Override INFINITE_LOOP_GOAL from .env"
+  echo "  --context TEXT           Override INFINITE_LOOP_CONTEXT"
+  echo "  --max-iterations N       Override max iterations"
+  echo "  --max-turns N            Override max turns per session"
+  echo "  --workers N              Override concurrent workers"
+  echo "  --tag TEXT               Override run tag"
+  echo "  --help / -h              Show this help"
+  echo ""
+  echo "Any other flag is forwarded directly to launch-loop.py."
+  echo ""
+  echo "Examples:"
+  echo "  bash run.sh                         # Run with .env config"
+  echo "  bash run.sh --dry-run               # Preview config"
+  echo "  bash run.sh --force-reset --quiet   # Clean start, quiet"
+  echo "  bash run.sh --goal \"Fix tests\"      # Override goal"
+  exit 0
+fi
+
+# ── Load .env ─────────────────────────────────────────────────────────────────
+if [ ! -f "$ENV_FILE" ]; then
+  echo "ERROR: .env not found at $ENV_FILE"
+  echo "Copy .env.example to .env and configure it first:"
+  echo "  cp .env.example .env"
+  exit 1
+fi
+
+# Export all .env vars so launch-loop.py can read them via os.environ
+set -a
+source "$ENV_FILE"
+set +a
+
+# ── Build daemon args ─────────────────────────────────────────────────────────
+declare -a DAEMON_ARGS=()
+
+# Map .env vars to CLI flags (only set non-empty values)
+[ -n "${INFINITE_LOOP_GOAL:-}" ]            && DAEMON_ARGS+=("--goal" "$INFINITE_LOOP_GOAL")
+[ -n "${INFINITE_LOOP_CONTEXT:-}" ]         && DAEMON_ARGS+=("--context" "$INFINITE_LOOP_CONTEXT")
+[ -n "${INFINITE_LOOP_CONTEXT_FILE:-}" ]    && DAEMON_ARGS+=("--context-file" "$INFINITE_LOOP_CONTEXT_FILE")
+[ -n "${INFINITE_LOOP_TOOLSETS:-}" ]        && DAEMON_ARGS+=("--toolsets" "$INFINITE_LOOP_TOOLSETS")
+[ -n "${INFINITE_LOOP_WORKDIR:-}" ]         && DAEMON_ARGS+=("--workdir" "$INFINITE_LOOP_WORKDIR")
+[ -n "${INFINITE_LOOP_MAX_ITERATIONS:-}" ]  && DAEMON_ARGS+=("--max-iterations" "$INFINITE_LOOP_MAX_ITERATIONS")
+[ -n "${INFINITE_LOOP_MAX_TURNS:-}" ]       && DAEMON_ARGS+=("--max-turns" "$INFINITE_LOOP_MAX_TURNS")
+[ -n "${INFINITE_LOOP_COMPACT_EVERY:-}" ]   && DAEMON_ARGS+=("--compact-every" "$INFINITE_LOOP_COMPACT_EVERY")
+[ "${INFINITE_LOOP_EVOLVE:-false}" == "true" ]     && DAEMON_ARGS+=("--evolve")
+[ "${INFINITE_LOOP_RUN:-false}" == "true" ]        && DAEMON_ARGS+=("--run")
+[ "${INFINITE_LOOP_GIT:-false}" == "true" ]        && DAEMON_ARGS+=("--git")
+[ "${INFINITE_LOOP_GIT_COMMIT:-false}" == "true" ] && DAEMON_ARGS+=("--git-commit")
+[ "${INFINITE_LOOP_STORE_GIT_DIFF:-false}" == "true" ] && DAEMON_ARGS+=("--store-git-diff")
+[ -n "${INFINITE_LOOP_WORKERS:-}" ]         && DAEMON_ARGS+=("--workers" "$INFINITE_LOOP_WORKERS")
+[ -n "${INFINITE_LOOP_SESSION_TIMEOUT:-}" ] && DAEMON_ARGS+=("--session-timeout" "$INFINITE_LOOP_SESSION_TIMEOUT")
+[ -n "${INFINITE_LOOP_RETRY_DELAY:-}" ]     && DAEMON_ARGS+=("--retry-delay" "$INFINITE_LOOP_RETRY_DELAY")
+[ -n "${INFINITE_LOOP_MAX_RETRIES:-}" ]     && DAEMON_ARGS+=("--max-retries" "$INFINITE_LOOP_MAX_RETRIES")
+[ -n "${INFINITE_LOOP_COOLDOWN:-}" ]        && DAEMON_ARGS+=("--cooldown" "$INFINITE_LOOP_COOLDOWN")
+[ -n "${INFINITE_LOOP_COOLDOWN_MODE:-}" ]   && DAEMON_ARGS+=("--cooldown-mode" "$INFINITE_LOOP_COOLDOWN_MODE")
+[ -n "${INFINITE_LOOP_MAX_OUTPUT_CHARS:-}" ] && DAEMON_ARGS+=("--max-output-chars" "$INFINITE_LOOP_MAX_OUTPUT_CHARS")
+[ -n "${INFINITE_LOOP_TAG:-}" ]             && DAEMON_ARGS+=("--tag" "$INFINITE_LOOP_TAG")
+[ -n "${INFINITE_LOOP_PROFILE:-}" ]         && DAEMON_ARGS+=("--profile" "$INFINITE_LOOP_PROFILE")
+[ -n "${INFINITE_LOOP_MODEL:-}" ]           && DAEMON_ARGS+=("--model" "$INFINITE_LOOP_MODEL")
+[ -n "${INFINITE_LOOP_PROVIDER:-}" ]        && DAEMON_ARGS+=("--provider" "$INFINITE_LOOP_PROVIDER")
+[ -n "${INFINITE_LOOP_SHUTDOWN_SENTINEL:-}" ] && DAEMON_ARGS+=("--shutdown-sentinel" "$INFINITE_LOOP_SHUTDOWN_SENTINEL")
+[ -n "${INFINITE_LOOP_LOG_FILE:-}" ]        && DAEMON_ARGS+=("--log-file" "$INFINITE_LOOP_LOG_FILE")
+[ -n "${INFINITE_LOOP_LOG_MAX_MB:-}" ]      && DAEMON_ARGS+=("--log-max-mb" "$INFINITE_LOOP_LOG_MAX_MB")
+[ -n "${INFINITE_LOOP_STATUS_HTML:-}" ]     && DAEMON_ARGS+=("--status-html" "$INFINITE_LOOP_STATUS_HTML")
+[ -n "${INFINITE_LOOP_STATUS_FILE:-}" ]     && DAEMON_ARGS+=("--status-file" "$INFINITE_LOOP_STATUS_FILE")
+[ -n "${INFINITE_LOOP_GOALS_FILE:-}" ]      && DAEMON_ARGS+=("--goals-file" "$INFINITE_LOOP_GOALS_FILE")
+[ -n "${INFINITE_LOOP_WEBHOOK_PORT:-}" ]    && DAEMON_ARGS+=("--webhook-port" "$INFINITE_LOOP_WEBHOOK_PORT")
+[ -n "${INFINITE_LOOP_WORKER_URL:-}" ]      && DAEMON_ARGS+=("--worker-url" "$INFINITE_LOOP_WORKER_URL")
+[ -n "${INFINITE_LOOP_NOTIFY_CMD:-}" ]      && DAEMON_ARGS+=("--notify-cmd" "$INFINITE_LOOP_NOTIFY_CMD")
+[ -n "${INFINITE_LOOP_ON_ERROR_CMD:-}" ]    && DAEMON_ARGS+=("--on-error-cmd" "$INFINITE_LOOP_ON_ERROR_CMD")
+[ -n "${INFINITE_LOOP_HTTP_CALLBACK:-}" ]   && DAEMON_ARGS+=("--http-callback" "$INFINITE_LOOP_HTTP_CALLBACK")
+[ -n "${INFINITE_LOOP_NOTIFY_PUSHBULLET:-}" ] && DAEMON_ARGS+=("--notify-pushbullet" "$INFINITE_LOOP_NOTIFY_PUSHBULLET")
+[ -n "${INFINITE_LOOP_NOTIFY_NTFY:-}" ]     && DAEMON_ARGS+=("--notify-ntfy" "$INFINITE_LOOP_NOTIFY_NTFY")
+[ -n "${INFINITE_LOOP_NOTIFY_NTFY_SERVER:-}" ] && DAEMON_ARGS+=("--notify-ntfy-server" "$INFINITE_LOOP_NOTIFY_NTFY_SERVER")
+[ "${INFINITE_LOOP_NOTIFY_DESKTOP:-false}" == "true" ]   && DAEMON_ARGS+=("--notify-desktop")
+[ "${INFINITE_LOOP_NOTIFY_ON_COMPLETION:-false}" == "true" ] && DAEMON_ARGS+=("--notify-on-completion")
+[ "${INFINITE_LOOP_PREFLIGHT:-false}" == "true" ]        && DAEMON_ARGS+=("--preflight")
+[ "${INFINITE_LOOP_PREFLIGHT_FAIL_FAST:-false}" == "true" ] && DAEMON_ARGS+=("--preflight-fail-fast")
+[ -n "${INFINITE_LOOP_SKILLS:-}" ]          && DAEMON_ARGS+=("--skills" "$INFINITE_LOOP_SKILLS")
+[ "${INFINITE_LOOP_CONVERGENCE_STOP:-false}" == "true" ] && DAEMON_ARGS+=("--convergence-stop")
+[ -n "${INFINITE_LOOP_CONVERGENCE_THRESHOLD:-}" ] && DAEMON_ARGS+=("--convergence-threshold" "$INFINITE_LOOP_CONVERGENCE_THRESHOLD")
+[ -n "${INFINITE_LOOP_CONVERGENCE_WINDOW:-}" ]   && DAEMON_ARGS+=("--convergence-window" "$INFINITE_LOOP_CONVERGENCE_WINDOW")
+[ -n "${INFINITE_LOOP_OUTPUT_SCHEMA:-}" ]   && DAEMON_ARGS+=("--output-schema" "$INFINITE_LOOP_OUTPUT_SCHEMA")
+[ -n "${INFINITE_LOOP_OUTPUT_SCHEMA_FILE:-}" ] && DAEMON_ARGS+=("--output-schema-file" "$INFINITE_LOOP_OUTPUT_SCHEMA_FILE")
+[ -n "${INFINITE_LOOP_STARTUP_DELAY:-}" ]   && DAEMON_ARGS+=("--startup-delay" "$INFINITE_LOOP_STARTUP_DELAY")
+[ -n "${INFINITE_LOOP_PROMPT_SUFFIX:-}" ]   && DAEMON_ARGS+=("--prompt-suffix" "$INFINITE_LOOP_PROMPT_SUFFIX")
+[ -n "${INFINITE_LOOP_WATCH_DIR:-}" ]       && DAEMON_ARGS+=("--watch-dir" "$INFINITE_LOOP_WATCH_DIR")
+[ -n "${INFINITE_LOOP_WATCH_POLL:-}" ]      && DAEMON_ARGS+=("--watch-poll" "$INFINITE_LOOP_WATCH_POLL")
+[ -n "${INFINITE_LOOP_ARCHIVE_DIR:-}" ]     && DAEMON_ARGS+=("--archive-dir" "$INFINITE_LOOP_ARCHIVE_DIR")
+[ -n "${INFINITE_LOOP_ARCHIVE_RETENTION:-}" ] && DAEMON_ARGS+=("--archive-retention" "$INFINITE_LOOP_ARCHIVE_RETENTION")
+[ -n "${INFINITE_LOOP_ARCHIVE_MAX_SIZE:-}" ] && DAEMON_ARGS+=("--archive-max-size" "$INFINITE_LOOP_ARCHIVE_MAX_SIZE")
+[ -n "${INFINITE_LOOP_KEEP_ITERATIONS:-}" ] && DAEMON_ARGS+=("--keep-iterations" "$INFINITE_LOOP_KEEP_ITERATIONS")
+[ -n "${INFINITE_LOOP_TASK_TYPE:-}" ]       && DAEMON_ARGS+=("--task-type" "$INFINITE_LOOP_TASK_TYPE")
+[ "${INFINITE_LOOP_NO_AUTO_TOOLSETS:-false}" == "true" ]    && DAEMON_ARGS+=("--no-auto-toolsets")
+[ "${INFINITE_LOOP_NO_FAILURE_LEARNING:-false}" == "true" ] && DAEMON_ARGS+=("--no-failure-learning")
+[ -n "${INFINITE_LOOP_HEARTBEAT_TIMEOUT:-}" ] && DAEMON_ARGS+=("--heartbeat-timeout" "$INFINITE_LOOP_HEARTBEAT_TIMEOUT")
+[ -n "${INFINITE_LOOP_MAX_IDLE_ITERATIONS:-}" ] && DAEMON_ARGS+=("--max-idle-iterations" "$INFINITE_LOOP_MAX_IDLE_ITERATIONS")
+[ -n "${INFINITE_LOOP_SPAWN_SOURCE:-}" ]    && DAEMON_ARGS+=("--spawn-source" "$INFINITE_LOOP_SPAWN_SOURCE")
+
+# Boolean flags (no value arg)
+[ "${INFINITE_LOOP_STOP_AT_GOALS_END:-false}" == "true" ]  && DAEMON_ARGS+=("--stop-at-goals-end")
+[ "${INFINITE_LOOP_TRACK_GOALS:-false}" == "true" ]        && DAEMON_ARGS+=("--track-goals")
+[ "${INFINITE_LOOP_RESET_GOALS:-false}" == "true" ]        && DAEMON_ARGS+=("--reset-goals")
+[ "${INFINITE_LOOP_USE_LIBRARY:-false}" == "true" ]        && DAEMON_ARGS+=("--use-library")
+[ "${INFINITE_LOOP_PASS_SESSION_ID:-false}" == "true" ]    && DAEMON_ARGS+=("--pass-session-id")
+[ "${INFINITE_LOOP_CHECKPOINTS:-false}" == "true" ]        && DAEMON_ARGS+=("--checkpoints")
+[ "${INFINITE_LOOP_RESUME:-false}" == "true" ]             && DAEMON_ARGS+=("--resume")
+[ "${INFINITE_LOOP_IGNORE_RULES:-false}" == "true" ]       && DAEMON_ARGS+=("--ignore-rules")
+[ "${INFINITE_LOOP_IGNORE_USER_CONFIG:-false}" == "true" ] && DAEMON_ARGS+=("--ignore-user-config")
+[ "${INFINITE_LOOP_YOLO:-false}" == "true" ]               && DAEMON_ARGS+=("--yolo")
+[ "${INFINITE_LOOP_SAFE_MODE:-false}" == "true" ]          && DAEMON_ARGS+=("--safe-mode")
+[ "${INFINITE_LOOP_ACCEPT_HOOKS:-false}" == "true" ]       && DAEMON_ARGS+=("--accept-hooks")
+[ "${INFINITE_LOOP_WORKTREE:-false}" == "true" ]           && DAEMON_ARGS+=("--worktree")
+[ "${INFINITE_LOOP_CONTINUE:-false}" == "true" ]           && DAEMON_ARGS+=("--continue")
+
+# ── Process overrides from CLI args ───────────────────────────────────────────
+declare -a EXTRA_ARGS=()
+QUIET=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run)    DAEMON_ARGS+=("--dry-run"); shift ;;
+    --force-reset) DAEMON_ARGS+=("--force-reset"); shift ;;
+    --quiet|-q)   QUIET=true; shift ;;
+    --goal)       DAEMON_ARGS+=("--goal" "$2"); shift 2 ;;
+    --context)    DAEMON_ARGS+=("--context" "$2"); shift 2 ;;
+    --max-iterations) DAEMON_ARGS+=("--max-iterations" "$2"); shift 2 ;;
+    --max-turns)  DAEMON_ARGS+=("--max-turns" "$2"); shift 2 ;;
+    --workers)    DAEMON_ARGS+=("--workers" "$2"); shift 2 ;;
+    --tag)        DAEMON_ARGS+=("--tag" "$2"); shift 2 ;;
+    --help|-h)    echo "See 'bash run.sh --help' for usage."; exit 0 ;;
+    *)            EXTRA_ARGS+=("$1"); shift ;;
+  esac
+done
+
+# ── Banner ────────────────────────────────────────────────────────────────────
+if [ "$QUIET" = false ]; then
+  echo "╔══════════════════════════════════════════════╗"
+  echo "║  Infinite Loop Daemon                        ║"
+  echo "║  bash run.sh — one command to start          ║"
+  echo "╚══════════════════════════════════════════════╝"
+  echo ""
+  echo "  Config from: .env"
+  echo "  Goal: ${INFINITE_LOOP_GOAL:0:70}..."
+  echo "  Workers: ${INFINITE_LOOP_WORKERS:-1}  |  Max iters: ${INFINITE_LOOP_MAX_ITERATIONS:-∞}"
+  echo "  Git: ${INFINITE_LOOP_GIT:-off}  |  Auto-commit: ${INFINITE_LOOP_GIT_COMMIT:-off}"
+  echo ""
+  echo "  Stop:   echo 'stop' > ${INFINITE_LOOP_SHUTDOWN_SENTINEL:-/tmp/infinite-loop-stop}"
+  echo "  Status: cat ${INFINITE_LOOP_STATUS_FILE:-/tmp/loop-status.json}"
+  echo "  Logs:   tail -f ${INFINITE_LOOP_LOG_FILE:-/tmp/infinite-loop.log}"
+  echo ""
+fi
+
+# ── Launch ────────────────────────────────────────────────────────────────────
+exec python3 "$SCRIPT_DIR/launch-loop.py" "${DAEMON_ARGS[@]}" "${EXTRA_ARGS[@]}"

@@ -146,7 +146,7 @@ The `context` field is critical for iterative work — it tells the NEXT spawned
 | Script | Path | Purpose |
 |--------|------|---------|
 | **launch-loop.py** | `launch-loop.py` (root) | Thin backward-compatible shim (18 lines). Imports `main()` from the `hermes_loop/` package. All real code lives in the package. |
-| **hermes_loop/** | `hermes_loop/` (directory) | **Main daemon package** (32 modules). Contains all daemon logic: CLI, loop, functions, iteration, webhook, dashboard, preflight, notifications, and more. See [project structure](#files--structure) for the full module list. |
+| **hermes_loop/** | `hermes_loop/` (directory) | **Main daemon package** (35 modules). Contains all daemon logic: CLI, loop, functions, iteration, webhook, dashboard, preflight, notifications, and more. See [project structure](#files--structure) for the full module list. |
 | **session-self-loop.py** | `session-self-loop.py` (root) | Lightweight in-session loop tracker for self-enhancement from within your current Hermes session. |
 | **Makefile** | `Makefile` (root) | Convenience targets: `make run`, `make dry-run`, `make self-test`, `make status`, `make stop`, `make clean`. ★ |
 | **run.sh** | `run.sh` (root) | **One-command entrypoint** — sources `.env`, forwards all settings as CLI flags. Just `bash run.sh`. ★ |
@@ -1085,7 +1085,7 @@ infinite-loop/
 ├── launch-loop.py               ← Thin backward-compatible shim (18 lines) ★
 ├── session-self-loop.py         ← In-session loop tracker ★
 │
-├── hermes_loop/                 ← Main daemon package (32 modules) ★
+├── hermes_loop/                 ← Main daemon package (35 modules) ★
 │   ├── __init__.py
 │   ├── __main__.py              ← `python3 -m hermes_loop` entry point
 │   ├── cli.py                   ← Argparse + main() entry point

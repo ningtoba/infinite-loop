@@ -54,6 +54,20 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.20.1] — 2026-06-26
+
+### Changed
+- `run.sh` — Banner version updated to v14.20.0, "What's new" section now highlights
+  `--status` and shutdown summary features (was still showing v14.18.0 content).
+- `CONTRIBUTING.md` — Fixed stale version reference (14.18.0 → 14.20.0), stale
+  module count (32 → 35), stale self-test count (45 cases / 9 groups → 50 cases /
+  10 groups), and stale flag counts (87 → 90). Added `validate_env_vars()` to the
+  self-test reference table.
+- `README.md` — Updated module count reference from 32 to 35 in two places.
+- `CHANGELOG.md` — Added missing v14.20.1 entry with docs fixup details.
+
+---
+
 ## [14.19.0] — 2026-06-26
 
 ### Added

@@ -31,7 +31,7 @@ is met.
 
 **Key architecture points:**
 
-- **`hermes_loop/`** — Main package (32 modules). Contains all daemon logic:
+- **`hermes_loop/`** — Main package (35 modules). Contains all daemon logic:
   `cli.py` (argparse + entry point), `loop.py` (iteration loop),
   `functions.py` (helper functions), `iteration.py` (spawned session execution),
   `error_utils.py` (error classification + actionable suggestions),
@@ -52,7 +52,7 @@ is met.
 - **`scripts/archive-state.sh`** — Archive old iterations to JSONL or Markdown.
 - **`scripts/replay-ledger.sh`** — Re-run archived iterations from JSONL files.
 
-**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.18.0"`
+**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.20.0"`
 in `hermes_loop/config.py`. The project follows
 [Semantic Versioning](https://semver.org/).
 
@@ -186,7 +186,7 @@ kill <PID>
 | `bash run.sh --dry-run` | Preview the resolved configuration |
 | `bash run.sh --force-reset --quiet` | Clear ledger and start fresh, noise-free |
 | `python3 launch-loop.py --self-test` | Run self-tests (count auto-detected at runtime) |
-| `python3 launch-loop.py --list-flags` | Print all 87 flags organized by group |
+| `python3 launch-loop.py --list-flags` | Print all 90 flags organized by group |
 | `python3 launch-loop.py --list-groups` | Print group names with flag counts |
 | `python3 launch-loop.py --examples` | Print categorized usage examples |
 | `python3 launch-loop.py --help` | Full CLI reference |
@@ -198,7 +198,7 @@ kill <PID>
 | `make dry-run` | Preview config (convenience) |
 | `make self-test` | Run tests (convenience) |
 | `make examples` | Print categorized usage examples |
-| `make list-flags` | Print all 87 flags organized by group |
+| `make list-flags` | Print all 90 flags organized by group |
 | `make list-groups` | Print group names with flag counts |
 | `make status` | Show formatted one-line ledger status |
 | `make log` | Tail the daemon log file |
@@ -238,7 +238,7 @@ git checkout -b feature/describe-your-change
 
 Make your changes. A few guidelines:
 
-- **`hermes_loop/` is a package (32 modules)** — find the right module before
+- **`hermes_loop/` is a package (35 modules)** — find the right module before
   adding code. The `cli.py` module has the argparse setup and `main()` entry
   point. `loop.py` has `run_loop()`. `functions.py` has helper functions like
   `_execute_iteration()`, `_build_iteration_record()`,
@@ -265,7 +265,7 @@ Run the self-tests before committing:
 python3 launch-loop.py --self-test
 ```
 
-This runs 45 in-process test cases across 9 test groups without spawning any
+This runs 50 in-process test cases across 10 test groups without spawning any
 child Hermes sessions. All tests should pass (exit code 0).
 
 **What the self-tests cover:**
@@ -281,6 +281,7 @@ child Hermes sessions. All tests should pass (exit code 0).
 | `GoalSpec` parsing | 3 | Simple goal, profile, full spec with model/provider |
 | `_classify_progress()` | 4 | Completed, regression, stuck, progress with git changes |
 | `_suggest_actionable_fix()` | 9 | Timeout, network, stuck (workers/library), regression, consecutive errors, completed/progress (no suggestion), unknown |
+| `validate_env_vars()` | 7 | Unknown vars, typo detection, valid prefix, empty value, edge cases |
 
 **If you're adding a new function**, consider adding a self-test for it in the
 `run_self_tests()` function at the bottom of `launch-loop.py`.
@@ -507,7 +508,7 @@ hermes-loop/
 ├── .env                        # Your local configuration (git-ignored)
 ├── .env.example                # Documented config template
 ├── .gitignore
-├── hermes_loop/                # Main package (32 modules) ★
+├── hermes_loop/                # Main package (35 modules) ★
 │   ├── __init__.py
 │   ├── __main__.py
 │   ├── cli.py                  # Argparse + main() entry point

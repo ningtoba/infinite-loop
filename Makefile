@@ -27,6 +27,7 @@ help:
 	@echo "    help         Show this help message"
 	@echo "    init         Walk through interactive setup wizard (--init)"
 	@echo "    wizard       Alias for make init"
+	@echo "    demo         Interactive walkthrough of the daemon lifecycle (--demo)"
 	@echo ""
 	@echo "  Run:"
 	@echo "    run          Run the daemon (reads .env). Add ARGS for overrides"
@@ -63,6 +64,7 @@ help:
 	@echo "  make env                      # Create .env from .env.example"
 	@echo "  make dry-run                 # Preview default config"
 	@echo "  make run                      # Run with .env config"
+	@echo "  make demo                     # Interactive daemon walkthrough"
 	@echo "  make examples                  # See usage patterns"
 	@echo "  make explain FLAG=workers      # Help on a specific flag"
 	@echo "  make help-topic TOPIC=notifications  # Flags in a group"
@@ -91,6 +93,10 @@ env:
 .PHONY: init wizard
 init wizard:
 	$(PYTHON) -m hermes_loop --init
+
+.PHONY: demo
+demo:
+	$(PYTHON) -m hermes_loop --demo
 
 # ── Run / Test ────────────────────────────────────────────────────────────────
 

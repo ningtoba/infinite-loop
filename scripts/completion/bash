@@ -25,6 +25,7 @@ _hermes_loop_completions()
         --checkpoints
         --continue
         --convergence-stop
+        --demo
         --doctor
         --dry-run
         --evolve

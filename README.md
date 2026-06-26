@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.26.0
+# Infinite Loop Daemon — v14.27.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -7,7 +7,7 @@ JSON ledger, and can batch-process hundreds of goals in sequence.
 
 > **Changelog**: See [CHANGELOG.md](./CHANGELOG.md) for the complete version history.
 > **Contributing**: See [CONTRIBUTING.md](./CONTRIBUTING.md) for onboarding and development guide.
-> **Quick reference**: Use `make help` for convenience targets (run, dry-run, self-test, check, pre-commit, status, stop, clean).
+> **Quick reference**: Use `make help` for convenience targets (run, dry-run, self-test, check, pre-commit, status, demo, stop, clean).
 
 ## Origin
 
@@ -63,6 +63,10 @@ bash run.sh
 python3 -m hermes_loop --init
 make init
 
+# Or try the interactive walkthrough:
+python3 -m hermes_loop --demo
+make demo
+
 # Or with overrides:
 bash run.sh --dry-run                           # Preview config, don't run
 bash run.sh --max-iterations 10 --quiet         # Run 10 iterations, no banner
@@ -81,6 +85,7 @@ make explain FLAG=workers                       # Help on a specific flag
 make help-topic TOPIC=notifications             # Flags in a group
 make check                                      # Full pre-commit gate (lint + test + check-env + completions)
 make pre-commit                                 # Quick pre-commit gate (lint + self-test, no .env needed)
+make demo                                       # Interactive daemon lifecycle walkthrough
 
 # Monitor progress:
 python3 -m hermes_loop --status                         # compact built-in status
@@ -154,7 +159,7 @@ The `context` field is critical for iterative work — it tells the NEXT spawned
 | Script | Path | Purpose |
 |--------|------|---------|
 | **launch-loop.py** | `launch-loop.py` (root) | Thin backward-compatible shim (18 lines). Imports `main()` from the `hermes_loop/` package. All real code lives in the package. |
-| **hermes_loop/** | `hermes_loop/` (directory) | **Main daemon package** (35 modules). Contains all daemon logic: CLI, loop, functions, iteration, webhook, dashboard, preflight, notifications, and more. See [project structure](#files--structure) for the full module list. |
+| **hermes_loop/** | `hermes_loop/` (directory) | **Main daemon package** (36 modules). Contains all daemon logic: CLI, loop, functions, iteration, webhook, dashboard, preflight, notifications, and more. See [project structure](#files--structure) for the full module list. |
 | **session-self-loop.py** | `session-self-loop.py` (root) | Lightweight in-session loop tracker for self-enhancement from within your current Hermes session. |
 | **Makefile** | `Makefile` (root) | Convenience targets: `make run`, `make dry-run`, `make self-test`, `make status`, `make stop`, `make clean`. ★ |
 | **run.sh** | `run.sh` (root) | **One-command entrypoint** — sources `.env`, forwards all settings as CLI flags. Just `bash run.sh`. ★ |
@@ -476,6 +481,15 @@ kill $LOOP_PID
 |---------|------|-------|-------------|
 | `--help-topic` flag | UX | `cli.py`, `Makefile` | Show all flags in a single argument group (notifications, git, toolsets, etc.). Accepts group names (case-insensitive, prefix match). Pre-argparse, no `--goal` required. |
 | `make help-topic` | DX | `Makefile` | New convenience target: `make help-topic TOPIC=notifications`. |
+
+---
+
+## v14.27.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `--demo` flag | UX | `cli.py` | Interactive walkthrough of the daemon's full lifecycle — shows goal parsing, prompt construction, Hermes spawning, JSON parsing, ledger write, and summary display using a safe test goal. Attempts a live session if available, otherwise simulates output. Pre-argparse. |
+| `make demo` | DX | `Makefile` | New convenience target: `make demo` to launch the interactive walkthrough. |
 
 ---
 

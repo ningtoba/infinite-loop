@@ -85,8 +85,9 @@ def _list_flags(show_help=True):
         "--help-topic": "Show all flags in a single argument group (no --goal required)",
         "--init": "Interactive setup wizard — walks you through configuration step by step",
         "--wizard": "Alias for --init (interactive setup wizard)",
+        "--doctor": "Run comprehensive self-diagnosis — checks hermes, PATH, .env, git, shell, disk space, gateway, and more",
+        "--demo": "Interactive walkthrough of the daemon's full lifecycle — shows prompt construction, spawning, JSON parsing, ledger write, and summary display using a safe test goal",
     }
-
     total_flags = sum(len(v) for v in group_map.values()) + len(introspection_flags)
     header = f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — CLI Flags Reference"
     print()
@@ -275,6 +276,14 @@ def _list_examples():
     _comment("Quick one-command entrypoint (reads .env)")
     _cmd("bash run.sh")
     _cmd('bash run.sh --goal "Override" --git --quiet')
+    print()
+
+    _section("Demo & Walkthrough")
+    _comment("Interactive walkthrough — shows the full daemon lifecycle")
+    _cmd("hermes_loop --demo")
+    _comment(
+        "Press Enter to advance through each step: config, prompt, spawn, parse, summary"
+    )
     print()
 
     _section("Flag Reference")
@@ -494,6 +503,7 @@ def _help_topic(topic: str) -> None:
         ("--wizard", "Alias for --init"),
         ("--doctor", "Run comprehensive self-diagnosis"),
         ("--check-env", "Validate .env file for typos and mistakes"),
+        ("--demo", "Interactive walkthrough of the daemon lifecycle"),
     ]
 
     # Find matching group
@@ -631,6 +641,386 @@ def _help_topic(topic: str) -> None:
         print(f"    {'':14s}{c.dim(f'... and {len(all_group_titles) - 5} more')}")
     print(f"  {c.dim('See all groups:')} {c.flag('hermes_loop --list-groups')}")
     print()
+
+
+def _run_demo() -> None:
+    """Run an interactive demonstration of the daemon's lifecycle.
+
+    Shows each step of the daemon workflow with clear annotations:
+    prompt construction, spawned session, output parsing, ledger write,
+    and summary display. Uses a safe test goal and cleans up after itself.
+    """
+    c = colorizer
+    import time
+
+    DEMO_LEDGER = "/tmp/infinite-loop-demo-state.json"
+    DEMO_SENTINEL = "/tmp/infinite-loop-demo-stop"
+    DEMO_SENTINEL_FILE = os.path.expanduser(DEMO_SENTINEL)
+    test_goal = "Print the current UTC date and a friendly greeting, then exit."
+    test_context = "This is a demonstration run. Just print the date and a greeting."
+
+    def _step(label: str) -> None:
+        print(
+            f"\n  {c.colorize('▸', 'bold', 'cyan')} {c.colorize(label, 'bold', 'white')}"
+        )
+        print(f"  {c.dim('─' * 60)}")
+
+    def _code(text: str) -> None:
+        for line in text.split("\n"):
+            print(f"    {c.value(line)}")
+
+    def _note(text: str) -> None:
+        print(f"    {c.dim(f'# {text}')}")
+
+    def _ok(text: str) -> None:
+        print(f"    {c.ok(text)}")
+
+    def _pause() -> None:
+        print()
+        try:
+            input(f"    {c.dim('[Press Enter to continue...]')}")
+        except (EOFError, KeyboardInterrupt):
+            print()
+
+    header = f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — Demo Mode"
+    print()
+    print(f"  {c.colorize('╔' + '═' * 58 + '╗', 'bold', 'cyan')}")
+    print(
+        f"  {c.colorize('║', 'bold', 'cyan')}  {c.colorize(header, 'bold', 'white')}        {c.colorize('║', 'bold', 'cyan')}"
+    )
+    print(f"  {c.colorize('╚' + '═' * 58 + '╝', 'bold', 'cyan')}")
+    print()
+    print(f"  {c.dim('This walkthrough shows the daemon')}")
+    print(f"  {c.dim('lifecycle — no real work is performed.')}")
+    print(f"  {c.dim('A safe test goal is used and all')}")
+    print(f"  {c.dim('temporary files are cleaned up at the end.')}")
+    print()
+
+    # ── Step 1: Goal & Config ──────────────────────────────────────────────
+    _step("Step 1: Goal & Configuration")
+    print(f"  {c.colorize('Goal:', 'bold', 'yellow')}  {test_goal}")
+    print(f"  {c.colorize('Type:', 'bold', 'yellow')}  content (auto-detected)")
+    print(f"  {c.colorize('Mode:', 'bold', 'yellow')}  single iteration, no evolution")
+    print()
+    print(f"  {c.dim('The daemon parses CLI flags or .env vars,')}")
+    print(f"  {c.dim('auto-detects the task type, and builds')}")
+    print(f"  {c.dim('the internal configuration state.')}")
+    _pause()
+
+    # ── Step 2: Prompt Construction ────────────────────────────────────────
+    _step("Step 2: Prompt Construction")
+    print(f"  {c.dim('The delegation prompt is what gets sent to')}")
+    print(f"  {c.dim('the spawned Hermes session. It includes:')}")
+    print()
+    print(f"    {c.colorize('•', 'cyan')} The iteration number and worker info")
+    print(f"    {c.colorize('•', 'cyan')} The goal statement")
+    print(f"    {c.colorize('•', 'cyan')} Context from prior iterations")
+    print(f"    {c.colorize('•', 'cyan')} Available tools and capabilities")
+    print(
+        f"    {c.colorize('•', 'cyan')} Self-modification instructions (if applicable)"
+    )
+    print(f"    {c.colorize('•', 'cyan')} JSON output format specification")
+    print()
+    print(f"  {c.dim('Building prompt for iteration #1...')}")
+    print()
+    _code("You are iteration #1 of an autonomous loop daemon.")
+    _code("")
+    _code("Your job: use your available tools to accomplish the GOAL below, then")
+    _code(" report the result as a single JSON line.")
+    _code("")
+    _code(f"GOAL: {test_goal}")
+    _code("TASK TYPE: content")
+    _code("")
+    _code(f"CONTEXT: {test_context}")
+    _code("")
+    _code("AVAILABLE TOOLS: terminal,file,delegation,web,skills,browser,memory")
+    _code("")
+    _code("  - terminal: shell commands, build, test, git, packages")
+    _code("  - file: read_file, write_file, patch, search_files")
+    _code("  - web: web_search, web_extract for internet research")
+    _code("  - delegation: delegate_task() — run parallel subagents")
+    _code("  - ...")
+    _code("")
+    _code("Print ONE JSON object on the LAST line of your output:")
+    _code('  {"summary": "what was done", "duration_seconds": <int>,')
+    _code('   "error": null|<str>, "next_goal": "<suggested next step>"}')
+    _code("")
+    _pause()
+
+    # ── Step 3: Spawn Hermes Session ──────────────────────────────────────
+    _step("Step 3: Spawn Hermes Session")
+    print(f"  {c.dim('The daemon spawns a Hermes chat session with:')}")
+    print()
+    _code(
+        f'hermes chat -q "<prompt>" -t terminal,file,delegation,web,skills,browser,memory'
+    )
+    _code(f"            -Q --max-turns 500 --session-timeout 7200")
+    print()
+    print(
+        f"  {c.colorize('Key differences from simple -z oneshot:', 'bold', 'yellow')}"
+    )
+    print(
+        f"    {c.colorize('✓', 'green')}  {c.dim('chat -q stays alive for multiple turns')}"
+    )
+    print(
+        f"    {c.colorize('✓', 'green')}  {c.dim('delegate_task() results arrive in time')}"
+    )
+    print(
+        f"    {c.colorize('✓', 'green')}  {c.dim('Session has both direct tools AND delegation')}"
+    )
+    print(
+        f"    {c.colorize('✓', 'green')}  {c.dim('Optional: --use-library runs in-process instead')}"
+    )
+    print()
+    _pause()
+
+    # ── Step 4: Attempt to run (with fallback) ────────────────────────────
+    _step("Step 4: Run the Spawned Session")
+    print(f"  {c.dim('Attempting to run a live demo session...')}")
+    print()
+
+    from .hermes_utils import find_hermes
+
+    hermes_bin = find_hermes()
+    if shutil.which(hermes_bin) or shutil.which("hermes"):
+        # Build a minimal prompt
+        from .hermes_utils import _build_delegation_prompt
+
+        demo_prompt = _build_delegation_prompt(
+            iteration=1,
+            goal=test_goal,
+            context=test_context,
+            toolsets=["terminal", "file"],
+            workdir=os.getcwd(),
+            evolve=False,
+            task_type="content",
+        )
+        import subprocess
+
+        cmd = [
+            hermes_bin if shutil.which(hermes_bin) else "hermes",
+            "chat",
+            "-q",
+            demo_prompt,
+            "-t",
+            "terminal,file",
+            "-Q",
+            "--max-turns",
+            "10",
+            "--session-timeout",
+            "120",
+        ]
+        print(f"  {c.dim('Running:')}")
+        _code(
+            " ".join(
+                str(p) if i == 0 else (c.dim(str(p)) if "|" in str(p) else str(p))
+                for i, p in enumerate(cmd)
+            )
+        )
+        full_cmd = " ".join(f"'{c}'" if " " in str(c) else str(c) for c in cmd)
+        print()
+        print(f"  {c.dim('Waiting for the spawned session to respond...')}")
+        print()
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env={**os.environ, "PYTHONUNBUFFERED": "1"},
+            )
+            output = result.stdout + result.stderr
+            # Extract the JSON summary
+            json_lines = []
+            in_json = False
+            brace_count = 0
+            for line in output.split("\n"):
+                if "{" in line:
+                    in_json = True
+                if in_json:
+                    json_lines.append(line)
+                    brace_count += line.count("{") - line.count("}")
+                    if brace_count == 0 and in_json:
+                        break
+
+            if json_lines:
+                json_text = "\n".join(json_lines)
+                try:
+                    parsed = json.loads(json_text)
+                    _ok(f"✓  Session completed successfully!")
+                    print(
+                        f"    {c.colorize('Summary:', 'bold', 'yellow')} {parsed.get('summary', '')}"
+                    )
+                    if parsed.get("duration_seconds"):
+                        print(
+                            f"    {c.colorize('Duration:', 'bold', 'yellow')} {parsed['duration_seconds']}s"
+                        )
+                    if parsed.get("error"):
+                        print(
+                            f"    {c.colorize('Error:', 'bold', 'red')} {parsed['error']}"
+                        )
+                    else:
+                        _ok("    ✓  No errors")
+                    print()
+                    print(f"  {c.dim('Raw JSON output:')}")
+                    for jl in json_lines:
+                        print(f"    {c.dim(jl)}")
+                except json.JSONDecodeError:
+                    print(f"    {c.tag_warn()}  JSON not detected. Raw output:")
+                    for line in output.split("\n")[:10]:
+                        print(f"    {c.dim(line)}")
+            else:
+                print(f"    {c.tag_warn()}  No JSON response. Raw output:")
+                for line in output.split("\n")[:10]:
+                    print(f"    {c.dim(line)}")
+        except subprocess.TimeoutExpired:
+            print(f"    {c.tag_warn()}  Session timed out (expected with no real work)")
+        except FileNotFoundError:
+            print(f"    {c.tag_fail()}  'hermes' binary not found on PATH")
+            print(f"    {c.dim('  Falling back to simulated demo...')}")
+            _simulate_demo_output(c, test_goal)
+        except Exception as e:
+            print(f"    {c.tag_warn()}  Session error: {e}")
+            print(f"    {c.dim('  Falling back to simulated demo...')}")
+            _simulate_demo_output(c, test_goal)
+    else:
+        print(f"    {c.tag_warn()}  'hermes' binary not found on PATH")
+        print(f"    {c.dim('  Showing simulated output instead.')}")
+        _simulate_demo_output(c, test_goal)
+
+    _pause()
+
+    # ── Step 5: Parse & Ledger ────────────────────────────────────────────
+    _step("Step 5: Output Parsing & Ledger Write")
+    print(f"  {c.dim('The daemon parses the JSON from the spawned session')}")
+    print(f"  {c.dim('using multi-line brace-counting, then writes to the')}")
+    print(f"  {c.dim('ledger file. The ledger tracks every iteration:')}")
+    print()
+    print(
+        f"    {c.colorize('📁', 'bold')}  {c.dim('Ledger:')}  {c.value('/tmp/infinite-loop-state.json')}"
+    )
+    print()
+    _code("{")
+    _code('  "status": "running",')
+    _code('  "total_iterations": 1,')
+    _code('  "current_goal": "Print the current UTC date...",')
+    _code('  "started_at": "2026-06-26T12:35:00+08:00",')
+    _code('  "iterations": [')
+    _code("    {")
+    _code('      "iteration": 1,')
+    _code('      "summary": "Printed UTC date and greeting",')
+    _code('      "classification": "completed",')
+    _code('      "duration_seconds": 15,')
+    _code('      "error": null')
+    _code("    }")
+    _code("  ]")
+    _code("}")
+    print()
+
+    _pause()
+
+    # ── Step 6: Summary & Display ─────────────────────────────────────────
+    _step("Step 6: Post-Iteration Summary")
+    print(f"  {c.dim('After each iteration, the daemon displays a')}")
+    print(f"  {c.dim('compact [SUMMARY] line with iteration stats:')}")
+    print()
+    _code(
+        f"[SUMMARY] ✔ Iteration 1 | content | (15s) | completed | cpu=2.1s | mem=64MB | [████████░░] 1/1 100% | ETA=done"
+    )
+    print()
+    print(f"  {c.dim('From left to right: status icon, iteration #,')}")
+    print(f"  {c.dim('task type, wall-clock duration, classification,')}")
+    print(f"  {c.dim('system resource usage, progress bar, and ETA.')}")
+    print()
+    print(f"  {c.colorize('If an error occurs, [SUGGEST] lines appear with')}")
+    print(f"  {c.colorize('actionable fixes — no need to consult docs.', 'yellow')}")
+    print()
+
+    _pause()
+
+    # ── Step 7: Cleanup ───────────────────────────────────────────────────
+    _step("Step 7: Cleanup")
+    for path in [DEMO_LEDGER, DEMO_SENTINEL]:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            pass
+    _ok("✓  Temporary files cleaned up")
+    print()
+
+    # ── Summary ────────────────────────────────────────────────────────────
+    print(f"  {c.colorize('╔' + '═' * 58 + '╗', 'bold', 'cyan')}")
+    print(
+        f"  {c.colorize('║', 'bold', 'cyan')}  {c.colorize('Demo Complete!', 'bold', 'green')}  {c.dim('What did we just see?')}            {c.colorize('║', 'bold', 'cyan')}"
+    )
+    print(f"  {c.colorize('╚' + '═' * 58 + '╝', 'bold', 'cyan')}")
+    print()
+    print(
+        f"    {c.colorize('1.', 'cyan')}  {c.dim('Goal → Prompt construction (the actual prompt text)')}"
+    )
+    print(
+        f"    {c.colorize('2.', 'cyan')}  {c.dim('Prompt → Hermes spawn (chat -q with full tools)')}"
+    )
+    print(
+        f"    {c.colorize('3.', 'cyan')}  {c.dim('Spawn → Result capture (multi-line JSON parsing)')}"
+    )
+    print(
+        f"    {c.colorize('4.', 'cyan')}  {c.dim('Result → Ledger write (persistent state tracking)')}"
+    )
+    print(
+        f"    {c.colorize('5.', 'cyan')}  {c.dim('Ledger → Summary display ([SUMMARY] with stats)')}"
+    )
+    print()
+    print(f"  {c.dim('Next steps:')}")
+    print(
+        f"    {c.flag('hermes_loop --init')}        {c.dim('# Interactive setup wizard')}"
+    )
+    dq_ch = chr(34)
+    print(
+        f"    {c.flag('hermes_loop --dry-run --goal ' + dq_ch + '...' + dq_ch)}  {c.dim('# Preview without running')}"
+    )
+    print(
+        f"    {c.flag('hermes_loop --goal ' + dq_ch + '...' + dq_ch + ' --run')}   {c.dim('# Real loop')}"
+    )
+    print(
+        f"    {c.flag('hermes_loop --examples')}      {c.dim('# See usage patterns')}"
+    )
+    print(
+        f"    {c.flag('hermes_loop --help')}          {c.dim('# Full flag reference')}"
+    )
+    print()
+
+
+def _simulate_demo_output(c, goal: str):
+    """Print a simulated demo output when Hermes is not available."""
+    import random
+    import time as _time
+
+    words = ["Printed", "Returned", "Fetched", "Showed", "Displayed"]
+    print(f"    {c.dim('[simulated] Spawning hermes chat -q...')}")
+    _time.sleep(0.5)
+    print(f"    {c.dim('[simulated] Session active, processing...')}")
+    _time.sleep(0.5)
+    print(f"    {c.dim('[simulated] Received output (1 lines)...')}")
+    print()
+    summary = f"{random.choice(words)} current UTC time and greeting"
+    print(f"    {c.ok(chr(10003))}  Session completed successfully!")
+    print(f"    {c.colorize('Summary:', 'bold', 'yellow')} {summary}")
+    _ok("    " + chr(10003) + "  No errors")
+    print()
+    print(f"  {c.dim('Simulated JSON output:')}")
+    dq = chr(34)  # double quote
+    print(f"    {c.dim('{')}")
+    esc = chr(92)  # backslash
+    print(
+        f'    {c.dim("  " + dq + "summary" + dq + ": " + dq)}{c.value(summary)}{c.dim(dq + ",")}'
+    )
+    print(f'    {c.dim("  " + dq + "duration_seconds" + dq + ": 4,")}')
+    print(f'    {c.dim("  " + dq + "error" + dq + ": null,")}')
+    print(f'    {c.dim("  " + dq + "next_goal" + dq + ": " + dq + dq)}')
+    print(f"    {c.dim('}')}")
 
 
 def _display_status():
@@ -1485,6 +1875,17 @@ def _create_parser(for_introspection=False):
         "Pre-argparse -- no --goal required. "
         "Example: python3 -m hermes_loop --doctor",
     )
+    group.add_argument(
+        "--demo",
+        action="store_true",
+        help="Run an interactive walkthrough of the daemon's full lifecycle. "
+        "Shows each step — goal parsing, prompt construction, Hermes session "
+        "spawning, JSON output parsing, ledger write, and post-iteration "
+        "summary display — using a safe test goal. Attempts a live Hermes "
+        "session if available, otherwise shows simulated output. "
+        "Pre-argparse — no --goal required. "
+        "All temporary files are cleaned up automatically.",
+    )
 
     return parser
 
@@ -1601,6 +2002,12 @@ def main():
         print_diagnosis_report(checks, version=LAUNCH_LOOP_VERSION)
         sys.exit(0)
 
+    # Check --demo before argparse to avoid required --goal conflict
+    if "--demo" in sys.argv:
+        configure_color_mode(color_mode)
+        _run_demo()
+        sys.exit(0)
+
     # Friendly error if --goal is missing (before argparse dry error)
     standalone_flags = {
         "--version",
@@ -1618,6 +2025,7 @@ def main():
         "--init",
         "--wizard",
         "--doctor",
+        "--demo",
     }
     arg_set = set(sys.argv[1:])
     has_goal = any(
@@ -1658,6 +2066,14 @@ def main():
         )
         print(
             "See 'python3 -m hermes_loop --init' for interactive setup wizard",
+            file=sys.stderr,
+        )
+        print(
+            "See 'python3 -m hermes_loop --doctor' for self-diagnosis",
+            file=sys.stderr,
+        )
+        print(
+            "See 'python3 -m hermes_loop --demo' for a walkthrough of the daemon lifecycle",
             file=sys.stderr,
         )
         if env_hint:

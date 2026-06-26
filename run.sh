@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.26.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.27.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh

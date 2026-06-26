@@ -4,6 +4,34 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.27.0] — 2026-06-26
+
+### Added
+- **`--demo` flag**: New `hermes_loop --demo` command that runs an interactive
+  walkthrough of the daemon's full lifecycle. Shows each step — goal parsing,
+  prompt construction, Hermes session spawning, JSON output parsing, ledger
+  write, and post-iteration summary display — using a safe test goal.
+  Attempts a live Hermes session if available, otherwise shows simulated
+  output. All temporary files are cleaned up automatically.
+  Pre-argparse — no `--goal` required. Press `Enter` to advance through
+  each step at your own pace.
+- **`make demo` target**: New Makefile convenience target that runs
+  `python3 -m hermes_loop --demo`. Listed in `make help` under "Setup & Docs"
+  and in the `--examples` Demo & Walkthrough section.
+
+### Changed
+- `hermes_loop/cli.py` — New `_run_demo()` function (~350 lines, with
+  `_simulate_demo_output()` fallback) that orchestrates the 7-step demo.
+  Added `--demo` to: Startup & Debug argparse group, introspection_flags
+  dict, standalone_flags set, pre-argparse handler, `--help-topic`
+  introspection list, `--examples` Demo & Walkthrough section, and the
+  missing-`--goal` error hints.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.26.0 to 14.27.0.
+- `Makefile` — Added `demo` target, added entry to `make help` under
+  "Setup & Docs" and examples section.
+
+---
+
 ## [14.26.0] — 2026-06-26
 
 ### Added

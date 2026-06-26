@@ -1,5 +1,5 @@
 #!/bin/bash
-# run-loop.sh — Unified entrypoint (v14.7.0 — Shell completion + --list-flags)
+# run-loop.sh — Unified entrypoint (v14.27.0 — Demo mode + interactive walkthrough)
 #
 # THE PRIMARY way to create an autonomous delegation loop. No cron jobs.
 #

@@ -19,6 +19,7 @@ bool_flags=(
     '--checkpoints[Enable file checkpoints in spawned sessions]'
     '--continue[Resume the most recent session in spawned sessions]'
     '--convergence-stop[Auto-stop when N consecutive iterations produce similar summaries (stuck detection)]'
+    '--demo[Run an interactive walkthrough of the daemon'\''s full lifecycle]'
     '--doctor[Run comprehensive self-diagnosis and exit]'
     '--dry-run[Print what would happen without spawning any sessions]'
     '--evolve[Let iterations propose the next goal (self-directing)]'

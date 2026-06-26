@@ -29,8 +29,9 @@ help:
 	@echo "  Run:"
 	@echo "    run          Run the daemon (reads .env). Add ARGS for overrides"
 	@echo "    dry-run      Show config without starting (ARGS supported)"
-	@echo "    self-test    Run in-process self-tests (9 groups, 45 cases)"
+	@echo "    self-test    Run in-process self-tests (10 groups, 52 cases)"
 	@echo "    version      Print daemon version and exit"
+	@echo "    check-env    Validate .env file for typos, unknown variables, common mistakes"
 	@echo "    examples     Print categorized real-world usage examples"
 	@echo "    list-flags   Print all 90 flags organized by group"
 	@echo "    list-groups  Print compact group names with flag counts"
@@ -90,6 +91,10 @@ self-test:
 .PHONY: version
 version:
 	$(RUN_SH) --version
+
+.PHONY: check-env
+check-env:
+	$(PYTHON) -m hermes_loop --check-env
 
 .PHONY: examples
 examples:

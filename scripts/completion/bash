@@ -21,6 +21,7 @@ _hermes_loop_completions()
     # ---- ALL BOOLEAN (no-argument) flags ----
     local bool_flags=(
         --accept-hooks
+        --check-env
         --checkpoints
         --continue
         --convergence-stop

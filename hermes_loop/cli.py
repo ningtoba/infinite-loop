@@ -35,6 +35,12 @@ from .notifications import _send_completion_notification
 from .functions import set_max_output_chars
 from .completions import generate_bash_completion, generate_zsh_completion
 from .color_utils import colorizer, configure_color_mode
+from .env_utils import (
+    check_env_file,
+    format_validation_results,
+    parse_env_vars_from_file,
+    validate_env_vars,
+)
 
 
 def _list_flags(show_help=True):
@@ -231,7 +237,7 @@ def _list_examples():
     _comment("Full detailed flag reference")
     _cmd("hermes_loop --help")
     print()
-    _comment("Run self-tests (9 groups, 45 cases)")
+    _comment("Run self-tests (10 groups, 52 cases)")
     _cmd("hermes_loop --self-test")
     print()
     _comment("Health check before running")
@@ -900,6 +906,15 @@ def _create_parser(for_introspection=False):
         "Always up-to-date — never manually edit completion scripts again. "
         "Example: --completion-script bash | source /dev/stdin",
     )
+    group.add_argument(
+        "--check-env",
+        action="store_true",
+        help="Validate the .env file for typos, unknown variables, and common mistakes. "
+        "Checks every INFINITE_LOOP_* variable against the canonical list of recognized "
+        "variables and suggests corrections for misspelled names. "
+        "Pre-argparse — no --goal required. "
+        "Example: python3 -m hermes_loop --check-env",
+    )
 
     return parser
 
@@ -953,6 +968,22 @@ def main():
             print(generate_zsh_completion(parser))
         sys.exit(0)
 
+    # Check --check-env before argparse to avoid required --goal conflict
+    if "--check-env" in sys.argv:
+        # Detect color mode early
+        color_mode = "auto"
+        for i, arg in enumerate(sys.argv[1:], 1):
+            if arg.startswith("--color="):
+                color_mode = arg.split("=", 1)[1]
+                break
+            if arg == "--color" and i + 1 < len(sys.argv):
+                color_mode = sys.argv[i + 1]
+                break
+        configure_color_mode(color_mode)
+        env_path = os.path.join(os.getcwd(), ".env")
+        exit_code = check_env_file(env_path)
+        sys.exit(exit_code)
+
     # Friendly error if --goal is missing (before argparse dry error)
     standalone_flags = {
         "--version",
@@ -963,6 +994,7 @@ def main():
         "--list-flags",
         "--list-groups",
         "--examples",
+        "--check-env",
     }
     arg_set = set(sys.argv[1:])
     has_goal = any(
@@ -1193,9 +1225,41 @@ def main():
         _log("")
 
     if not args.run:
-        _log("  Run with --run to start the actual loop.")
+        _log(f"  {colorizer.dim('Run with --run to start the actual loop.')}")
         _log("")
         if args.dry_run:
+            # Environment variable validation (suggestive, not blocking)
+            env_path = os.path.join(os.getcwd(), ".env")
+            if os.path.isfile(env_path):
+                vars_found, parse_errors = parse_env_vars_from_file(env_path)
+                if parse_errors:
+                    _log(f"  [WARN] {len(parse_errors)} parse error(s) in .env file:")
+                    for err in parse_errors:
+                        _log(f"    {err}")
+                if vars_found:
+                    env_results = validate_env_vars(vars_found)
+                    issues = [
+                        r
+                        for r in env_results
+                        if r["type"] in ("typo", "unknown", "deprecated", "warning")
+                    ]
+                    if issues:
+                        _log(
+                            f"  [{colorizer.tag_warn()}WARN] {len(issues)} env var issue(s) detected:"
+                        )
+                        for r in issues:
+                            line = (
+                                f"    {r['type'].upper()}: {r['key']} — {r['message']}"
+                            )
+                            _log(line)
+                    else:
+                        _log(
+                            f"  [OK] .env variables validated ({len(vars_found)} recognized, no issues)"
+                        )
+            else:
+                _log(
+                    f"  [NOTE] No .env file found at {env_path} — using defaults/CLI flags"
+                )
             _log("  [DRY RUN] No sessions will be spawned. Exiting.")
             sys.exit(0)
 

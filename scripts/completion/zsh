@@ -15,6 +15,7 @@
 local -a bool_flags
 bool_flags=(
     '--accept-hooks[Auto-approve shell hooks in spawned sessions]'
+    '--check-env[Validate the]'
     '--checkpoints[Enable file checkpoints in spawned sessions]'
     '--continue[Resume the most recent session in spawned sessions]'
     '--convergence-stop[Auto-stop when N consecutive iterations produce similar summaries (stuck detection)]'

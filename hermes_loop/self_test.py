@@ -533,6 +533,118 @@ def _run_self_test() -> dict:
 
     _run_subtests("test_suggest_actionable_fix", _test_suggest_actionable_fix())
 
+    # ------------------------------------------------------------------
+    # Test: env_utils — validate_env_vars
+    # ------------------------------------------------------------------
+    def _test_validate_env_vars():
+        from .env_utils import validate_env_vars, KNOWN_ENV_VARS, _find_closest_match
+
+        cases = []
+
+        # Known variable should return type "ok"
+        cases.append(
+            (
+                "known-var",
+                lambda: validate_env_vars({"INFINITE_LOOP_GOAL": "fix tests"}),
+                lambda r: (
+                    any(
+                        x["type"] == "ok" and x["key"] == "INFINITE_LOOP_GOAL"
+                        for x in r
+                    ),
+                    f"expected ok for known var, got {r}",
+                ),
+            )
+        )
+
+        # Typo should be detected
+        cases.append(
+            (
+                "typo-detection",
+                lambda: validate_env_vars({"INFINITE_LOOP_COOL_DOWN": "10"}),
+                lambda r: (
+                    any(
+                        x["type"] == "typo"
+                        and "INFINITE_LOOP_COOLDOWN" in x.get("message", "")
+                        for x in r
+                    ),
+                    f"expected typo detection for COOL_DOWN, got {r}",
+                ),
+            )
+        )
+
+        # Unknown var (no close match) should return type "unknown"
+        cases.append(
+            (
+                "unknown-var",
+                lambda: validate_env_vars({"INFINITE_LOOP_ZZZZZZ": "test"}),
+                lambda r: (
+                    any(
+                        x["type"] == "unknown" and x["key"] == "INFINITE_LOOP_ZZZZZZ"
+                        for x in r
+                    ),
+                    f"expected unknown for ZZZZZZ, got {r}",
+                ),
+            )
+        )
+
+        # Non-INFINITE_LOOP_ var should return type "warning"
+        cases.append(
+            (
+                "non-prefix-var",
+                lambda: validate_env_vars({"MY_CUSTOM_VAR": "value"}),
+                lambda r: (
+                    any(
+                        x["type"] == "warning" and x["key"] == "MY_CUSTOM_VAR"
+                        for x in r
+                    ),
+                    f"expected warning for non-prefix var, got {r}",
+                ),
+            )
+        )
+
+        # _find_closest_match should return closest known var name
+        cases.append(
+            (
+                "closest-match",
+                lambda: _find_closest_match("INFINITE_LOOP_COOL_DOWN", KNOWN_ENV_VARS),
+                lambda r: (
+                    r == "INFINITE_LOOP_COOLDOWN",
+                    f"expected COOLDOWN, got {r!r}",
+                ),
+            )
+        )
+
+        # _find_closest_match returns None for very different names
+        cases.append(
+            (
+                "no-close-match",
+                lambda: _find_closest_match("COMPLETELY_UNRELATED", KNOWN_ENV_VARS),
+                lambda r: (
+                    r is None,
+                    f"expected None, got {r!r}",
+                ),
+            )
+        )
+
+        # Missing common required vars
+        cases.append(
+            (
+                "missing-goal",
+                lambda: validate_env_vars({}),
+                lambda r: (
+                    any(
+                        x["type"] == "missing" and x["key"] == "INFINITE_LOOP_GOAL"
+                        for x in r
+                    ),
+                    f"expected missing GOAL warning, got {r}",
+                ),
+            )
+        )
+
+        return cases
+
+    _run_subtests("test_validate_env_vars", _test_validate_env_vars())
+
     total = passed_total + failed_total
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
     if failed_total == 0:

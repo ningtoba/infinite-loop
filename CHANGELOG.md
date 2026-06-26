@@ -4,7 +4,46 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
-## [14.16.0] — 2026-06-26
+## [14.17.0] — 2026-06-26
+
+### Added
+- **`--check-env` flag**: Validate your `.env` file for typos, unknown variables, and
+  common mistakes without needing `--goal`. Every `INFINITE_LOOP_*` variable is checked
+  against the canonical list of 82 recognized variables. Misspellings like
+  `INFINITE_LOOP_COOL_DOWN` are detected and corrected (`→ INFINITE_LOOP_COOLDOWN`).
+  Non-prefixed variables are flagged as warnings. The exit code is 0 when no issues
+  are found, 1 when typos/unknowns/deprecated vars are present.
+  Examples:
+  ```bash
+  python3 -m hermes_loop --check-env              # validate .env in cwd
+  make check-env                                   # same via Makefile
+  bash run.sh --check-env                          # same via run.sh wrapper
+  ```
+- **`hermes_loop/env_utils.py`** — New module with `parse_env_vars_from_file()`,
+  `validate_env_vars()`, `format_validation_results()`, `check_env_file()`,
+  and `_find_closest_match()` (fuzzy matching via `difflib.get_close_matches`).
+  All 82 known env vars are defined as the `KNOWN_ENV_VARS` set, which should be
+  kept in sync with `.env.example` and `run.sh`.
+- **`--dry-run` now validates .env**: Running `--dry-run` automatically checks the
+  `.env` file for issues and reports them as part of the dry-run output. Issues
+  are non-blocking (suggestive only), so the dry-run still proceeds.
+- **`make check-env` target**: New Makefile convenience target for env validation.
+- **`self_test.py` — `test_validate_env_vars`**: 7 new self-test cases covering
+  known vars, typo detection, unknown vars, non-prefix vars, fuzzy matching, no-match
+  fallback, and missing-required-var warnings.
+
+### Changed
+- `run.sh` — Added `--check-env` to the Actions section in `--help` and to the
+  while-loop passthrough so it forwards correctly.
+- `Makefile` — Added `check-env` target and documented it in the help/usage section.
+- `hermes_loop/cli.py` — `main()` now handles `--check-env` as a pre-argparse flag
+  (no `--goal` required) and validates env during `--dry-run`. Added import of
+  `check_env_file`, `validate_env_vars`, `parse_env_vars_from_file`. Added
+  `--check-env` to the `Standalone_flags` set and the Startup & Debug argparse group.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.16.0 to 14.17.0.
+- Updated self-test references from "9 groups, 45 cases" to "10 groups, 52 cases" across 5 files (README.md, Makefile, CONTRIBUTING.md, .env.example, cli.py).
+
+---
 
 ### Added
 - **`--completion-script {bash|zsh}` flag**: Generate shell completion scripts

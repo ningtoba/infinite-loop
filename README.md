@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.15.0
+# Infinite Loop Daemon — v14.17.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -69,7 +69,7 @@ make env                                        # Create .env from .env.example
 make dry-run                                    # Preview config
 make run                                        # Run with .env config
 make run ARGS="--goal 'fix lint errors' --git"  # Run with extra flags
-make self-test                                  # Run self-tests (9 groups, 45 cases)
+make self-test                                  # Run self-tests (10 groups, 52 cases)
 make examples                                   # Print categorized usage examples
 make list-flags                                 # Print all 90 flags organized by group
 make list-groups                                # Print group names with flag counts
@@ -359,13 +359,14 @@ Default toolsets: `terminal,file,delegation,web,skills,browser,memory,session_se
 | `--preflight` | `false` | Run preflight health checks before loop |
 | `--preflight-fail-fast` | `false` | Stop on first preflight failure |
 | `--dry-run` | `false` | Print config and exit (no loop) |
-| `--self-test` | `false` | Run in-process self-tests (9 groups, 45 cases) and exit |
+| `--self-test` | `false` | Run in-process self-tests (10 groups, 52 cases) and exit |
 | `--list-flags` | *(n/a)* | Print all 90 flags organized by group with help text. Pre-argparse (no `--goal` required) |
 | `--list-groups` | *(n/a)* | Print only group names with flag counts (compact overview) |
 | `--examples` | *(n/a)* | Print categorized real-world usage examples across 7 categories |
 | `--save-config` | `""` | Save config to JSON file and exit |
 | `--config` | `""` | Load config from JSON file |
 | `--completion-script` | *(n/a)* | Generate shell completion for bash/zsh from live argparse. `--completion-script bash | source /dev/stdin` |
+| `--check-env` | *(n/a)* | Validate .env for typos, unknown variables, and common mistakes. Pre-argparse, no `--goal` needed. |
 | `--version` | *(n/a)* | Print version and exit |
 | `--help` | *(n/a)* | Print full help |
 
@@ -434,6 +435,18 @@ echo '{"summary": "added feature X", "next_goal": "add feature Y"}' > /tmp/sessi
 echo '{"done": true}' > /tmp/session-loop-state.json
 kill $LOOP_PID
 ```
+
+---
+
+## v14.17.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `--check-env` flag | UX | `env_utils.py`, `cli.py`, `run.sh`, `Makefile` | Validate `.env` for typos, unknown variables, and common mistakes. 82 recognized vars. Typo detection via fuzzy matching (e.g. `INFINITE_LOOP_COOL_DOWN` → `INFINITE_LOOP_COOLDOWN`). Pre-argparse, no `--goal` needed. |
+| Env validation in `--dry-run` | UX | `cli.py` | `--dry-run` now auto-checks `.env` and reports issues alongside config preview. Non-blocking — issues are suggestive only. |
+| `make check-env` target | DX | `Makefile` | Convenience target for env validation. |
+| `env_utils.py` module | New | `env_utils.py` | 5 functions for env var parsing, validation, fuzzy matching, formatted output, and orchestration. |
+| Self-tests for env validator | Test | `self_test.py` | 7 new test cases: known vars, typos, unknown vars, non-prefix vars, close matches, no-match, missing required. |
 
 ---
 

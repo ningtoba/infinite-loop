@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.15.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.17.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -41,6 +41,7 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "    --dry-run             Print config and exit"
   echo "    --force-reset         Clear existing ledger, start fresh"
   echo "    --self-test           Run in-process unit tests and exit"
+  echo "    --check-env           Validate .env file for typos and unknown variables"
   echo ""
   echo "  Info:"
   echo "    --help / -h           Show this help message"
@@ -192,6 +193,7 @@ while [[ $# -gt 0 ]]; do
     --tag)        DAEMON_ARGS+=("--tag" "$2"); shift 2 ;;
     --help|-h)    echo "See 'bash run.sh --help' for usage."; exit 0 ;;
     --list-flags|--list-groups|--examples) DAEMON_ARGS+=("$1"); shift ;;
+    --check-env)  DAEMON_ARGS+=("--check-env"); shift ;;
     --completion-script) DAEMON_ARGS+=("$1" "$2"); shift 2 ;;
     *)            EXTRA_ARGS+=("$1"); shift ;;
   esac
@@ -199,24 +201,29 @@ done
 
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
-  echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop Daemon v14.15.0               ║"
-  echo "║  run.sh — one command to start               ║"
-  echo "║                                                ║"
-  echo "║  What's new ⚡                                ║"
-  echo "║  • Auto-colorized _log() tags (24 patterns)    ║"
-  echo "║  • Colorized startup banner & feature list    ║"
-  echo "║  • [SUMMARY] with ETA/progress bar             ║"
-  echo "║  • Shows git changes, CPU/mem per iteration   ║"
-  echo "║  • Worker breakdown for multi-worker runs     ║"
-  echo "║  • --examples: categorized usage patterns     ║"
-  echo "║  • Shell tab-completion for all 80+ flags     ║"
-  echo "║  • --list-flags and --list-groups quick ref    ║"
-  echo "║  • [SUGGEST] smart fixes on errors/stuck      ║"
-  echo "║  • --quiet mode: compact per-iteration output ║"
-  echo "║  • [BEAT] heartbeat during long iterations    ║"
-  echo "║  • Docs now consistent: "9 groups, 45 cases"   ║"
-  echo "╚══════════════════════════════════════════════╝"
+  echo '╔══════════════════════════════════════════════╗'
+  echo '║  Infinite Loop Daemon v14.17.0               ║'
+  echo '║  run.sh — one command to start               ║'
+  echo '║                                                ║'
+  echo '║  What's new ⚡                                ║'
+  echo '║  • --check-env: validate .env for typos       ║'
+  echo '║  • --dry-run now checks .env automatically    ║'
+  echo '║  • make check-env convenience target          ║'
+  echo '║                                                ║'
+  echo '║  Also available:                              ║'
+  echo '║  • Auto-colorized _log() tags (24 patterns)    ║'
+  echo '║  • Colorized startup banner & feature list    ║'
+  echo '║  • [SUMMARY] with ETA/progress bar             ║'
+  echo '║  • Shows git changes, CPU/mem per iteration   ║'
+  echo '║  • Worker breakdown for multi-worker runs     ║'
+  echo '║  • --examples: categorized usage patterns     ║'
+  echo '║  • Shell tab-completion for all 80+ flags     ║'
+  echo '║  • --list-flags and --list-groups quick ref    ║'
+  echo '║  • [SUGGEST] smart fixes on errors/stuck      ║'
+  echo '║  • --quiet mode: compact per-iteration output ║'
+  echo '║  • [BEAT] heartbeat during long iterations    ║'
+  echo '║  • Docs now consistent: "9 groups, 45 cases"   ║'
+  echo '╚══════════════════════════════════════════════╝'
   echo ""
   echo "  Config: .env"
   echo "  Goal: ${INFINITE_LOOP_GOAL:0:80}..."

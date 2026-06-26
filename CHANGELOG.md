@@ -7,7 +7,25 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [14.2.0] — 2026-06-26
+## [14.3.0] — 2026-06-26
+
+### Added
+- **Organized `--help` output**: All 80+ CLI flags now grouped into 22 logical
+  sections (Core Task, Toolsets, Iteration Control, Parallelism, Timeouts &
+  Retries, Git Integration, Goals File, Rate Limiting, Convergence Detection,
+  Structured Output, Shutdown, Profile/Model, Webhook/HTTP, Notifications,
+  Logging, Status/Dashboard, Ledger Management, Archiving, File Watcher,
+  Worker, Spawned Session Flags, Startup/Debug) for much more readable
+  `--help` output.
+
+### Changed
+- Bumped `launch-loop.py` from v14.2.0 to v14.3.0
+
+### Fixed
+- **`run.sh --dry-run` with `.env` `--run`**: When `--dry-run` is used but
+  `.env` has `INFINITE_LOOP_RUN=true`, the `--run` flag was still forwarded
+  making dry-run effectively a no-op. Now `--dry-run` strips `--run` from
+  the forwarded args.
 
 ### Added
 - **Makefile**: Convenience targets — `make run`, `make dry-run`, `make self-test`,

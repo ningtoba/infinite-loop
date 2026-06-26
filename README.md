@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.2.0
+# Infinite Loop Daemon — v14.3.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -436,6 +436,15 @@ kill $LOOP_PID
 | SSE broadcast fix | Bugfix | `launch-loop.py` | Added missing `global _sse_clients` in `_broadcast_to_sse_clients()` to prevent UnboundLocalError crash |
 
 > **Full changelog**: See [CHANGELOG.md](./CHANGELOG.md) for the complete version history since v1.0.0.
+
+---
+
+## v14.3.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Organized --help output | Usability | `launch-loop.py` | Argument groups (Core, Iteration, Notification, Error Recovery, Archival, Behavior) for readable `--help` |
+| run.sh dry-run bugfix | Bugfix | `run.sh` | `--dry-run` now sets `DRY_RUN=true` and strips `--run` from daemon args to prevent no-op dry-runs |
 
 ---
 

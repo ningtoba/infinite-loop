@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-VERSION = "14.2.0"
+VERSION = "14.3.0"
 """
 launch-loop.py — Infinite loop daemon v14.2.0
 
@@ -6876,7 +6876,23 @@ def main():
 
     # Helpful early exit when --help or -h is passed
     if "--help" in sys.argv or "-h" in sys.argv:
-        parser = _build_arg_parser()
+        parser = argparse.ArgumentParser(
+            description=(
+                f"Infinite Loop Daemon v{VERSION} — Autonomous Hermes Agent Looping Framework\n\n"
+                "Spawns Hermes sessions in a loop with real tools (terminal, file, delegation) + "
+                "multi-level delegate_task() trees. Each iteration spawns a `hermes chat -q` session "
+                "with configurable toolsets, max-turns, and context propagation.\n\n"
+                "Common usage:\n"
+                "  python3 launch-loop.py --goal \"Fix lint errors\" --run\n"
+                "  python3 launch-loop.py --goal \"Refactor auth\" --git --git-commit --evolve --run\n"
+                "  python3 launch-loop.py --goals-file goals.txt --track-goals --workers 5 --run\n"
+                "  python3 launch-loop.py --self-test\n"
+                "  python3 launch-loop.py --dry-run\n\n"
+                "Stop:  echo 'stop' > /tmp/infinite-loop-stop\n"
+                "Status: cat /tmp/infinite-loop-state.json | python3 -m json.tool"
+            ),
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
         parser.print_help()
         sys.exit(0)
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# run-loop.sh — Unified entrypoint (v14.2.0 — New: Makefile, CONTRIBUTING.md, improved --help, SSE fix)
+# run-loop.sh — Unified entrypoint (v14.3.0 — New: organized --help, dry-run fix)
 #
 # THE PRIMARY way to create an autonomous delegation loop. No cron jobs.
 #

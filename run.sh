@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.2.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.3.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -20,7 +20,7 @@ LEDGER_PATH="/tmp/infinite-loop-state.json"
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.2.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.3.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
@@ -174,7 +174,7 @@ QUIET=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dry-run)    DAEMON_ARGS+=("--dry-run"); shift ;;
+    --dry-run)    DAEMON_ARGS+=("--dry-run"); DRY_RUN=true; shift ;;
     --force-reset) DAEMON_ARGS+=("--force-reset"); shift ;;
     --self-test)  DAEMON_ARGS+=("--self-test"); shift ;;
     --quiet|-q)   QUIET=true; shift ;;
@@ -193,14 +193,12 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop Daemon v14.2.0                ║"
+  echo "║  Infinite Loop Daemon v14.3.0                ║"
   echo "║  bash run.sh — one command to start          ║"
   echo "║                                                ║"
-  echo "║  New in v14.2.0:                              ║"
-  echo "║  • Makefile convenience targets               ║"
-  echo "║  • CONTRIBUTING.md onboarding guide           ║"
-  echo "║  • Improved --help with quick reference       ║"
-  echo "║  • SSE broadcast fix (global var declaration) ║"
+  echo "║  New in v14.3.0:                              ║"
+  echo "║  • Organized --help with 22 flag sections      ║"
+  echo "║  • --dry-run strips --run from .env config     ║"
   echo "╚══════════════════════════════════════════════╝"
   echo ""
   echo "  Config from: .env"
@@ -215,4 +213,12 @@ if [ "$QUIET" = false ]; then
 fi
 
 # ── Launch ────────────────────────────────────────────────────────────────────
+# Strip --run when --dry-run is active (--run makes dry-run a no-op)
+if [ "${DRY_RUN:-false}" = "true" ]; then
+  filtered=()
+  for arg in "${DAEMON_ARGS[@]}"; do
+    [ "$arg" != "--run" ] && filtered+=("$arg")
+  done
+  exec python3 "$SCRIPT_DIR/launch-loop.py" "${filtered[@]}" "${EXTRA_ARGS[@]}"
+fi
 exec python3 "$SCRIPT_DIR/launch-loop.py" "${DAEMON_ARGS[@]}" "${EXTRA_ARGS[@]}"

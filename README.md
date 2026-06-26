@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.19.0
+# Infinite Loop Daemon — v14.20.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -75,10 +75,10 @@ make list-flags                                 # Print all 90 flags organized b
 make list-groups                                # Print group names with flag counts
 
 # Monitor progress:
-cat /tmp/infinite-loop-state.json | python3 -m json.tool    # full ledger
-bash scripts/inspect-ledger.sh                               # formatted view
-bash scripts/inspect-ledger.sh --watch                       # auto-refresh
-bash scripts/inspect-ledger.sh --summary                     # compact one-liner
+python3 -m hermes_loop --status                         # compact built-in status
+bash scripts/inspect-ledger.sh                           # formatted view
+bash scripts/inspect-ledger.sh --watch                   # auto-refresh
+bash scripts/inspect-ledger.sh --summary                 # compact one-liner
 ```
 
 **Stop the loop**:

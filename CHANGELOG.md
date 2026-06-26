@@ -4,6 +4,56 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.20.0] — 2026-06-26
+
+### Added
+- **`--status` flag**: New built-in `hermes_loop --status` command that reads the
+  iteration ledger and displays a compact, colorized status summary in the terminal.
+  No `--goal` required. Shows daemon status (running/paused/stopped), iteration
+  count with success/error/stuck breakdown, duration, current goal, last iteration
+  summary with error info, worker/evolve/git config, and quick-action stop/pause/log
+  commands. Replaces the need for `cat /tmp/infinite-loop-state.json | python3 -m json.tool`
+  or `bash scripts/inspect-ledger.sh --summary` for quick status checks.
+  Example output:
+  ```
+  \---------------------------------------------------------------------
+    Status:        ✓ running
+    Iterations:    10  (✓8 ok, ✗2 err)
+    Errors:        timeout=2
+    Duration:     45s
+    Goal:         Fix lint errors one at a time
+    Updated:      2026-06-26T12:00:00
+
+    [Last Iteration]
+      #10  Resolved 3 ESLint warnings in src/utils.ts
+
+    Workers: 1  Evolve: yes  Git: yes
+
+    Quick actions:
+      Stop:   echo stop > /tmp/infinite-loop-stop
+      Pause:  echo pause > /tmp/infinite-loop-stop
+      Logs:   tail -f /tmp/infinite-loop-state.json
+      Full:   bash scripts/inspect-ledger.sh
+  ```
+- **`--status` in `Makefile`**: `make status` now uses `python3 -m hermes_loop --status`
+  (the built-in) instead of `bash scripts/inspect-ledger.sh --summary`. Falls back to
+  the shell script if the built-in fails.
+- **`--status` in `--help` description**: The `Status:` line in `--help` now shows
+  `python3 -m hermes_loop --status` instead of `cat /tmp/... | python3 -m json.tool`.
+- **`--status` in `--examples` Help & Diagnostics section**: New "Status & Monitoring"
+  subsection with `--status` usage examples.
+- **`--status` added to `Standalone_flags` set**: Works without `--goal`.
+
+### Changed
+- `hermes_loop/cli.py` — New `_display_status()` function (130 lines). Added `--status`
+  to pre-argparse handler, introspection flags, and Startup & Debug argparse group.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.19.0 to 14.20.0.
+- `run.sh` banner updated to v14.20.0.
+- `README.md` — Updated changelog, quick-start status command, and feature references.
+- `Makefile` — `make status` now calls the built-in `python3 -m hermes_loop --status`.
+
+---
+
 ## [14.19.0] — 2026-06-26
 
 ### Added

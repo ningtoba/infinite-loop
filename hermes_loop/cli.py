@@ -79,6 +79,7 @@ def _list_flags(show_help=True):
         "--examples": "Print categorized real-world usage examples",
         "--version": "Print daemon version and exit",
         "--completion-script": "Generate shell completion script for bash or zsh from live argparse",
+        "--status": "Read the ledger and display a compact status summary (no --goal required)",
     }
 
     total_flags = sum(len(v) for v in group_map.values()) + len(introspection_flags)
@@ -255,6 +256,153 @@ def _list_examples():
     _cmd('bash run.sh --goal "Override" --git --quiet')
     print()
 
+    _section("Status & Monitoring")
+    _comment("Quick status of running daemon (reads ledger, no --goal needed)")
+    _cmd("hermes_loop --status")
+    _cmd("hermes_loop --status --color never   # plain text, no ANSI codes")
+    print()
+    _comment("Full iteration history")
+    _cmd("bash scripts/inspect-ledger.sh")
+    _cmd("bash scripts/inspect-ledger.sh --summary   # compact one-liner")
+    print()
+    _comment("Live log tail / HTML dashboard")
+    _cmd("tail -f /tmp/infinite-loop.log")
+    _cmd('hermes_loop --goal "..." --status-html /tmp/dash.html --run')
+    print()
+
+
+def _display_status():
+    """Read the ledger and print a compact colorized status. Used by --status flag."""
+    from .file_utils import read_ledger
+    from datetime import datetime, timezone
+    import time
+
+    ledger = read_ledger()
+    c = colorizer
+
+    header = f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} \u2014 Status"
+    print()
+    print(f"  {c.colorize(header, 'bold', 'white')}")
+    print(f"  {c.dim('=' * 44)}")
+    print()
+
+    if ledger is None:
+        print(f"  {c.tag_warn()}  No ledger found at {LEDGER_PATH}")
+        print(f"  {c.dim('  The daemon may not be running.')}")
+        print(
+            f"  {c.dim('  Start with:')} {c.flag('python3 -m hermes_loop --goal ... --run')}"
+        )
+        print()
+        return
+
+    status = ledger.get("status", "unknown")
+    status_icon = {
+        "running": c.tag_ok(),
+        "paused": c.tag_warn(),
+        "stopped: signal": c.tag_fail(),
+        "stopped: sentinel": c.tag_fail(),
+        "stopped: max_iterations": c.tag_fail(),
+        "stopped: idle": c.tag_fail(),
+    }.get(status, c.dim("\u25cf"))
+
+    total = ledger.get("total_iterations", 0)
+    goal = ledger.get("current_goal") or ledger.get("initial_command", "?")
+    tag_val = ledger.get("tag", "")
+    started_at = ledger.get("started_at", "")
+    last_updated = ledger.get("last_updated", "")
+
+    # Duration
+    dur_str = "?"
+    try:
+        if started_at:
+            if "Z" in started_at or "+" in started_at:
+                start_ts = datetime.fromisoformat(started_at).timestamp()
+            else:
+                start_ts = datetime.fromisoformat(started_at[:19]).timestamp()
+            now_ts = time.time()
+            dur_s = now_ts - start_ts
+            if dur_s >= 3600:
+                dur_str = f"{dur_s / 3600:.1f}h"
+            elif dur_s >= 60:
+                dur_str = f"{dur_s / 60:.1f}m"
+            else:
+                dur_str = f"{dur_s:.0f}s"
+    except (ValueError, TypeError):
+        pass
+
+    # Error counts
+    error_type_counts = ledger.get("error_type_counts", {})
+    err_count = sum(error_type_counts.values())
+    err_types = []
+    for etype in ("timeout", "network", "schema", "unknown", "heartbeat"):
+        cnt = error_type_counts.get(etype, 0)
+        if cnt:
+            err_types.append(f"{etype}={cnt}")
+
+    # Last iteration
+    iters = ledger.get("iterations", [])
+    last_iter = iters[-1] if iters else None
+
+    # Success count
+    success_count = sum(
+        1 for it in iters if not it.get("error") and it.get("classification") != "stuck"
+    )
+    stuck_count = sum(
+        1 for it in iters if not it.get("error") and it.get("classification") == "stuck"
+    )
+
+    print(f"  {c.value('Status:')}        {status_icon} {status}")
+    print(
+        f"  {c.value('Iterations:')}    {c.flag(str(total))}  ({c.tag_ok()}{success_count} ok",
+        end="",
+    )
+    if err_count:
+        print(f" {c.tag_fail()}{err_count} err", end="")
+    if stuck_count:
+        print(f" {c.dim(str(stuck_count))} stuck", end="")
+    print(")")
+    if err_types:
+        print(f"  {c.value('Errors:')}        {c.dim(', '.join(err_types))}")
+    if dur_str != "?":
+        print(f"  {c.value('Duration:')}     {c.dim(dur_str)}")
+    if tag_val:
+        print(f"  {c.value('Tag:')}           {c.flag(tag_val)}")
+    print(f"  {c.value('Goal:')}         {c.dim(goal[:100])}")
+    print(
+        f"  {c.value('Updated:')}      {c.dim(last_updated[:19] if last_updated else '?')}"
+    )
+
+    if last_iter:
+        n = last_iter.get("n", "?")
+        summary = (last_iter.get("summary") or "")[:80]
+        last_err = last_iter.get("error", "")
+        cls = last_iter.get("classification", "")
+        print()
+        print(f"  {c.group_title('[Last Iteration]')}")
+        print(f"    #{n}  {c.dim(summary)}")
+        if last_err:
+            print(f"    {c.tag_fail()}error: {last_err[:120]}")
+        if cls and cls != "completed":
+            print(f"    {c.tag_warn()}classification: {cls}")
+
+    # Worker info
+    workers = ledger.get("workers", 1)
+    evolve = ledger.get("evolve", False)
+    git = ledger.get("git", False)
+    print()
+    ev_str = "yes" if evolve else "no"
+    git_str = "yes" if git else "no"
+    print(f"  {c.dim(f'Workers: {workers}  Evolve: {ev_str}  Git: {git_str}')}")
+
+    # Quick actions
+    print()
+    print(f"  {c.group_title('Quick actions:')}")
+    print(f"    {c.dim('Stop:')}   echo stop > {SENTINEL_PATH_DEFAULT}")
+    print(f"    {c.dim('Pause:')}  echo pause > {SENTINEL_PATH_DEFAULT}")
+    print(f"    {c.dim('Logs:')}   tail -f {LEDGER_PATH}")
+    print(f"    {c.dim('Full:')}   bash scripts/inspect-ledger.sh")
+    print()
+
 
 def _create_parser(for_introspection=False):
     """Build and return the argparse parser with all argument groups.
@@ -284,10 +432,11 @@ def _create_parser(for_introspection=False):
             "  python3 -m hermes_loop --goals-file goals.txt --track-goals --workers 5 --run\n"
             "  python3 -m hermes_loop --self-test\n"
             "  python3 -m hermes_loop --dry-run\n"
-            "  python3 -m hermes_loop --examples\n\n"
+            "  python3 -m hermes_loop --examples\n"
+            "  python3 -m hermes_loop --status\n\n"
             "Stop:  echo 'stop' > /tmp/infinite-loop-stop\n"
             "Pause: echo 'pause' > /tmp/infinite-loop-stop\n"
-            "Status: cat /tmp/infinite-loop-state.json | python3 -m json.tool"
+            "Status: python3 -m hermes_loop --status"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -841,7 +990,7 @@ def _create_parser(for_introspection=False):
     # ── 22. Startup & Debug ─────────────────────────────────────────────────
     group = parser.add_argument_group(
         "Startup & Debug",
-        "Preflight checks, dry-run, self-test, config loading, startup delay, and quiet output",
+        "Preflight checks, dry-run, self-test, config loading, startup delay, quiet output, and status",
     )
     group.add_argument(
         "--quiet",
@@ -903,7 +1052,7 @@ def _create_parser(for_introspection=False):
         choices=["bash", "zsh"],
         help="Generate and print a shell completion script for bash or zsh "
         "by introspecting the live argparse parser. "
-        "Always up-to-date — never manually edit completion scripts again. "
+        "Always up-to-date -- never manually edit completion scripts again. "
         "Example: --completion-script bash | source /dev/stdin",
     )
     group.add_argument(
@@ -912,8 +1061,17 @@ def _create_parser(for_introspection=False):
         help="Validate the .env file for typos, unknown variables, and common mistakes. "
         "Checks every INFINITE_LOOP_* variable against the canonical list of recognized "
         "variables and suggests corrections for misspelled names. "
-        "Pre-argparse — no --goal required. "
+        "Pre-argparse -- no --goal required. "
         "Example: python3 -m hermes_loop --check-env",
+    )
+    group.add_argument(
+        "--status",
+        action="store_true",
+        help="Read the ledger and display a compact colorized status summary. "
+        "Shows daemon status, iteration count, success/error counts, duration, "
+        "goal, last iteration summary, and quick stop/pause/log commands. "
+        "Pre-argparse -- no --goal required. "
+        "Example: python3 -m hermes_loop --status",
     )
 
     return parser
@@ -984,6 +1142,12 @@ def main():
         exit_code = check_env_file(env_path)
         sys.exit(exit_code)
 
+    # Check --status before argparse to avoid required --goal conflict
+    if "--status" in sys.argv:
+        configure_color_mode(color_mode)
+        _display_status()
+        sys.exit(0)
+
     # Friendly error if --goal is missing (before argparse dry error)
     standalone_flags = {
         "--version",
@@ -995,6 +1159,7 @@ def main():
         "--list-groups",
         "--examples",
         "--check-env",
+        "--status",
     }
     arg_set = set(sys.argv[1:])
     has_goal = any(

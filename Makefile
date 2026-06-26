@@ -112,7 +112,10 @@ list-groups:
 
 .PHONY: status
 status:
-	@if [ -f /tmp/infinite-loop-state.json ]; then \
+	@PYTHON_OUT=$$(python3 -m hermes_loop --status 2>&1) || true; \
+	if echo "$$PYTHON_OUT" | grep -q "Status:"; then \
+		echo "$$PYTHON_OUT"; \
+	elif [ -f /tmp/infinite-loop-state.json ]; then \
 		bash $(SCRIPTS)/inspect-ledger.sh --summary; \
 	else \
 		echo "Ledger not found at /tmp/infinite-loop-state.json"; \

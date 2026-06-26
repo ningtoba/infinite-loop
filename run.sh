@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.18.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.20.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -19,7 +19,7 @@ LEDGER_PATH="/tmp/infinite-loop-state.json"
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.15.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.20.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""

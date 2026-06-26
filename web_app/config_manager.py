@@ -94,8 +94,6 @@ CONFIG_DEFAULTS: dict[str, dict[str, Any]] = {
     "INFINITE_LOOP_PREFLIGHT_FAIL_FAST": {"default": "false", "type": "bool", "group": "startup", "label": "Preflight Fail Fast", "description": "Stop on first preflight failure"},
     "INFINITE_LOOP_DRY_RUN": {"default": "false", "type": "bool", "group": "startup", "label": "Dry Run", "description": "Print config and exit"},
     "INFINITE_LOOP_SELF_TEST": {"default": "false", "type": "bool", "group": "startup", "label": "Self Test", "description": "Run in-process self-tests"},
-    "INFINITE_LOOP_SAVE_CONFIG": {"default": "", "type": "string", "group": "persistence", "label": "Save Config", "description": "Save config to JSON file"},
-    "INFINITE_LOOP_CONFIG": {"default": "", "type": "string", "group": "persistence", "label": "Config", "description": "Load config from JSON file"},
 }
 
 
@@ -122,7 +120,6 @@ CONFIG_GROUPS = [
     {"id": "spawned", "name": "Spawned Session Flags", "icon": "terminal"},
     {"id": "prompt", "name": "Prompt Customization", "icon": "edit-3"},
     {"id": "startup", "name": "Startup", "icon": "play-circle"},
-    {"id": "persistence", "name": "Config Persistence", "icon": "save"},
 ]
 
 

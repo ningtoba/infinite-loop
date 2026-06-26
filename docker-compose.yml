@@ -17,7 +17,7 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       # Mount the host's hermes binary — no need to bundle another instance
-      - /usr/local/bin/hermes:/usr/local/bin/hermes:ro
+      - ${HOME:-~}/.local/bin/hermes:/usr/local/bin/hermes:ro
       # Mount the host's hermes config directory (profiles, settings, etc.)
       - ${HOME:-~}/.hermes:/home/hermes/.hermes
       # Mount the work directory (your target project)

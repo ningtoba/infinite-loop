@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Hermes loop runtime artifacts (user-specific)
+/tmp/infinite-loop-state.json
+/tmp/infinite-loop-stop
+/tmp/infinite-loop-*.log

@@ -7,6 +7,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [14.8.0] — 2026-06-26
+
+### Changed
+- **Project structure documentation** — Updated `README.md` file tree to show the `hermes_loop/` package (32 modules) instead of describing `launch-loop.py` as the main daemon. The shim is now correctly documented as a thin backward-compatible wrapper (18 lines).
+- **`CONTRIBUTING.md`** — Complete overhaul for the package architecture: updated every reference from `launch-loop.py` (the old monolithic 7.7K-line file) to the `hermes_loop/` package; fixed stale version reference (`14.2.0` → `14.7.0`); updated project structure tree with all 32 modules, `references/` and `research/` directories; fixed version bump instructions to point to `hermes_loop/config.py`; added package-aware syntax-check commands.
+- **`Makefile` lint target** — Now checks all 32 `hermes_loop/*.py` modules in addition to `session-self-loop.py` and `launch-loop.py`. Uses a loop that reports per-file pass/fail with a final summary.
+
+### Added
+- `hermes_loop/` package added to the README scripts table with description.
+
+### Fixed
+- Stale project structure references throughout documentation — the repo has been a `hermes_loop/` package since v14.0.0 but CONTRIBUTING.md and README.md still described the old flat architecture.
+
+---
+
 ## [14.7.0] — 2026-06-26
 
 ### Added

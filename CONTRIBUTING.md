@@ -24,31 +24,37 @@ documentation, or just asking a question — your help is welcome.
 
 ## Project Overview
 
-The Infinite Loop Daemon (`launch-loop.py`, ~7.7K lines) is a background daemon
-that spawns autonomous Hermes chat sessions, collects their JSON output into a
-ledger, and iterates until a stop condition is met.
+The Infinite Loop Daemon is a background daemon (split across the `hermes_loop/`
+package and two top-level scripts) that spawns autonomous Hermes chat sessions,
+collects their JSON output into a ledger, and iterates until a stop condition
+is met.
 
 **Key architecture points:**
 
-- **`launch-loop.py`** — Main daemon. Spawns `hermes chat -q` subprocesses with
-  real tools (`terminal`, `file`, `delegation`, `web`, etc.). Sessions stay
-  alive for multiple turns (unlike `-z` oneshot), so `delegate_task()` subagent
-  results arrive and are collected properly.
+- **`hermes_loop/`** — Main package (32 modules). Contains all daemon logic:
+  `cli.py` (argparse + entry point), `loop.py` (iteration loop),
+  `functions.py` (helper functions), `iteration.py` (spawned session execution),
+  `error_utils.py` (error classification + actionable suggestions),
+  `webhook.py` / `dashboard.py` (HTTP server + SSE dashboard),
+  `preflight.py` (health checks), `notifications.py` (Pushbullet/ntfy/desktop),
+  and many more. `launch-loop.py` at the repo root is now a thin import shim.
+- **`launch-loop.py`** — Thin backward-compatible shim (18 lines). Imports
+  `main()` from `hermes_loop` and calls it. All real code lives in the package.
 - **`session-self-loop.py`** — Lightweight in-session loop for when you want to
   iterate from *within* your current Hermes session rather than a background
   daemon.
 - **`run.sh`** — One-command entrypoint. Sources `.env` and forwards all
-  settings as CLI flags to `launch-loop.py`. Just `bash run.sh`.
-- **`scripts/run-loop.sh`** — Shell wrapper with full flag forwarding (original
-  entrypoint before `run.sh` was added).
+  settings as CLI flags to `launch-loop.py` (which delegates to the package).
+  Just `bash run.sh`.
 - **`scripts/inspect-ledger.sh`** — Formatted viewer for the JSON state ledger
   at `/tmp/infinite-loop-state.json`. Supports `--watch`, `--summary`, `--json`,
   `--errors-only`, and `--last N`.
 - **`scripts/archive-state.sh`** — Archive old iterations to JSONL or Markdown.
 - **`scripts/replay-ledger.sh`** — Re-run archived iterations from JSONL files.
 
-**Version**: The current version is defined as `VERSION = "14.2.0"` at the top
-of `launch-loop.py`. The project follows [Semantic Versioning](https://semver.org/).
+**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.7.0`
+in `hermes_loop/config.py`. The project follows
+[Semantic Versioning](https://semver.org/).
 
 ---
 
@@ -225,13 +231,14 @@ git checkout -b feature/describe-your-change
 
 Make your changes. A few guidelines:
 
-- **`launch-loop.py` is big (~7.7K lines)** — find the right function before
-  adding code. The `run_loop()` function has been progressively decomposed:
-  look for `_execute_iteration()`, `_build_iteration_record()`,
+- **`hermes_loop/` is a package (32 modules)** — find the right module before
+  adding code. The `cli.py` module has the argparse setup and `main()` entry
+  point. `loop.py` has `run_loop()`. `functions.py` has helper functions like
+  `_execute_iteration()`, `_build_iteration_record()`,
   `_handle_notifications()`, `_detect_convergence()`, `_handle_backoff()`,
   `_classify_progress()`, and similar extracted helpers.
 - **New flags** require additions in:
-  1. `argparse` argument definitions in `create_parser()`
+  1. `argparse` argument definitions in `hermes_loop/cli.py` (`create_parser()`)
   2. `.env.example` documentation
   3. `run.sh` forwarding logic
   4. `README.md` flag table
@@ -274,9 +281,13 @@ child Hermes sessions. All tests should pass (exit code 0).
 **Before submitting**, also verify:
 
 ```bash
-# Python syntax check
-python3 -m py_compile launch-loop.py
+# Python syntax check on all package files
+python3 -m py_compile hermes_loop/cli.py
+python3 -m py_compile hermes_loop/loop.py
+python3 -m py_compile hermes_loop/functions.py
+python3 -m py_compile hermes_loop/iteration.py
 python3 -m py_compile session-self-loop.py
+python3 -m py_compile launch-loop.py
 
 # Shell script syntax
 bash -n scripts/inspect-ledger.sh
@@ -397,10 +408,10 @@ def _classify_progress(summary: str, has_git_changes: bool, error: str | None) -
 2. **Update the CHANGELOG** — Add an entry under a new `## [Unreleased]`
    section at the top of `CHANGELOG.md`. Follow the existing format
    (Keep a Changelog + SemVer).
-3. **Update the version** — Bump `VERSION` in `launch-loop.py` if this is
+3. **Update the version** — Bump `LAUNCH_LOOP_VERSION` in `hermes_loop/config.py` if this is
    a release-worthy change. Follow semantic versioning:
-   - **Patch** (`14.1.0` → `14.1.1`): Bug fixes, minor doc changes
-   - **Minor** (`14.1.0` → `14.2.0`): New features, non-breaking additions
+   - **Patch** (`14.7.0` → `14.7.1`): Bug fixes, minor doc changes
+   - **Minor** (`14.7.0` → `14.8.0`): New features, non-breaking additions
    - **Major** (`14.0.0` → `15.0.0`): Breaking changes to CLI flags, ledger
      format, or spawned session interface
 4. **Update docs** — If you added or changed a CLI flag, update `README.md`
@@ -476,28 +487,69 @@ it. Examples of good feature requests:
 
 ## Project Structure
 
-```
+```text
 hermes-loop/
-├── launch-loop.py              # Main daemon (~7.7K lines, 7762 lines)
+├── run.sh                      # One-command entrypoint ★
+├── Makefile                    # Convenience targets ★
+├── launch-loop.py              # Thin backward-compatible shim (18 lines)
 ├── session-self-loop.py        # In-session loop tracker (~440 lines)
-├── run.sh                      # One-command entrypoint
-├── Makefile                    # Convenience targets (run, self-test, stop, etc.)
-├── .env                        # Your local configuration (git-ignored)
-├── .env.example                # Documented config template
-├── .gitignore
+├── CONTRIBUTING.md             # This file
 ├── README.md                   # Full documentation
 ├── CHANGELOG.md                # Complete version history
 ├── SKILL.md                    # Hermes skill metadata
-├── CONTRIBUTING.md             # This file
+├── .env                        # Your local configuration (git-ignored)
+├── .env.example                # Documented config template
+├── .gitignore
+├── hermes_loop/                # Main package (32 modules) ★
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── cli.py                  # Argparse + main() entry point
+│   ├── loop.py                 # run_loop() iteration logic
+│   ├── functions.py            # Helper functions
+│   ├── iteration.py            # Spawned session execution
+│   ├── config.py               # Constants, paths, defaults
+│   ├── error_utils.py          # Error classification + suggestions
+│   ├── error_recovery.py       # Automatic error recovery
+│   ├── webhook.py              # HTTP webhook server
+│   ├── dashboard.py            # SSE status dashboard
+│   ├── preflight.py            # Preflight health checks
+│   ├── notifications.py        # Pushbullet/ntfy/desktop notifications
+│   ├── heartbeat.py            # Session heartbeat monitoring
+│   ├── worker_manager.py       # Hermes worker process management
+│   ├── library_worker.py       # AIAgent in-process execution
+│   ├── state.py                # Ledger state management
+│   ├── file_utils.py           # File I/O utilities
+│   ├── git_utils.py            # Git diff/commit helpers
+│   ├── goal_utils.py           # Goal parsing/tracking
+│   ├── signal_handlers.py      # Signal handling (SIGINT/SIGTERM)
+│   ├── stats.py                # Statistics and ETA
+│   ├── validation.py           # JSON Schema validation
+│   ├── similarity.py           # Text similarity (Jaccard)
+│   ├── cooldown.py             # Adaptive cooldown calculation
+│   ├── hermes_utils.py         # Hermes binary detection
+│   ├── system_utils.py         # System resource tracking
+│   ├── file_watcher.py         # Directory/file change watcher
+│   ├── archiving.py            # Ledger archival
+│   ├── self_test.py            # In-process unit tests
+│   ├── tracker.py              # Context window tracker
+│   └── legacy.py               # Backward compatibility
 ├── scripts/
 │   ├── run-loop.sh             # Shell wrapper (original entrypoint)
 │   ├── inspect-ledger.sh       # Formatted ledger viewer
 │   ├── archive-state.sh        # Archive iterations to JSONL/Markdown
 │   ├── replay-ledger.sh        # Re-run archived iterations
 │   └── verify-delegation-config.sh  # Historical reference
-├── Makefile                     # Convenience targets (run, self-test, stop, etc.)
-├── CONTRIBUTING.md              # This file
-└── __pycache__/                # Auto-generated (git-ignored)
+├── references/                 # Deep-dive design documents
+│   ├── cross-iteration-context.md
+│   ├── spawn-toolset-restriction.md
+│   ├── terminal-timeout-trap.md
+│   ├── hermes-worker.md
+│   └── ...
+└── research/                   # Feature research documents
+    ├── v11.11.0-features.md
+    ├── v12.0.0-features.md
+    ├── v14.0.0-features.md
+    └── ...
 ```
 
 > **Tip**: Use `make help` to see all available convenience targets (run,

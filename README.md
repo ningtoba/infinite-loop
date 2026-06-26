@@ -92,7 +92,7 @@ You (current Hermes agent session / terminal)
   │
   └─ python3 launch-loop.py --goal "..." --run
       │
-      │  launch-loop.py loops in the background:
+      │  hermes_loop/ package runs the loop in the background:
       │
       ├─ iter 1:  spawns `hermes chat -q "<prompt>" -t terminal,file,delegation,... -Q --max-turns 500`
       │              │
@@ -114,8 +114,8 @@ You (current Hermes agent session / terminal)
 
 ## How It Works
 
-1. **You** run the daemon via `python3 launch-loop.py --run` (usually in `terminal(background=true)`)
-2. **Daemon** auto-detects task type from the goal and enriches toolsets
+1. **You** run the daemon via `python3 launch-loop.py --run` (usually in `terminal(background=true)`). The `launch-loop.py` shim delegates to the `hermes_loop/` package.
+2. **Daemon** (`hermes_loop/` package) auto-detects task type from the goal and enriches toolsets
 3. **Daemon** spawns `hermes chat -q "..." -t terminal,file,delegation,... -Q --max-turns 500` on each iteration
 4. **Spawned Hermes** gets task-optimized prompts, past failure context, and the right tools
 5. **Spawned Hermes** stays alive for multiple turns — `delegate_task()` results arrive
@@ -142,7 +142,8 @@ The `context` field is critical for iterative work — it tells the NEXT spawned
 
 | Script | Path | Purpose |
 |--------|------|---------|
-| **launch-loop.py** | `launch-loop.py` (root) | Main daemon — the primary loop. Spawns Hermes sessions, manages the JSON ledger, handles all flags. **287 KB, 7,557 lines.** |
+| **launch-loop.py** | `launch-loop.py` (root) | Thin backward-compatible shim (18 lines). Imports `main()` from the `hermes_loop/` package. All real code lives in the package. |
+| **hermes_loop/** | `hermes_loop/` (directory) | **Main daemon package** (32 modules). Contains all daemon logic: CLI, loop, functions, iteration, webhook, dashboard, preflight, notifications, and more. See [project structure](#files--structure) for the full module list. |
 | **session-self-loop.py** | `session-self-loop.py` (root) | Lightweight in-session loop tracker for self-enhancement from within your current Hermes session. |
 | **Makefile** | `Makefile` (root) | Convenience targets: `make run`, `make dry-run`, `make self-test`, `make status`, `make stop`, `make clean`. ★ |
 | **run.sh** | `run.sh` (root) | **One-command entrypoint** — sources `.env`, forwards all settings as CLI flags. Just `bash run.sh`. ★ |
@@ -936,8 +937,42 @@ infinite-loop/
 ├── SKILL.md                     ← Original Hermes skill file (83 KB)
 │
 │
-├── launch-loop.py               ← Main daemon (287 KB, 7,557 lines) ★
+├── launch-loop.py               ← Thin backward-compatible shim (18 lines) ★
 ├── session-self-loop.py         ← In-session loop tracker ★
+│
+├── hermes_loop/                 ← Main daemon package (32 modules) ★
+│   ├── __init__.py
+│   ├── __main__.py              ← `python3 -m hermes_loop` entry point
+│   ├── cli.py                   ← Argparse + main() entry point
+│   ├── loop.py                  ← run_loop() iteration logic
+│   ├── functions.py             ← Helper functions (execute, merge, notify)
+│   ├── iteration.py             ← Spawned session execution
+│   ├── config.py                ← Constants, paths, defaults
+│   ├── error_utils.py           ← Error classification + actionable suggestions
+│   ├── error_recovery.py        ← Automatic error recovery
+│   ├── webhook.py               ← HTTP webhook server
+│   ├── dashboard.py             ← SSE status dashboard
+│   ├── preflight.py             ← Preflight health checks
+│   ├── notifications.py         ← Pushbullet/ntfy/desktop notifications
+│   ├── heartbeat.py             ← Session heartbeat monitoring
+│   ├── worker_manager.py        ← Hermes worker process management
+│   ├── library_worker.py        ← AIAgent in-process execution
+│   ├── state.py                 ← Ledger state management
+│   ├── file_utils.py            ← File I/O utilities
+│   ├── git_utils.py             ← Git diff/commit helpers
+│   ├── goal_utils.py            ← Goal parsing/tracking
+│   ├── signal_handlers.py       ← Signal handling (SIGINT/SIGTERM)
+│   ├── stats.py                 ← Statistics and ETA
+│   ├── validation.py            ← JSON Schema validation
+│   ├── similarity.py            ← Text similarity (Jaccard)
+│   ├── cooldown.py              ← Adaptive cooldown calculation
+│   ├── hermes_utils.py          ← Hermes binary detection
+│   ├── system_utils.py          ← System resource tracking (Linux /proc)
+│   ├── file_watcher.py          ← Directory/file change watcher
+│   ├── archiving.py             ← Ledger archival
+│   ├── self_test.py             ← In-process unit tests
+│   ├── tracker.py               ← Context window tracker
+│   └── legacy.py                ← Backward compatibility
 │
 ├── scripts/
 │   ├── run-loop.sh              ← Unified shell wrapper
@@ -963,4 +998,8 @@ infinite-loop/
 │   ├── v14.0.0-features.md
 │   ├── ... (20+ research documents)
 │   └── aiagent-vs-subprocess-analysis.md
+│
+└── scripts/completion/
+    ├── bash                     ← Bash tab-completion script
+    └── zsh                      ← Zsh tab-completion script
 ```

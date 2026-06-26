@@ -147,9 +147,21 @@ clean:
 .PHONY: lint
 lint:
 	@echo "Checking Python syntax..."
-	$(PYTHON) -m py_compile launch-loop.py && echo "  ✓ launch-loop.py"
-	$(PYTHON) -m py_compile session-self-loop.py && echo "  ✓ session-self-loop.py"
-	@echo "Syntax OK"
+	@ERRORS=0; \
+	for f in hermes_loop/*.py session-self-loop.py launch-loop.py; do \
+		if $(PYTHON) -m py_compile "$$f" 2>/dev/null; then \
+			echo "  ✓ $$f"; \
+		else \
+			echo "  ✗ $$f — syntax error"; \
+			ERRORS=$$((ERRORS + 1)); \
+		fi; \
+	done; \
+	if [ "$$ERRORS" -eq 0 ]; then \
+		echo "Syntax OK — all files pass"; \
+	else \
+		echo "$$ERRORS file(s) have syntax errors"; \
+		exit 1; \
+	fi
 
 .PHONY: completion
 completion:

@@ -2634,6 +2634,7 @@ def main():
             reset_goals=args.reset_goals,
             heartbeat_timeout=args.heartbeat_timeout,
             quiet=args.quiet,
+            force_reset=args.force_reset,
         )
 
     if args.notify_on_completion or args.notify_pushbullet or args.notify_ntfy:

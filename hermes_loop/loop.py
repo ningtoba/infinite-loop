@@ -206,6 +206,7 @@ def run_loop(
     reset_goals: bool = False,
     heartbeat_timeout: int = 0,
     quiet: bool = False,
+    force_reset: bool = False,
 ) -> None:
     global _shutdown_requested
 
@@ -788,6 +789,9 @@ def run_loop(
             workers=workers,
             use_library=use_library,
             consecutive_errors=consecutive_errors,
+            git=git,
+            git_commit=git_commit,
+            force_reset=force_reset,
         )
         if suggestion:
             for line in suggestion.split("\n"):

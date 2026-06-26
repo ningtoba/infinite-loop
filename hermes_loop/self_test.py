@@ -536,14 +536,55 @@ def _run_self_test() -> dict:
                 ),
             )
         )
-        # Regression should suggest reviewing git diff
+        # Regression with no flags enabled should suggest all three git-related flags
         cases.append(
             (
-                "regression-suggestion",
+                "regression-suggestion-defaults",
                 lambda: _suggest_actionable_fix(None, "regression", "refactor db"),
                 lambda r: (
-                    r is not None and "git diff" in r.lower(),
-                    f"expected git diff suggestion for regression, got {r!r}",
+                    r is not None
+                    and "Add --git to track" in r  # should suggest --git
+                    and "--git-commit" in r
+                    and "--force-reset" in r,
+                    f"expected --git+--git-commit+--force-reset for regression defaults, got {r!r}",
+                ),
+            )
+        )
+        # Regression with ALL flags already enabled should suggest nothing
+        cases.append(
+            (
+                "regression-suggestion-all-enabled",
+                lambda: _suggest_actionable_fix(
+                    None,
+                    "regression",
+                    "refactor db",
+                    git=True,
+                    git_commit=True,
+                    force_reset=True,
+                ),
+                lambda r: (
+                    r is None,
+                    f"expected no suggestion when git+git-commit+force-reset all enabled, got {r!r}",
+                ),
+            )
+        )
+        # Regression with only git enabled should skip --git but still suggest others
+        cases.append(
+            (
+                "regression-suggestion-git-only",
+                lambda: _suggest_actionable_fix(
+                    None,
+                    "regression",
+                    "refactor db",
+                    git=True,
+                ),
+                lambda r: (
+                    r is not None
+                    and "Add --git to track"
+                    not in r  # should NOT suggest adding the --git flag
+                    and "--git-commit" in r
+                    and "--force-reset" in r,
+                    f"expected --git-commit+force-reset (no --git flag) for git-only, got {r!r}",
                 ),
             )
         )

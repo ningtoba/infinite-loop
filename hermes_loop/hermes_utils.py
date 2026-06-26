@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -21,6 +22,39 @@ from .heartbeat import (
     _cleanup_heartbeat_file,
 )
 from .signal_handlers import _shutdown_requested
+
+# Regex for token/progress lines on Hermes stderr
+_TOKEN_RE = re.compile(
+    r"(?:tokens?|tok/s|generat|complete|response|model)"
+    r"|(?:\[DONE\]|\[MODEL\]|\[REQUEST\]|\[RESPONSE\]|\[TOKEN\])",
+    re.IGNORECASE,
+)
+
+
+def _read_stderr_real_time(
+    proc: subprocess.Popen,
+    worker_tag: str,
+) -> None:
+    """Daemon thread: read stderr line-by-line and log token/progress info.
+
+    Hermes prints progress (token counts, model status, timing) to stderr.
+    This thread captures those lines in real-time and logs them with a
+    ``[MODEL{worker_tag}]`` prefix so the user sees live token flow.
+    """
+    try:
+        for raw_line in iter(proc.stderr.readline, ""):
+            if not raw_line:
+                break
+            line = raw_line.rstrip("\n\r")
+            if not line:
+                continue
+            # Only log lines that look like progress / token info
+            if _TOKEN_RE.search(line):
+                # Shorten noisy lines but keep the useful part
+                display = line[:300]
+                _log(f"[MODEL{worker_tag}] {display}")
+    except (ValueError, OSError, AttributeError):
+        pass  # pipe closed or process gone
 
 
 def find_hermes() -> str:
@@ -767,8 +801,17 @@ def spawn_delegation_session(
             )
             monitor_thread.start()
 
+            # Real-time stderr reader (token/progress feedback)
+            stderr_reader = threading.Thread(
+                target=_read_stderr_real_time,
+                args=(proc, worker_tag),
+                daemon=True,
+            )
+            stderr_reader.start()
+
             try:
                 stdout_b, stderr_b = proc.communicate(timeout=timeout_seconds)
+                stderr_reader.join(timeout=2)
                 elapsed = time.time() - start
                 stdout = (stdout_b or "").strip()
                 stderr = (stderr_b or "").strip()
@@ -787,17 +830,31 @@ def spawn_delegation_session(
                     "spawned_session_id": "",
                 }
         else:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 cmd,
-                capture_output=True,
-                timeout=timeout_seconds,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 cwd=workdir or os.getcwd(),
                 text=True,
             )
+            # Real-time stderr reader (token/progress feedback)
+            stderr_reader = threading.Thread(
+                target=_read_stderr_real_time,
+                args=(proc, worker_tag),
+                daemon=True,
+            )
+            stderr_reader.start()
+            try:
+                stdout_b, stderr_b = proc.communicate(timeout=timeout_seconds)
+                stderr_reader.join(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                stdout_b, stderr_b = proc.communicate(timeout=5)
+                stderr_reader.join(timeout=2)
             elapsed = time.time() - start
-            stdout = (result.stdout or "").strip()
-            stderr = (result.stderr or "").strip()
-            subprocess_exit_code = result.returncode
+            stdout = (stdout_b or "").strip()
+            stderr = (stderr_b or "").strip()
+            subprocess_exit_code = proc.returncode
 
         extracted_session_id = ""
         for line in (stdout or "").split("\n"):

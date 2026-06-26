@@ -121,12 +121,17 @@ def _suggest_actionable_fix(
     workers: int = 1,
     use_library: bool = False,
     consecutive_errors: int = 0,
+    git: bool = False,
+    git_commit: bool = False,
+    force_reset: bool = False,
 ) -> str | None:
     """Generate a human-readable, actionable suggestion based on the error/classification.
 
     Maps common failure patterns to specific CLI flags and configuration changes
-    the user can make. Returns None when no suggestion is warranted (e.g. completed
-    successfully).
+    the user can make.  Considers already-enabled flags (``git``, ``git_commit``,
+    ``force_reset``) to avoid stale advice.
+
+    Returns None when no suggestion is warranted (e.g. completed successfully).
 
     Suggestion priority: errors > stuck/regression > partial > running fine.
     """
@@ -210,10 +215,27 @@ def _suggest_actionable_fix(
     if classification == "regression":
         tips = [
             "Suggestions:",
-            "  • Previous changes may have broken something — review the git diff",
-            "  • Run with --force-reset to start with a clean ledger",
-            "  • Add --git-commit so each iteration is a revert-able commit",
         ]
+        if git:
+            tips.append(
+                "  • Previous changes may have broken something — review the git diff"
+            )
+        else:
+            tips.append("  • Add --git to track file changes across iterations")
+        if not force_reset:
+            tips.append("  • Run with --force-reset to start with a clean ledger")
+        if not git_commit:
+            tips.append(
+                "  • Add --git-commit so each iteration is a revert-able commit"
+            )
+        if not tips[1:]:  # only "Suggestions:" header, nothing useful
+            return None
+        # If the only tip is a review note (not an actionable flag change), skip it
+        no_op_tip = (
+            "  • Previous changes may have broken something — review the git diff"
+        )
+        if len(tips) == 2 and tips[1] == no_op_tip:
+            return None
         return "\n".join(tips)
 
     if classification == "partial":

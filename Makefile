@@ -25,6 +25,8 @@ help:
 	@echo "  Setup & Docs:"
 	@echo "    env          Copy .env.example to .env (safe, no overwrite)"
 	@echo "    help         Show this help message"
+	@echo "    init         Walk through interactive setup wizard (--init)"
+	@echo "    wizard       Alias for make init"
 	@echo ""
 	@echo "  Run:"
 	@echo "    run          Run the daemon (reads .env). Add ARGS for overrides"
@@ -80,6 +82,12 @@ env:
 		echo "Created .env from .env.example"; \
 		echo "Edit .env with your settings, then: make run"; \
 	fi
+
+# ── Interactive Setup Wizard ─────────────────────────────────────────────
+
+.PHONY: init wizard
+init wizard:
+	$(PYTHON) -m hermes_loop --init
 
 # ── Run / Test ────────────────────────────────────────────────────────────────
 

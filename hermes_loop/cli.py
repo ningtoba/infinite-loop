@@ -34,6 +34,7 @@ from .heartbeat import _cleanup_stale_heartbeats
 from .notifications import _send_completion_notification
 from .functions import set_max_output_chars
 from .completions import generate_bash_completion, generate_zsh_completion
+from .wizard import run_wizard
 from .color_utils import colorizer, configure_color_mode
 from .env_utils import (
     check_env_file,
@@ -81,6 +82,8 @@ def _list_flags(show_help=True):
         "--completion-script": "Generate shell completion script for bash or zsh from live argparse",
         "--status": "Read the ledger and display a compact status summary (no --goal required)",
         "--explain": "Show detailed help for a specific CLI flag (no --goal required)",
+        "--init": "Interactive setup wizard — walks you through configuration step by step",
+        "--wizard": "Alias for --init (interactive setup wizard)",
     }
 
     total_flags = sum(len(v) for v in group_map.values()) + len(introspection_flags)
@@ -256,6 +259,10 @@ def _list_examples():
     print()
     _comment("Shell tab-completion (one-time setup)")
     _cmd("make completion")
+    print()
+    _comment("Interactive setup wizard")
+    _cmd("hermes_loop --init")
+    _cmd("make init")
     print()
     _comment("Quick one-command entrypoint (reads .env)")
     _cmd("bash run.sh")
@@ -1246,6 +1253,25 @@ def _create_parser(for_introspection=False):
         "Pre-argparse -- no --goal required. "
         "Example: python3 -m hermes_loop --explain workers",
     )
+    group.add_argument(
+        "--init",
+        action="store_true",
+        help="Interactive setup wizard — walks you through the most common "
+        "configuration options step by step and generates a .env file. "
+        "Ideal for first-time users. "
+        "Alias: --wizard. "
+        "Pre-argparse -- no --goal required. "
+        "Example: python3 -m hermes_loop --init",
+    )
+    group.add_argument(
+        "--wizard",
+        action="store_true",
+        help="Alias for --init. Interactive setup wizard that generates "
+        "a .env file by asking about goal, workers, git, notifications, "
+        "and other common settings. "
+        "Pre-argparse -- no --goal required. "
+        "Example: python3 -m hermes_loop --wizard",
+    )
 
     return parser
 
@@ -1335,6 +1361,11 @@ def main():
         _display_status()
         sys.exit(0)
 
+    # Check --init / --wizard before argparse to avoid required --goal conflict
+    if "--init" in sys.argv or "--wizard" in sys.argv:
+        run_wizard()
+        sys.exit(0)
+
     # Friendly error if --goal is missing (before argparse dry error)
     standalone_flags = {
         "--version",
@@ -1348,6 +1379,8 @@ def main():
         "--check-env",
         "--status",
         "--explain",
+        "--init",
+        "--wizard",
     }
     arg_set = set(sys.argv[1:])
     has_goal = any(
@@ -1368,11 +1401,15 @@ def main():
         )
         parser.print_usage()
         print(
-            "\nSee 'python3 -m hermes_loop --help' for full options",
+            "See 'python3 -m hermes_loop --help' for full options",
             file=sys.stderr,
         )
         print(
             "See 'python3 -m hermes_loop --examples' for usage patterns",
+            file=sys.stderr,
+        )
+        print(
+            "See 'python3 -m hermes_loop --init' for interactive setup wizard",
             file=sys.stderr,
         )
         sys.exit(1)

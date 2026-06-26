@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.22.0
+# Infinite Loop Daemon — v14.23.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -58,6 +58,10 @@ skill for independent use, development, and documentation.
 ```bash
 # One command — reads everything from .env
 bash run.sh
+
+# Or use the interactive setup wizard:
+python3 -m hermes_loop --init
+make init
 
 # Or with overrides:
 bash run.sh --dry-run                           # Preview config, don't run
@@ -453,6 +457,15 @@ kill $LOOP_PID
 | Feature | Type | Files | Description |
 |---------|------|-------|-------------|
 | `--explain` flag | UX | `cli.py` | Detailed help on any single CLI flag. Accepts full names or unambiguous prefixes. Shows: group, type, default, full description, aliases, related flags, and usage example. Pre-argparse, no `--goal` required. |
+
+---
+
+## v14.23.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `--init` / `--wizard` flag | DX | `wizard.py`, `cli.py` | Interactive setup wizard that walks through 8 configuration steps (goal, workers, git, evolve, iterations, notifications, quiet, output) and generates a `.env` file. Pre-argparse, no `--goal` required. `make init` / `make wizard` targets added. |
+| New module | DX | `wizard.py` | 313-line `run_wizard()` with interactive questionnaire, `.env` writer that preserves existing non-daemon variables, and CLI-flag fallback instructions. |
 
 ---
 

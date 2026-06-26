@@ -4,6 +4,32 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.23.0] — 2026-06-26
+
+### Added
+- **`--init` / `--wizard` flag**: New interactive setup wizard that walks first-time
+  users through the most common configuration options step by step and generates a
+  `.env` file. Covers: goal/goals-file, workers (parallelism), git integration
+  (git, git-commit, store-git-diff), evolve mode, max iterations, notifications
+  (desktop, ntfy, Pushbullet), quiet mode, and output path. Pre-argparse — no
+  `--goal` required. Example: `hermes_loop --init` or `make init`.
+- **`make init` / `make wizard` target**: New Makefile targets that launch the
+  interactive setup wizard. Example: `make init`.
+
+### Changed
+- `hermes_loop/wizard.py` — **New module** (313 lines). Contains `run_wizard()`
+  with 8-step interactive questionnaire, `.env` writer that preserves existing
+  non-daemon variables, and CLI-flag fallback instructions for users who skip
+  file saving.
+- `hermes_loop/cli.py` — Added `--init` and `--wizard` pre-argparse handlers,
+  introspection flags, argparse group definitions, standalone flags set, and
+  `--init` hint in the `--goal` missing error message. Added wizard entry to
+  `--examples` output (Help & Diagnostics section).
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.22.0 to 14.23.0.
+- `Makefile` — Added `init`/`wizard` targets and help section entries.
+
+---
+
 ## [14.22.0] — 2026-06-26
 
 ### Added

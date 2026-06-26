@@ -52,7 +52,7 @@ is met.
 - **`scripts/archive-state.sh`** — Archive old iterations to JSONL or Markdown.
 - **`scripts/replay-ledger.sh`** — Re-run archived iterations from JSONL files.
 
-**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.20.0"`
+**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.24.0"`
 in `hermes_loop/config.py`. The project follows
 [Semantic Versioning](https://semver.org/).
 
@@ -265,7 +265,7 @@ Run the self-tests before committing:
 python3 launch-loop.py --self-test
 ```
 
-This runs 50 in-process test cases across 10 test groups without spawning any
+This runs 10 self-test groups (all cases auto-detected at runtime) without spawning any
 child Hermes sessions. All tests should pass (exit code 0).
 
 **What the self-tests cover:**

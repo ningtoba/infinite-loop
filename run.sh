@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.24.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.25.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -49,7 +49,9 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "    --list-flags          Print all 90 flags organized by group with help text"
   echo "    --list-groups         Print compact group names with flag counts"
   echo "    --examples            Print categorized real-world usage examples (7 categories)"
+  echo "    --check-env           Validate .env file for typos and unknown variables"
   echo "    --completion-script {bash|zsh}  Generate shell completion (pipe to source)"
+  echo "    --doctor              Run comprehensive self-diagnosis"
   echo ""
   echo "EXAMPLES:"
   echo "  bash run.sh                           # Run with .env config"
@@ -194,6 +196,7 @@ while [[ $# -gt 0 ]]; do
     --help|-h)    echo "See 'bash run.sh --help' for usage."; exit 0 ;;
     --list-flags|--list-groups|--examples) DAEMON_ARGS+=("$1"); shift ;;
     --check-env)  DAEMON_ARGS+=("--check-env"); shift ;;
+    --doctor)     DAEMON_ARGS+=("--doctor"); shift ;;
     --completion-script) DAEMON_ARGS+=("$1" "$2"); shift 2 ;;
     *)            EXTRA_ARGS+=("$1"); shift ;;
   esac
@@ -202,7 +205,7 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo '╔══════════════════════════════════════════════╗'
-  echo '║  Infinite Loop Daemon v14.24.0               ║'
+  echo '║  Infinite Loop Daemon v14.25.0               ║'
   echo '║  run.sh — one command to start               ║'
   echo '║                                                ║'
   echo '║  What's new ⚡                                ║'
@@ -224,7 +227,8 @@ if [ "$QUIET" = false ]; then
   echo '║  • [SUGGEST] smart fixes on errors/stuck      ║'
   echo '║  • --quiet mode: compact per-iteration output ║'
   echo '║  • [BEAT] heartbeat during long iterations    ║'
-  echo '║  • Self-test count auto-detected (never stale)║'
+  echo '║  • --self-test count auto-detected             ║'
+  echo '║  • --doctor: comprehensive self-diagnosis     ║'
   echo '╚══════════════════════════════════════════════╝'
   echo ""
   echo "  Config: .env"

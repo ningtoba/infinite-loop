@@ -253,6 +253,9 @@ def _list_examples():
     _comment("Health check before running")
     _cmd("hermes_loop --preflight")
     print()
+    _comment("Full self-diagnosis (hermes, PATH, .env, git, shell, disk)")
+    _cmd("hermes_loop --doctor")
+    print()
     _comment("Save current config for reuse")
     _cmd('hermes_loop --goal "Config snapshot" --save-config my-loop.json')
     _cmd('hermes_loop --goal "Load config" --config my-loop.json --run')
@@ -1272,6 +1275,16 @@ def _create_parser(for_introspection=False):
         "Pre-argparse -- no --goal required. "
         "Example: python3 -m hermes_loop --wizard",
     )
+    group.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Run comprehensive self-diagnosis and exit. Checks hermes binary, "
+        "PATH, .env file validity, git repo, Python version, disk space, "
+        "required scripts, shell completion, and gateway connectivity. "
+        "Reports pass/warn/fail per check with actionable suggestions. "
+        "Pre-argparse -- no --goal required. "
+        "Example: python3 -m hermes_loop --doctor",
+    )
 
     return parser
 
@@ -1366,6 +1379,14 @@ def main():
         run_wizard()
         sys.exit(0)
 
+    # Check --doctor before argparse to avoid required --goal conflict
+    if "--doctor" in sys.argv:
+        from .diagnosis import run_diagnosis, print_diagnosis_report
+
+        checks = run_diagnosis()
+        print_diagnosis_report(checks, version=LAUNCH_LOOP_VERSION)
+        sys.exit(0)
+
     # Friendly error if --goal is missing (before argparse dry error)
     standalone_flags = {
         "--version",
@@ -1381,6 +1402,7 @@ def main():
         "--explain",
         "--init",
         "--wizard",
+        "--doctor",
     }
     arg_set = set(sys.argv[1:])
     has_goal = any(
@@ -1390,6 +1412,17 @@ def main():
         i + 1 < len(sys.argv) and sys.argv[i] == "--goals-file"
         for i in range(len(sys.argv))
     )
+    env_hint = ""
+    # Check if .env exists in the project root for an actionable hint
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(script_dir, ".."))
+        env_path = os.path.join(project_root, ".env")
+        if os.path.isfile(env_path):
+            env_hint = "\nOr use 'bash run.sh' to launch with your .env configuration"
+    except Exception:
+        pass
+
     if not has_goal and not has_goals_file and not arg_set & standalone_flags:
         parser = argparse.ArgumentParser(
             description=f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION}",
@@ -1412,6 +1445,8 @@ def main():
             "See 'python3 -m hermes_loop --init' for interactive setup wizard",
             file=sys.stderr,
         )
+        if env_hint:
+            print(env_hint, file=sys.stderr)
         sys.exit(1)
 
     parser = _create_parser()

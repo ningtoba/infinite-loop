@@ -25,6 +25,7 @@ _hermes_loop_completions()
         --checkpoints
         --continue
         --convergence-stop
+        --doctor
         --dry-run
         --evolve
         --force-reset
@@ -32,6 +33,7 @@ _hermes_loop_completions()
         --git-commit
         --ignore-rules
         --ignore-user-config
+        --init
         --no-auto-toolsets
         --no-failure-learning
         --notify-desktop
@@ -50,6 +52,7 @@ _hermes_loop_completions()
         --store-git-diff
         --track-goals
         --use-library
+        --wizard
         --worktree
         --yolo
     )

@@ -19,6 +19,7 @@ bool_flags=(
     '--checkpoints[Enable file checkpoints in spawned sessions]'
     '--continue[Resume the most recent session in spawned sessions]'
     '--convergence-stop[Auto-stop when N consecutive iterations produce similar summaries (stuck detection)]'
+    '--doctor[Run comprehensive self-diagnosis and exit]'
     '--dry-run[Print what would happen without spawning any sessions]'
     '--evolve[Let iterations propose the next goal (self-directing)]'
     '--force-reset[Clear existing ledger and start fresh]'
@@ -26,6 +27,7 @@ bool_flags=(
     '--git-commit[Auto-commit changes per iteration (implies --git)]'
     '--ignore-rules[Start spawned sessions without loading AGENTS]'
     '--ignore-user-config[Pass --ignore-user-config to spawned sessions so they skip ~/]'
+    '--init[Interactive setup wizard — walks you through the most common configuration options step by step and generates a]'
     '--no-auto-toolsets[Disable automatic toolset enrichment based on task type]'
     '--no-failure-learning[Disable injection of past failure context into spawned sessions]'
     '--notify-desktop[Send desktop notifications via notify-send on each iteration result (Linux only)]'
@@ -44,6 +46,7 @@ bool_flags=(
     '--store-git-diff[Store the actual git diff (not just stats) in the ledger]'
     '--track-goals[When used with --goals-file, track completed goals so crashed/restarted runs automatically skip already-finished goals]'
     '--use-library[Use AIAgent]'
+    '--wizard[Alias for --init]'
     '--worktree[Run spawned sessions in an isolated git worktree]'
     '--yolo[Bypass all dangerous command approval prompts in spawned sessions]'
 )

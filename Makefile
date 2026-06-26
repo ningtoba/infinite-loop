@@ -34,6 +34,7 @@ help:
 	@echo "    self-test    Run in-process self-tests (count auto-detected at runtime)"
 	@echo "    version      Print daemon version and exit"
 	@echo "    check-env    Validate .env file for typos, unknown variables, common mistakes"
+	@echo "    doctor       Run comprehensive self-diagnosis (hermes, PATH, .env, git)"
 	@echo "    examples     Print categorized real-world usage examples"
 	@echo "    explain      Show detailed help on a single flag (pass FLAG=)"
 	@echo "    list-flags   Print all 90 flags organized by group"
@@ -114,6 +115,10 @@ check-env:
 .PHONY: examples
 examples:
 	$(RUN_SH) --examples
+
+.PHONY: doctor
+doctor:
+	$(PYTHON) -m hermes_loop --doctor
 
 .PHONY: explain
 explain:

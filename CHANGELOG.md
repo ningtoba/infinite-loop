@@ -4,6 +4,38 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.25.0] — 2026-06-26
+
+### Added
+- **`--doctor` flag**: New comprehensive self-diagnosis command that checks
+  the entire environment in one shot: hermes binary on PATH, git availability,
+  .env file validity (with typo detection), Python version, disk space,
+  required project scripts, shell completion status, and gateway connectivity.
+  Reports pass/warn/fail per check with actionable suggestions. Pre-argparse —
+  no `--goal` required. Example: `python3 -m hermes_loop --doctor`.
+- **`make doctor` target**: New Makefile convenience target that runs
+  `python3 -m hermes_loop --doctor`. Listed in `make help` under "Run".
+- **Smart `.env` hint in error message**: When `--goal` is missing and a `.env`
+  file exists in the project root, the error message now suggests
+  `bash run.sh` as the simplest entrypoint — helps first-time users who
+  create `.env` but try `python3 -m hermes_loop` directly.
+
+### Changed
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.24.0 to 14.25.0.
+- `hermes_loop/cli.py` — Added `--doctor` argparse definition, standalone flag,
+  pre-argparse handler, and Help & Diagnostics section in `--examples`.
+- `hermes_loop/diagnosis.py` — **New module** (396 lines). Contains `run_diagnosis()`
+  and `print_diagnosis_report()` with 8 check categories and 20+ individual checks.
+- `run.sh` — Bumped banner, docstring, and "What's new" section to v14.25.0;
+  added `--doctor` forwarding.
+- `Makefile` — Added `doctor` target, updated `help` section with `doctor` entry.
+- `README.md` — Version bump to 14.25.0.
+- `CONTRIBUTING.md` — Fixed stale version reference (14.20.0 → 14.24.0 → 14.25.0)
+  and stale test count description ("50 cases across 10 groups" → "10 groups, cases
+  auto-detected at runtime").
+
+---
+
 ## [14.24.0] — 2026-06-26
 
 ### Added

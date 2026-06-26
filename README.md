@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.0.0
+# Infinite Loop Daemon — v14.1.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -424,6 +424,19 @@ echo '{"summary": "added feature X", "next_goal": "add feature Y"}' > /tmp/sessi
 echo '{"done": true}' > /tmp/session-loop-state.json
 kill $LOOP_PID
 ```
+
+---
+
+## v14.1.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Dashboard XSS Fix | Security | `launch-loop.py` | Replaced `innerHTML` string interpolation with `createElement` + `textContent` in SSE dashboard's `addIterationRow()`. Eliminates DOM-based XSS from spawned session output. |
+| Dashboard Error Panel | Enhancement | `launch-loop.py` | Error type count cards (timeout, network, schema, unknown) with color-coded left-border accents. Active mitigations displayed as tags. |
+| Dashboard Performance Metrics | Enhancement | `launch-loop.py` | Avg turns, estimated tokens/iter, cost estimate, iters/goal metric cards on SSE dashboard. |
+| Dashboard Goals Visualization | Enhancement | `launch-loop.py` | Per-goal status with progress bar, ✓/▶/○ indicators, scrollable list. Populated from `goals_specs` + `goals_completed` via SSE payload. |
+| False Convergence Guard | Robustness | `launch-loop.py` | `_detect_convergence()` skips Jaccard similarity check when summary < 20 chars. Prevents false convergence stops from empty/error summaries. |
+| `--quiet` / `-q` mode | Usability | `scripts/run-loop.sh` | Suppresses ASCII banner and startup info in CI/CD and scripted use. |
 
 ---
 

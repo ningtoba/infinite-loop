@@ -105,6 +105,7 @@
 #   --track-goals         Track completed goals in ledger, skip on restart
 #   --reset-goals         Clear tracked goals for fresh run
 #   --shutdown-sentinel PATH  Path to sentinel file (default: /tmp/infinite-loop-stop)
+#   --quiet / -q          Suppress banner output (for CI/CD and scripts)
 #   --help                   Show this help
 
 set -euo pipefail
@@ -122,6 +123,7 @@ declare -a DAEMON_ARGS=()
 GOAL=""
 NO_RUN=false
 RECOVER=false
+QUIET=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -207,6 +209,7 @@ while [[ $# -gt 0 ]]; do
     --track-goals) DAEMON_ARGS+=("--track-goals"); shift ;;
     --reset-goals) DAEMON_ARGS+=("--reset-goals"); shift ;;
     --shutdown-sentinel) DAEMON_ARGS+=("--shutdown-sentinel" "$2"); shift 2 ;;
+    --quiet|-q) QUIET=true; shift ;;
     *) echo "Unknown option: $1"; show_help ;;
   esac
 done
@@ -217,23 +220,25 @@ if [ -z "$GOAL" ] && [ "$RECOVER" = false ]; then
   exit 1
 fi
 
-echo "╔══════════════════════════════════════════════╗"
-echo "║  Infinite Loop - v14.0.0                       ║"
-echo "║  Dashboard v3 SSE, Session                       ║"
-echo "║  Self-Healing Heartbeat, Hermes                  ║"
-echo "║  Version Check, Idempotent Goal Execution,       ║"
-echo "║  Concurrent Library Mode, Auto Error Recovery,   ║"
-echo "║  In-Process Archiving, Multi-Profile Goals       ║"
-echo "║  Function Decomposition Phase 2 & 3,             ║"
-echo "║  Self-Test Mode, Output Progress                 ║"
-echo "║  Classification, File, YOLO mode,                ║"
-echo "║  clean-slate mode, AIAgent library,              ║"
-echo "║  session tracking, Pushbullet & ntfy             ║"
-echo "║  notifications, preflight health checks,         ║"
-echo "║  /api/status, REST control, dashboard v2,        ║"
-echo "║  No cron. Real delegation. Real loops.           ║"
-echo "╚══════════════════════════════════════════════╝"
-echo ""
+if [ "$QUIET" = false ]; then
+  echo "╔══════════════════════════════════════════════╗"
+  echo "║  Infinite Loop - v14.0.0                       ║"
+  echo "║  Dashboard v3 SSE, Session                       ║"
+  echo "║  Self-Healing Heartbeat, Hermes                  ║"
+  echo "║  Version Check, Idempotent Goal Execution,       ║"
+  echo "║  Concurrent Library Mode, Auto Error Recovery,   ║"
+  echo "║  In-Process Archiving, Multi-Profile Goals       ║"
+  echo "║  Function Decomposition Phase 2 & 3,             ║"
+  echo "║  Self-Test Mode, Output Progress                 ║"
+  echo "║  Classification, File, YOLO mode,                ║"
+  echo "║  clean-slate mode, AIAgent library,              ║"
+  echo "║  session tracking, Pushbullet & ntfy             ║"
+  echo "║  notifications, preflight health checks,         ║"
+  echo "║  /api/status, REST control, dashboard v2,        ║"
+  echo "║  No cron. Real delegation. Real loops.           ║"
+  echo "╚══════════════════════════════════════════════╝"
+  echo ""
+fi
 
 # Check hermes is available
 if ! command -v hermes &>/dev/null; then
@@ -266,14 +271,15 @@ if [ "$NO_RUN" = true ]; then
 fi
 
 # Run
-echo "--- Starting Loop ---"
-echo "PID: $$"
-echo "Ledger: $LEDGER_PATH"
-echo "Sentinel: echo 'stop' > /tmp/infinite-loop-stop (also 'pause' / 'resume')"
-echo ""
-
-echo "Each iteration spawns 'hermes chat -q' with task-optimized prompts,"
-echo "auto-toolset enrichment, failure learning, and deep multi-level delegation."
-echo "Toolsets: terminal,file,delegation,web,skills,browser,memory,session_search,code_execution,todo,vision"
+if [ "$QUIET" = false ]; then
+  echo "--- Starting Loop ---"
+  echo "PID: $$"
+  echo "Ledger: $LEDGER_PATH"
+  echo "Sentinel: echo 'stop' > /tmp/infinite-loop-stop (also 'pause' / 'resume')"
+  echo ""
+  echo "Each iteration spawns 'hermes chat -q' with task-optimized prompts,"
+  echo "auto-toolset enrichment, failure learning, and deep multi-level delegation."
+  echo "Toolsets: terminal,file,delegation,web,skills,browser,memory,session_search,code_execution,todo,vision"
+fi
 
 exec python3 "${SKILL_DIR}/launch-loop.py" "${DAEMON_ARGS[@]}" --run

@@ -1,9 +1,25 @@
 #!/usr/bin/env python3
-VERSION = "14.0.0"
+VERSION = "14.1.0"
 """
-launch-loop.py — Infinite loop daemon v14.0.0
+launch-loop.py — Infinite loop daemon v14.1.0
 
-v13.0.0 changes:
+v14.1.0 changes:
+  - P0: Dashboard XSS Fix — Replaced innerHTML string interpolation with
+    createElement + textContent in SSE dashboard's addIterationRow().
+    Eliminates DOM-based XSS from spawned session output.
+  - P1: Dashboard Error Panel — Error type count cards (timeout, network,
+    schema, unknown) with color-coded left-border accents and active
+    mitigation tags. Populated via _build_sse_payload() from state.
+  - P1: Dashboard Performance Metrics — Avg turns, estimated tokens/iter,
+    cost estimate, iters/goal metric cards on SSE dashboard.
+  - P1: Dashboard Goals Visualization — Per-goal status with progress bar,
+    checkmark/play/pending indicators, scrollable list (max 30 visible).
+    Populated from goals_specs + goals_completed via SSE payload.
+  - P2: False Convergence Guard — _detect_convergence() skips Jaccard
+    similarity check when combined summary is < 20 chars. Prevents false
+    convergence stops from empty/error summaries.
+  - P3: --quiet mode for run-loop.sh — New --quiet/-q flag suppresses the
+    ASCII banner and startup info in CI/CD and scripted use.
   - Function Decomposition Phase 2 (P0): extracted _execute_iteration(),
     _merge_worker_results(), and _handle_backoff() from run_loop().
     run_loop() shrunk by ~250 more lines (total ~450 lines removed from v12.0.0).
@@ -450,7 +466,9 @@ def _log_startup_banner(
     _log(f"[DAEMON] sentinel={SENTINEL_PATH_DEFAULT}")
     _log(f"[DAEMON] workdir={os.getcwd()}")
     _log(
-        f"[DAEMON] v{LAUNCH_LOOP_VERSION} -- Function Decomposition Phase 2 & 3, "
+        f"[DAEMON] v{LAUNCH_LOOP_VERSION} -- Dashboard XSS Fix, Error Panel, "
+        "Performance Metrics, Goals Visualization, "
+        "Function Decomposition Phase 2 & 3, "
         "Self-Test Mode, Output Progress Classification, "
         "Idempotent Goal Execution, Concurrent Library Mode, "
         "Automatic Error Recovery, In-Process Archiving, "
@@ -1914,12 +1932,29 @@ _SSE_DASHBOARD_HTML_TPL = """<!DOCTYPE html>
   .cooldown-active { color: #d29922; }
   .cooldown-idle { color: var(--muted); }
   .compact-toggle { float: right; font-size: 0.75rem; color: var(--accent); cursor: pointer; text-decoration: underline; margin-top: 1.5rem; }
-  .compact-mode .meta, .compact-mode .stats-grid, .compact-mode h2, .compact-mode .progress, .compact-mode .cooldown-row, .compact-mode #iterations-table { display: none; }
+  .compact-mode .meta, .compact-mode .stats-grid, .compact-mode h2, .compact-mode .progress, .compact-mode .cooldown-row, .compact-mode #iterations-table, .compact-mode #goals-panel, .compact-mode #error-panel, .compact-mode #metrics-panel { display: none; }
   .compact-mode #summary-only { display: block; }
   #summary-only { display: none; }
   #connection-status { font-size: 0.75rem; color: var(--muted); float: right; }
   .connected { color: #3fb950; }
   .disconnected { color: #f85149; }
+  /* Error panel */
+  .err-card { background: var(--err-bg); padding: 8px 12px; border-radius: 6px; font-size: 0.82rem; display: inline-block; margin: 4px 4px 0 0; }
+  .err-card .num { font-weight: 700; margin-right: 4px; }
+  .err-timeout { border-left: 3px solid #d29922; }
+  .err-network { border-left: 3px solid #da3633; }
+  .err-schema { border-left: 3px solid #a371f7; }
+  .err-unknown { border-left: 3px solid var(--dim); }
+  .mitigation-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem; background: #1a3a1a; color: #3fb950; margin: 2px; }
+  .mitigation-active { background: #3a1a1a; color: #f85149; }
+  /* Goals panel */
+  .goal-row { display: flex; align-items: center; padding: 4px 0; font-size: 0.82rem; border-bottom: 1px solid var(--border-row); }
+  .goal-row .gidx { color: var(--dim); width: 24px; }
+  .goal-row .gstatus { width: 20px; text-align: center; margin-right: 6px; }
+  .goal-row .gtext { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
+  .goal-done .gtext { color: var(--muted); text-decoration: line-through; }
+  .goal-active .gtext { color: var(--accent); }
+
 </style>
 </head>
 <body>
@@ -1945,6 +1980,26 @@ _SSE_DASHBOARD_HTML_TPL = """<!DOCTYPE html>
 
 <h2>Progress</h2>
 <div class="progress" id="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+
+<h2>Errors <span id="error-summary" style="font-size:0.75rem;color:var(--muted);font-weight:400;"></span></h2>
+<div id="error-panel" style="margin-bottom:0.5rem;display:flex;flex-wrap:wrap;gap:4px;">
+  <div class="err-card err-timeout"><span class="num" id="err-timeout">0</span>timeout</div>
+  <div class="err-card err-network"><span class="num" id="err-network">0</span>network</div>
+  <div class="err-card err-schema"><span class="num" id="err-schema">0</span>schema</div>
+  <div class="err-card err-unknown"><span class="num" id="err-unknown">0</span>unknown</div>
+  <div id="mitigations-container" style="margin-left:8px;"></div>
+</div>
+
+<h2>Metrics <span id="metrics-summary" style="font-size:0.75rem;color:var(--muted);font-weight:400;"></span></h2>
+<div id="metrics-panel" class="stats-grid" style="margin-bottom:0.5rem;">
+  <div class="stat-card"><div class="num" id="metric-avg-turns">-</div><div class="label">Avg Turns</div></div>
+  <div class="stat-card"><div class="num" id="metric-tokens">-</div><div class="label">Tokens/Iter</div></div>
+  <div class="stat-card"><div class="num" id="metric-est-cost">-</div><div class="label">Est Cost</div></div>
+  <div class="stat-card"><div class="num" id="metric-iters-per-goal">-</div><div class="label">Iters/Goal</div></div>
+</div>
+
+<h2>Goals <span id="goals-summary" style="font-size:0.75rem;color:var(--muted);font-weight:400;"></span></h2>
+<div id="goals-panel" style="margin-bottom:0.5rem;"></div>
 
 <h2>Latest Iteration <span class="compact-toggle" id="compact-toggle" onclick="toggleCompact()">[compact]</span></h2>
 <div id="summary-only"></div>
@@ -1976,6 +2031,88 @@ function updateBadge(status) {
     else if (status === 'paused') badge.classList.add('paused');
     else if (status === 'reloading') badge.classList.add('reloading');
     else badge.classList.add('no_ledger');
+}
+function updateErrorPanel(data) {
+    var e = data.error_counts || {};
+    document.getElementById('err-timeout').textContent = e.timeout || 0;
+    document.getElementById('err-network').textContent = e.network || 0;
+    document.getElementById('err-schema').textContent = e.schema || 0;
+    document.getElementById('err-unknown').textContent = e.unknown || 0;
+    var total = (e.timeout||0)+(e.network||0)+(e.schema||0)+(e.unknown||0);
+    document.getElementById('error-summary').textContent = '(' + total + ' total errors)';
+    // Active mitigations
+    var mc = document.getElementById('mitigations-container');
+    mc.innerHTML = '';
+    var m = data.mitigations || {};
+    var mItems = [];
+    if (m.timeout_increased) mItems.push('timeout+' + (m.timeout_mult || ''));
+    if (m.cooldown_elevated) mItems.push('cooldown+');
+    if (m.force_subprocess) mItems.push('no-library');
+    if (m.reduced_workers) mItems.push('workers-');
+    if (m.consecutive_errors > 1) mItems.push(m.consecutive_errors + ' consec errs');
+    if (mItems.length === 0) mItems.push('none active');
+    mItems.forEach(function(t) {
+        var sp = document.createElement('span');
+        sp.className = 'mitigation-tag' + (t === 'none active' ? '' : ' mitigation-active');
+        sp.textContent = t;
+        mc.appendChild(sp);
+    });
+}
+function updateMetricsPanel(data) {
+    document.getElementById('metric-avg-turns').textContent = data.avg_turns_per_iter != null ? data.avg_turns_per_iter : '-';
+    document.getElementById('metric-tokens').textContent = data.avg_tokens_per_iter != null ? data.avg_tokens_per_iter : '-';
+    document.getElementById('metric-est-cost').textContent = data.est_cost || '-';
+    document.getElementById('metric-iters-per-goal').textContent = data.iters_per_goal != null ? data.iters_per_goal : '-';
+    document.getElementById('metrics-summary').textContent = data.metrics_summary || '';
+}
+function updateGoalsPanel(data) {
+    var gp = document.getElementById('goals-panel');
+    var goals = data.goals || [];
+    var doneCnt = 0;
+    goals.forEach(function(g) { if (g.done) doneCnt++; });
+    document.getElementById('goals-summary').textContent = doneCnt + '/' + goals.length + ' complete';
+    gp.innerHTML = '';
+    if (goals.length === 0) {
+        gp.innerHTML = '<p style="font-size:0.82rem;color:var(--muted)">No goals file loaded</p>';
+        return;
+    }
+    // Progress bar
+    var pct = goals.length > 0 ? Math.min(100.0 * doneCnt / goals.length, 100.0) : 0;
+    var pbDiv = document.createElement('div');
+    pbDiv.className = 'progress';
+    pbDiv.style.height = '6px';
+    var pbFill = document.createElement('div');
+    pbFill.className = 'progress-fill';
+    pbFill.style.width = pct + '%';
+    pbFill.style.height = '6px';
+    pbDiv.appendChild(pbFill);
+    gp.appendChild(pbDiv);
+    // Goal per-goal list (show max 30)
+    var maxShow = Math.min(goals.length, 30);
+    for (var i = 0; i < maxShow; i++) {
+        var g = goals[i];
+        var row = document.createElement('div');
+        row.className = 'goal-row' + (g.done ? ' goal-done' : '') + (g.active ? ' goal-active' : '');
+        var idxSpan = document.createElement('span');
+        idxSpan.className = 'gidx';
+        idxSpan.textContent = (i + 1);
+        row.appendChild(idxSpan);
+        var stSpan = document.createElement('span');
+        stSpan.className = 'gstatus';
+        stSpan.textContent = g.done ? '\u2713' : (g.active ? '\u25b6' : '\u25cb');
+        row.appendChild(stSpan);
+        var txtSpan = document.createElement('span');
+        txtSpan.className = 'gtext';
+        txtSpan.textContent = g.text || '';
+        row.appendChild(txtSpan);
+        gp.appendChild(row);
+    }
+    if (goals.length > 30) {
+        var more = document.createElement('p');
+        more.style.cssText = 'font-size:0.75rem;color:var(--muted);margin-top:4px;';
+        more.textContent = '... and ' + (goals.length - 30) + ' more goals';
+        gp.appendChild(more);
+    }
 }
 function updateMeta(data) {
     document.getElementById('total-iterations').textContent = data.total_iterations != null ? data.total_iterations : '-';
@@ -2015,6 +2152,12 @@ function updateCooldown(data) {
         cd.className = 'cooldown-idle';
     }
 }
+function createTag(text, cls) {
+    var span = document.createElement('span');
+    span.className = 'tag ' + cls;
+    span.textContent = text;
+    return span;
+}
 function addIterationRow(iter) {
     if (!iter || !iter.n) return;
     var tbody = document.getElementById('iterations-body');
@@ -2022,22 +2165,33 @@ function addIterationRow(iter) {
     if (iter.error && iter.error !== 'none' && iter.error !== '') {
         tr.className = 'error-row';
     }
-    var typeTag = '';
+    var tdN = document.createElement('td'); tdN.textContent = iter.n; tr.appendChild(tdN);
+    var tdType = document.createElement('td');
     if (iter.task_type) {
         var cls = iter.task_type === 'error' ? 'tag-err' : 'tag-ok';
-        typeTag = '<span class="tag ' + cls + '">' + iter.task_type + '</span>';
+        tdType.appendChild(createTag(iter.task_type, cls));
     }
-    var classifyTag = '';
+    tr.appendChild(tdType);
+    var tdDur = document.createElement('td');
+    tdDur.textContent = iter.duration_seconds != null ? iter.duration_seconds + 's' : '-';
+    tr.appendChild(tdDur);
+    var summary = iter.summary || iter.next_goal || '';
+    var tdSum = document.createElement('td');
+    tdSum.className = 'summary';
+    tdSum.title = summary;
+    tdSum.textContent = summary.substring(0, 80);
+    tr.appendChild(tdSum);
+    var tdCls = document.createElement('td');
     if (iter.classification) {
         var cCls = 'tag-ok';
         if (iter.classification === 'stuck' || iter.classification === 'regression') cCls = 'tag-err';
         else if (iter.classification === 'partial') cCls = 'tag-evolve';
-        classifyTag = '<span class="tag ' + cCls + '">' + iter.classification + '</span>';
+        tdCls.appendChild(createTag(iter.classification, cCls));
     }
-    var summary = iter.summary || iter.next_goal || '';
-    var safeSummary = summary.replace(/"/g, '&quot;');
-    var error = iter.error && iter.error !== 'none' ? iter.error.substring(0, 60) + '...' : '';
-    tr.innerHTML = '<td>' + iter.n + '</td><td>' + typeTag + '</td><td>' + (iter.duration_seconds != null ? iter.duration_seconds + 's' : '-') + '</td><td class="summary" title="' + safeSummary + '">' + summary.substring(0, 80) + '</td><td>' + classifyTag + '</td><td>' + error + '</td>';
+    tr.appendChild(tdCls);
+    var tdErr = document.createElement('td');
+    tdErr.textContent = iter.error && iter.error !== 'none' ? iter.error.substring(0, 60) + '...' : '';
+    tr.appendChild(tdErr);
     tbody.insertBefore(tr, tbody.firstChild);
     while (tbody.children.length > 100) {
         tbody.removeChild(tbody.lastChild);
@@ -2049,6 +2203,9 @@ function renderDashboard(data) {
     updateStats(data);
     updateProgress(data);
     updateCooldown(data);
+    updateErrorPanel(data);
+    updateMetricsPanel(data);
+    updateGoalsPanel(data);
     if (data.iteration && data.iteration.n) {
         addIterationRow(data.iteration);
     }
@@ -2298,15 +2455,41 @@ def _build_sse_payload(state: dict) -> dict:
 
     The payload contains everything the live dashboard needs to render
     without additional fetches: the latest iteration record, top-level
-    status fields, aggregated stats, and ETA.
+    status fields, aggregated stats, ETA, error counts, goals, and metrics.
     """
     stats = state.get("stats", {})
     iterations = state.get("iterations", [])
     latest = iterations[-1] if iterations else {}
+    et = state.get("error_type_counts", {})
+    mitigations = state.get("mitigations", {})
+    mitigations["consecutive_errors"] = stats.get("consecutive_errors", 0)
+    # Build goals list from goals_completed + goals_file
+    goals_completed = state.get("goals_completed", {})
+    goals_specs = state.get("goals_specs", [])
+    goals_list = []
+    for idx, spec in enumerate(goals_specs):
+        gtext = spec[0] if isinstance(spec, (tuple, list)) else spec
+        gh = _goal_hash(gtext) if gtext else ""
+        done = (
+            gh in goals_completed and goals_completed[gh].get("status") == "completed"
+        )
+        active = False
+        if state.get("goal_index") is not None:
+            active = idx == state["goal_index"]
+        goals_list.append({"text": gtext[:100], "done": done, "active": active})
+    # Metrics estimates
+    total_iters = state.get("total_iterations", 0)
+    avg_turns = stats.get("avg_turns_per_iter", None) or latest.get("turns_used", None)
+    avg_tokens = stats.get("avg_tokens_per_iter", None) or latest.get(
+        "tokens_used", None
+    )
+    iters_per_goal = None
+    if goals_list and total_iters > 0:
+        iters_per_goal = max(1, total_iters // max(len(goals_list), 1))
     return {
         "iteration": latest,
         "status": state.get("status", "unknown"),
-        "total_iterations": state.get("total_iterations", 0),
+        "total_iterations": total_iters,
         "max_iterations": state.get("max_iterations", 0),
         "goal": (state.get("initial_command") or "")[:80],
         "evolved_goal": state.get("evolved_goal", ""),
@@ -2322,6 +2505,19 @@ def _build_sse_payload(state: dict) -> dict:
         "consecutive_successes": state.get("consecutive_successes", 0),
         "cooldown": state.get("cooldown", 0),
         "eta": state.get("eta", {}),
+        "error_counts": {
+            "timeout": et.get("timeout", 0),
+            "network": et.get("network", 0),
+            "schema": et.get("schema", 0),
+            "unknown": et.get("unknown", 0),
+        },
+        "mitigations": mitigations,
+        "goals": goals_list,
+        "avg_turns_per_iter": avg_turns,
+        "avg_tokens_per_iter": avg_tokens,
+        "est_cost": state.get("est_cost", None),
+        "iters_per_goal": iters_per_goal,
+        "metrics_summary": "",
     }
 
 
@@ -5046,6 +5242,14 @@ def _detect_convergence(
     # Check if summaries have stopped making progress — all recent
     # iterations are saying essentially the same thing.
     if convergence_stop and iteration_count >= convergence_window:
+        # Skip convergence check for empty or too-short summaries (false positive guard)
+        trimmed = combined_summary[:200].strip()
+        if len(trimmed) < 20:
+            _log(
+                f"[CONVERGENCE] SKIP — summary too short ({len(trimmed)} chars) "
+                f"for meaningful comparison"
+            )
+            return False
         is_converged, avg_sim = check_convergence(
             existing_summaries + [combined_summary[:200]],
             threshold=convergence_threshold,
@@ -6142,7 +6346,7 @@ def load_or_create_ledger(
 
     return {
         "version": 11,
-        "version_detail": f"v{LAUNCH_LOOP_VERSION} -- Function Decomposition Phase 2, Phase 3, Self-Test Mode, Output Progress Classification, Idempotent Goal Execution.",
+        "version_detail": f"v{LAUNCH_LOOP_VERSION} -- Dashboard XSS Fix, Error Panel, Performance Metrics, Goals Visualization, Function Decomposition Phase 2, Phase 3, Self-Test Mode, Output Progress Classification, Idempotent Goal Execution.",
         "initial_command": goal,
         "initial_context": context,
         "started_at": datetime.now(timezone.utc).isoformat(),

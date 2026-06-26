@@ -1,25 +1,39 @@
 ---
 name: infinite-loop
-description: "Self-looping background daemon that spawns Hermes sessions via `hermes chat -q` with REAL tools (terminal, file) AND delegation (delegate_task). v14.0.0: Dashboard v3 SSE, Session Self-Healing Heartbeat, Hermes version check in preflight. v13.0.0: Function Decomposition Phase 2 & 3, Self-Test Mode (--self-test), Output Progress Classification, Idempotent Goal Execution (--track-goals/--reset-goals)."
-version: "14.0.0"
+description: "Self-looping background daemon that spawns Hermes sessions via `hermes chat -q` with REAL tools (terminal, file) AND delegation (delegate_task). v14.1.0: Dashboard SSE error panel, performance metrics, goals visualization; XSS fix; false convergence guard; --quiet mode. v14.0.0: Dashboard v3 SSE, Session Self-Healing Heartbeat, Hermes version check in preflight."
+version: "14.1.0"
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos]
 metadata:
   hermes:
-    tags: [infinite-loop, autonomous, background, looping, delegation, daemon, profile, http-callback, retry, tagging, pause-resume, max-turns, json-parser, auto-toolsets, task-type, failure-learning, worker, self-reference, cooldown, goals-file, progress-bar, signal-safe, output-schema, convergence, adaptive-cooldown, multi-goal-workers, resource-tracking, git-diff, context-propagation, in-session-loop, self-modification, config-file, desktop-notifications, error-classification, startup-delay, pushbullet, ntfy, push-notifications, v13.0.0, self-test, progress-classification, function-decomposition-phase2, concurrent-library-mode, error-recovery, ledger-archiving, multi-profile-goals, function-decomposition, session-chaining, resume, skills, ignore-rules, aiagent-library, session-tracking, checkpoints, yolo, ignore-user-config, spawn-source, safe-mode, accept-hooks, worktree, continue, library-mode-workers, automatic-recovery, archive-dir, GoalSpec]
+    tags: [infinite-loop, autonomous, background, looping, delegation, daemon, profile, http-callback, retry, tagging, pause-resume, max-turns, json-parser, auto-toolsets, task-type, failure-learning, worker, self-reference, cooldown, goals-file, progress-bar, signal-safe, output-schema, convergence, adaptive-cooldown, multi-goal-workers, resource-tracking, git-diff, context-propagation, in-session-loop, self-modification, config-file, desktop-notifications, error-classification, startup-delay, pushbullet, ntfy, push-notifications, v14.1.0, xss-fix, dashboard-sse, error-panel, performance-metrics, goals-dashboard, convergence-guard, quiet-mode]
     related_skills: [system-improvement, self-modifying-code, plan, hermes-agent]
 ---
 
 ---
 
-# Infinite Loop — v14.0.0 (Dashboard v3 SSE, Session Self-Healing Heartbeat, Hermes Version Check)
+# Infinite Loop — v14.1.0 (Dashboard SSE Error Panel, Performance Metrics, Goals Visualization, XSS Fix, Convergence Guard, --quiet mode)
 
 **Architecture**: Same solid foundation as v10.0.0/v11.0.0 — `hermes chat -q` with
 `terminal,file,delegation` toolsets, keeping sessions alive for multiple
 turns so `delegate_task()` subagent results arrive and are collected properly.
 
-**v13.0.0 enhancements — Function Decomposition Phase 2 & 3, Self-Test Mode, Output Progress Classification, Idempotent Goal Execution (iteration #29/30):**
+**v14.1.0 enhancements — Dashboard SSE Error Panel, Performance Metrics, Goals Visualization, XSS Fix, False Convergence Guard, --quiet mode:**
+
+1. **P0: Dashboard XSS Fix** — The SSE live dashboard (`addIterationRow`) previously built HTML rows via `innerHTML` string interpolation with raw `iter.task_type` and `iter.classification` values from spawned sessions. This was a DOM-based XSS vulnerability (MEDIUM severity). Fixed by using `createElement` + `textContent` for all user-data injection points. A `createTag()` helper function creates `<span>` elements with safe `textContent` assignment.
+
+2. **P1: Dashboard Error Panel** — A dedicated error visualization section in the SSE dashboard shows error type counts (timeout, network, schema, unknown) as color-coded cards with a left-border accent. Active mitigations (timeout increased, cooldown elevated, force library disable, worker reduction, consecutive errors) are displayed as tags next to the error cards. The initial fetch and live SSE updates both populate the panel.
+
+3. **P1: Dashboard Performance Metrics** — Four new metric cards: average turns per iteration, estimated tokens per iteration, estimated cost, and iterations per goal (when goals file is active). Data is derived from the latest iteration record's `turns_used`/`tokens_used` fields (populated in library mode) and from goals-completed tracking.
+
+4. **P1: Dashboard Goals Visualization** — When `--goals-file` is active, a dedicated Goals panel shows: a progress bar (completed/total), per-goal status rows with ✓ (done), ▶ (active), ○ (pending) indicators, and a scrollable list (max 30 visible, "+N more" beyond that). The panel is populated from `goals_specs` and `goals_completed` state via `_build_sse_payload()`.
+
+5. **P2: False Convergence Guard** — `_detect_convergence()` now skips the Jaccard similarity check when the combined summary is empty or fewer than 20 characters. Empty summaries from crashed/quiet sessions previously reported 1.0 similarity (identical empty strings), triggering false convergence stops. A log warning `[CONVERGENCE] SKIP` is emitted when skipped.
+
+6. **P3: --quiet mode for run-loop.sh** — New `--quiet` / `-q` flag suppresses the ASCII banner and startup info lines in `run-loop.sh`. Useful for CI/CD pipelines and scripted invocations where the 13-line banner is noise. The daemon's own banner and output are unaffected.
+
+**v14.0.0 enhancements — Dashboard v3 SSE, Session Self-Healing Heartbeat, Hermes Version Check (iteration #10):**
 
 1. **Function Decomposition Phase 2 (P0)** — Extracted 3 more self-contained functions from the `run_loop()` monolith: `_execute_iteration()`, `_merge_worker_results()`, and `_handle_backoff()`. `run_loop()` shrunk by another ~250 lines (total ~450 lines removed from v12.0.0). This makes the iteration lifecycle more readable and testable.
 

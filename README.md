@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.31.0
+# Infinite Loop Daemon — v14.32.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -455,6 +455,17 @@ echo '{"summary": "added feature X", "next_goal": "add feature Y"}' > /tmp/sessi
 echo '{"done": true}' > /tmp/session-loop-state.json
 kill $LOOP_PID
 ```
+
+---
+
+## v14.32.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `--preflight` as standalone | UX | `cli.py` | Pre-argparse handler lets `hermes_loop --preflight` run health checks without `--goal`. Supports `--preflight-fail-fast`, `--workdir`, `--shutdown-sentinel`. |
+| `--save-config` as standalone | UX | `cli.py` | Pre-argparse handler lets `hermes_loop --save-config config.json` save settings without `--goal`. Uses introspection-mode argparse. |
+| `--dry-run` as standalone | UX | `cli.py` | Pre-argparse handler shows helpful preview when `--dry-run` is used without `--goal`, listing other standalone flags. Still works normally with `--goal`. |
+| Standalone flags fix | Bugfix | `cli.py` | Added `--preflight`, `--preflight-fail-fast`, and `--save-config` to the `standalone_flags` set so the missing-goal error doesn't fire when these are present. |
 
 ---
 

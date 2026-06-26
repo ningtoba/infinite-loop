@@ -2006,11 +2006,126 @@ def main():
         _run_demo()
         sys.exit(0)
 
+    # Check --save-config before argparse to avoid required --goal conflict
+    save_config_path = None
+    for i, arg in enumerate(sys.argv[1:]):
+        if arg == "--save-config" and i + 2 < len(sys.argv):
+            save_config_path = sys.argv[i + 2]
+            break
+        if arg.startswith("--save-config="):
+            save_config_path = arg.split("=", 1)[1]
+            break
+    if save_config_path:
+        configure_color_mode(color_mode)
+        # Use introspection parser (no --goal required) to capture all settings
+        parser = _create_parser(for_introspection=True)
+        # Parse only known flags, ignore extras like --save-config itself
+        args, _ = parser.parse_known_args()
+        config_dict = {
+            key: val
+            for key, val in vars(args).items()
+            if val not in (None, "")
+            and not key.startswith("_")
+            and key not in ("config", "run", "force_reset")
+        }
+        config_dict["version"] = LAUNCH_LOOP_VERSION
+        out_path = os.path.expanduser(save_config_path)
+        os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+        with open(out_path, "w") as f:
+            json.dump(config_dict, f, indent=2)
+        print(f"  [OK] Configuration saved to {out_path}")
+        dq = chr(34)
+        print(
+            f"  {colorizer.dim('  Use:')} {colorizer.flag(f'hermes_loop --config {save_config_path} --goal {dq}...{dq} --run')}"
+        )
+        sys.exit(0)
+
+    # Check --preflight before argparse to avoid required --goal conflict
+    if "--preflight" in sys.argv:
+        configure_color_mode(color_mode)
+        # Check for --preflight-fail-fast companion
+        fail_fast = "--preflight-fail-fast" in sys.argv
+        workdir_val = ""
+        sentinel_val = SENTINEL_PATH_DEFAULT
+        for i, arg in enumerate(sys.argv[1:]):
+            if arg == "--workdir" and i + 2 < len(sys.argv):
+                workdir_val = sys.argv[i + 2]
+            if arg.startswith("--workdir="):
+                workdir_val = arg.split("=", 1)[1]
+            if arg == "--shutdown-sentinel" and i + 2 < len(sys.argv):
+                sentinel_val = sys.argv[i + 2]
+            if arg.startswith("--shutdown-sentinel="):
+                sentinel_val = arg.split("=", 1)[1]
+        results = PreflightChecker.run_all(
+            hermes_required=True,
+            workdir=workdir_val,
+            sentinel_path=sentinel_val,
+            webhook_port=0,
+            context_file="",
+            goals_file="",
+            schema_file="",
+            check_git=False,
+            check_disk="/tmp",
+            fail_fast=fail_fast,
+        )
+        _log(PreflightChecker.format_results(results))
+        all_passed = all(r["passed"] for r in results)
+        _log("[PREFLIGHT] --preflight specified. Exiting.")
+        sys.exit(0 if all_passed else 1)
+
+    # Check --dry-run before argparse to avoid required --goal conflict
+    if (
+        "--dry-run" in sys.argv
+        and "--goal" not in sys.argv
+        and "--goals-file" not in sys.argv
+    ):
+        configure_color_mode(color_mode)
+        print()
+        print(f"  {colorizer.colorize('DRY RUN — Preview', 'bold', 'white')}")
+        print(f"  {colorizer.dim('=' * 44)}")
+        print()
+        print(f"  {colorizer.dim('No --goal specified.')}")
+        dq2 = chr(34)
+        print(
+            f"  {colorizer.dim('Use:')} {colorizer.flag(f'hermes_loop --dry-run --goal {dq2}...{dq2}')}"
+        )
+        print(
+            f"  {colorizer.dim('  or:')} {colorizer.flag('hermes_loop --dry-run --goals-file goals.txt')}"
+        )
+        print()
+        print(f"  {colorizer.dim('Other standalone flags:')}")
+        print(
+            f"    {colorizer.flag('--explain')} {colorizer.value('<flag>')}   {colorizer.dim('Detailed help on any flag')}"
+        )
+        print(
+            f"    {colorizer.flag('--help-topic')} {colorizer.value('<group>')}{colorizer.dim(' Flags in a group')}"
+        )
+        print(
+            f"    {colorizer.flag('--status')}         {colorizer.dim('Ledger status summary')}"
+        )
+        print(
+            f"    {colorizer.flag('--doctor')}         {colorizer.dim('Self-diagnosis')}"
+        )
+        print(
+            f"    {colorizer.flag('--demo')}           {colorizer.dim('Lifecycle walkthrough')}"
+        )
+        print(
+            f"    {colorizer.flag('--list-flags')}     {colorizer.dim('All flags by group')}"
+        )
+        print(
+            f"    {colorizer.flag('--init')}           {colorizer.dim('Setup wizard')}"
+        )
+        print()
+        sys.exit(0)
+
     # Friendly error if --goal is missing (before argparse dry error)
     standalone_flags = {
         "--version",
         "--self-test",
         "--dry-run",
+        "--preflight",
+        "--preflight-fail-fast",
+        "--save-config",
         "--help",
         "-h",
         "--list-flags",

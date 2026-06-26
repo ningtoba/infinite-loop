@@ -4,6 +4,32 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.32.0] — 2026-06-26
+
+### Added
+- **Pre-argparse standalone `--preflight`, `--save-config`, `--dry-run`**: Three
+  flags that previously required `--goal` to be present are now true standalone
+  flags that work without it — just like `--status`, `--doctor`, and `--demo`.
+  - `hermes_loop --preflight` runs health checks and exits immediately (no `--goal`
+    needed). Supports `--workdir`, `--shutdown-sentinel`, and `--preflight-fail-fast`.
+  - `hermes_loop --save-config config.json` saves all current settings (with
+    defaults) to a JSON file without needing a `--goal`. The file can later be
+    loaded with `--config`, and `--goal` can be added at invocation time.
+  - `hermes_loop --dry-run` without `--goal` shows a helpful preview screen
+    explaining that a goal is needed and listing other standalone flags. When
+    used *with* `--goal`, the existing full dry-run logic still applies.
+- Added `--preflight` and `--save-config` to the `standalone_flags` set so the
+  missing-goal error message doesn't fire when these flags are present.
+
+### Changed
+- `hermes_loop/cli.py` — Added three pre-argparse handlers (before the
+  missing-goal check) for `--preflight`, `--save-config`, and `--dry-run` (when
+  `--goal` is absent). These use introspection-mode argparse where needed and
+  exit cleanly with 0 on success, 1 on failure.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.31.0 to 14.32.0.
+
+---
+
 ## [14.31.0] — 2026-06-26
 
 ### Added

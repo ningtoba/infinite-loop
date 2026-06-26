@@ -4,6 +4,26 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.11.0] — 2026-06-26
+
+### Fixed
+- **"~40 tests" documentation mismatch**: All docs referenced "~40 tests" or "~40 checks" for the self-test suite, but the actual output reports 9 test groups (45 individual cases). Updated every occurrence across 6 files to use consistent "9 groups, 45 cases" language: `README.md` (2 places), `Makefile`, `hermes_loop/cli.py`, `.env.example`, `CONTRIBUTING.md` (2 places), `SKILL.md`. Also fixed a stale missing-quote typo in `CONTRIBUTING.md` (`"14.10.0` → `"14.10.0"`).
+
+### Added
+- **`--list-flags`, `--list-groups`, `--examples` in README flag table**: These three pre-argparse convenience flags were missing from the Startup/Debug section of the README's "All CLI Flags" reference. Added with descriptions and default values.
+- **`--list-flags`, `--list-groups`, `--examples` in CONTRIBUTING.md**: Added to the Common Commands table so new contributors can discover them immediately.
+- **`CONTRIBUTING.md` test table correction**: Updated the self-test coverage table with accurate case counts (text_similarity: 3→5, validate_json_output: 3→4, GoalSpec: 3 with corrected descriptions, _classify_progress: 6→4, _suggest_actionable_fix: 7→9) and added actionable suggestions test group.
+
+### Changed
+- `CONTRIBUTING.md` — test table now reflects reality: 9 test groups, 45 total cases, accurate descriptions per group.
+
+---
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
+project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
 ## [14.10.0] — 2026-06-26
 
 ### Added

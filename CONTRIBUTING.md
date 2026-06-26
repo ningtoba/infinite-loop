@@ -52,7 +52,7 @@ is met.
 - **`scripts/archive-state.sh`** — Archive old iterations to JSONL or Markdown.
 - **`scripts/replay-ledger.sh`** — Re-run archived iterations from JSONL files.
 
-**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.10.0`
+**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.10.0"`
 in `hermes_loop/config.py`. The project follows
 [Semantic Versioning](https://semver.org/).
 
@@ -185,7 +185,10 @@ kill <PID>
 |---------|---------|
 | `bash run.sh --dry-run` | Preview the resolved configuration |
 | `bash run.sh --force-reset --quiet` | Clear ledger and start fresh, noise-free |
-| `python3 launch-loop.py --self-test` | Run ~40 in-process unit tests |
+| `python3 launch-loop.py --self-test` | Run self-tests (9 groups, 45 cases) |
+| `python3 launch-loop.py --list-flags` | Print all 87 flags organized by group |
+| `python3 launch-loop.py --list-groups` | Print group names with flag counts |
+| `python3 launch-loop.py --examples` | Print categorized usage examples |
 | `python3 launch-loop.py --help` | Full CLI reference |
 | `python3 launch-loop.py --version` | Print version string |
 | `bash scripts/inspect-ledger.sh` | View the state ledger |
@@ -258,7 +261,7 @@ Run the self-tests before committing:
 python3 launch-loop.py --self-test
 ```
 
-This runs ~40 in-process tests across 8 core functions without spawning any
+This runs 45 in-process test cases across 9 test groups without spawning any
 child Hermes sessions. All tests should pass (exit code 0).
 
 **What the self-tests cover:**
@@ -267,13 +270,13 @@ child Hermes sessions. All tests should pass (exit code 0).
 |----------|-------|---------------|
 | `extract_json_from_output()` | 6 | Edge cases: nested braces, no JSON, multiple JSON objects, malformed output |
 | `classify_error()` | 5 | Timeout, network, schema, unknown error types |
-| `text_similarity()` | 3 | Jaccard word-overlap for identical, partial, and completely different text |
-| `check_convergence()` | 3 | Convergence detection with and without recent history |
-| `validate_json_output()` | 3 | Valid JSON Schema, missing fields, type mismatches |
-| `calc_adaptive_cooldown()` | 4 | Duration ranges: <5s, 5–15s, 15–300s, >300s |
-| `GoalSpec` parsing | 3 | Simple goal, pipe format with profile, trailing spaces |
-|| `_classify_progress()` | 6 | Completed, progress, partial, stuck, regression, unknown |
-|| `_suggest_actionable_fix()` | 9 | Timeout, network, schema, stuck (workers/library), regression, consecutive errors, completed/progress (no suggestion), unknown |
+| `text_similarity()` | 5 | Jaccard word-overlap for identical, partial, completely-different, both-empty, one-empty |
+| `check_convergence()` | 3 | Convergence detection with fewer-than-window, all-identical, all-different |
+| `validate_json_output()` | 4 | Valid JSON Schema, missing fields, type mismatches, no schema |
+| `calc_adaptive_cooldown()` | 4 | Duration ranges: zero, long, short, interpolated |
+| `GoalSpec` parsing | 3 | Simple goal, profile, full spec with model/provider |
+| `_classify_progress()` | 4 | Completed, regression, stuck, progress with git changes |
+| `_suggest_actionable_fix()` | 9 | Timeout, network, stuck (workers/library), regression, consecutive errors, completed/progress (no suggestion), unknown |
 
 **If you're adding a new function**, consider adding a self-test for it in the
 `run_self_tests()` function at the bottom of `launch-loop.py`.

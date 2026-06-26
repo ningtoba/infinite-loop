@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.10.0
+# Infinite Loop Daemon — v14.11.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -69,7 +69,7 @@ make env                                        # Create .env from .env.example
 make dry-run                                    # Preview config
 make run                                        # Run with .env config
 make run ARGS="--goal 'fix lint errors' --git"  # Run with extra flags
-make self-test                                  # Run tests (~40 checks)
+make self-test                                  # Run self-tests (9 groups, 45 cases)
 
 # Monitor progress:
 cat /tmp/infinite-loop-state.json | python3 -m json.tool    # full ledger
@@ -355,7 +355,10 @@ Default toolsets: `terminal,file,delegation,web,skills,browser,memory,session_se
 | `--preflight` | `false` | Run preflight health checks before loop |
 | `--preflight-fail-fast` | `false` | Stop on first preflight failure |
 | `--dry-run` | `false` | Print config and exit (no loop) |
-| `--self-test` | `false` | Run in-process unit tests (~40 tests) and exit |
+| `--self-test` | `false` | Run in-process self-tests (9 groups, 45 cases) and exit |
+| `--list-flags` | *(n/a)* | Print all 87 flags organized by group with help text. Pre-argparse (no `--goal` required) |
+| `--list-groups` | *(n/a)* | Print only group names with flag counts (compact overview) |
+| `--examples` | *(n/a)* | Print categorized real-world usage examples across 7 categories |
 | `--save-config` | `""` | Save config to JSON file and exit |
 | `--config` | `""` | Load config from JSON file |
 | `--version` | *(n/a)* | Print version and exit |
@@ -428,6 +431,13 @@ kill $LOOP_PID
 ```
 
 ---
+
+## v14.11.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Fixed "~40 tests" doc mismatch | Docs | 6 files | All docs now say "9 groups, 45 cases" matching actual --self-test output. Added missing --list-flags, --list-groups, --examples to README flag table and CONTRIBUTING common commands. Corrected CONTRIBUTING test coverage table with accurate case counts. |
+| Fixed CONTRIBUTING version typo | Docs | `CONTRIBUTING.md` | `"14.10.0` → `"14.10.0"` (missing closing quote) |
 
 ## v14.10.0 Changelog
 

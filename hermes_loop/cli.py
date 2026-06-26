@@ -312,7 +312,7 @@ def _list_examples():
     print("    # Full detailed flag reference")
     print("    hermes_loop --help")
     print()
-    print("    # Run self-tests (~40 checks)")
+    print("    # Run self-tests (9 groups, 45 cases)")
     print("    hermes_loop --self-test")
     print()
     print("    # Health check before running")

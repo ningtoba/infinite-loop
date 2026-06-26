@@ -29,7 +29,7 @@ help:
 	@echo "  Run:"
 	@echo "    run          Run the daemon (reads .env). Add ARGS for overrides"
 	@echo "    dry-run      Show config without starting (ARGS supported)"
-	@echo "    self-test    Run in-process unit tests (~40 tests)"
+	@echo "    self-test    Run in-process self-tests (9 groups, 45 cases)"
 	@echo "    version      Print daemon version and exit"
 	@echo ""
 	@echo "  Monitoring:"

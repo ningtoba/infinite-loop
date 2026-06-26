@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.10.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.11.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -19,7 +19,7 @@ LEDGER_PATH="/tmp/infinite-loop-state.json"
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.10.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.11.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
@@ -197,7 +197,7 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop Daemon v14.10.0               ║"
+  echo "║  Infinite Loop Daemon v14.11.0               ║"
   echo "║  run.sh — one command to start               ║"
   echo "║                                                ║"
   echo "║  What's new ⚡                                ║"

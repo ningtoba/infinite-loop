@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.9.0
+# Infinite Loop Daemon — v14.10.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -519,11 +519,12 @@ or configuration change:
 | 3+ consecutive errors | Run `--preflight`, reduce `--workers`, check `--goal` text, add `--context` |
 | Partial progress | Normal for iterative tasks; consider `--evolve` |
 
-These suggestions appear in the daemon log right after the `[DONE]` line, so you
+These suggestions appear in the daemon log right after the `[SUMMARY]` line, so you
 see the error + actionable fix in one glance:
 
 ```
-[DONE] ✗ Iteration 5 (120s, stuck): Could not reproduce the bug
+[SUMMARY] ✔ Iteration 5 | content | (120s) | stuck | cpu=45.2s | mem=128MB | [█████░░░░░░░] 5/10 50% | ETA=5m
+
 [SUGGEST] Suggestions:
 [SUGGEST]   • Set --workers 1 to isolate the issue (concurrent sessions may interfere)
 [SUGGEST]   • Try --use-library for in-process execution (bypasses subprocess issues)
@@ -531,6 +532,31 @@ see the error + actionable fix in one glance:
 ```
 
 No extra flags needed — suggestions are always enabled.
+
+---
+
+### Rich Post-Iteration Summary (`[SUMMARY]`)
+
+The daemon displays a consolidated one-line `[SUMMARY]` after every iteration,
+replacing the old separate `[DONE]`, `[PROGRESS]`, and `[STATS]` lines. It's
+designed for scannability at a glance:
+
+```
+[SUMMARY] ✔ Iteration 3 | code-fix | (89s) | progress | git: 4 files changed | cpu=32.1s | mem=112MB | peak=118MB | workers=3/3 | [██░░░░░░░░░] 3/10 30% | ETA=7m
+```
+
+**What you see at a glance:**
+- **Status**: `✔` success or `✘` error
+- **Iteration**: Number and task type
+- **Duration**: Wall-clock time in seconds
+- **Classification**: `completed`, `progress`, `partial`, `stuck`, `regression`, or the error type
+- **Git**: Diff stats or commit hash when `--git` is enabled
+- **System**: CPU seconds, current + peak RSS memory
+- **Workers**: Success/fail breakdown for multi-worker runs
+- **Progress bar**: Visual progress with percentage and ETA
+
+Error iterations prominently show the error type instead of classification,
+and include `[SUGGEST]` lines with actionable fixes.
 
 ---
 
@@ -543,7 +569,7 @@ and 50+ line config dump. In quiet mode, you get only compact one-line status:
 [DAEMON] Running: goal=Fix lint errors | max=10 | tools=11 | type=code-fix
 [ITER #1] Fix lint errors in src/
 ...
-[DONE] ✓ Iteration 1 (45s, progress): Fixed 3 eslint errors in auth.ts
+[SUMMARY] ✔ Iteration 1 | code-fix | (45s) | progress | cpu=18.2s | mem=96MB  | [█░░░░░░░░░] 1/10 10% | ETA=6m45s
 ```
 
 **Usage**:

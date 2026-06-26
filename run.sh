@@ -45,6 +45,8 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "  Info:"
   echo "    --help / -h           Show this help message"
   echo "    --version             Print daemon version and exit"
+  echo "    --list-flags          Print organized flag listing"
+  echo "    --examples            Print categorized real-world usage examples"
   echo ""
   echo "EXAMPLES:"
   echo "  bash run.sh                           # Run with .env config"
@@ -187,7 +189,7 @@ while [[ $# -gt 0 ]]; do
     --workers)    DAEMON_ARGS+=("--workers" "$2"); shift 2 ;;
     --tag)        DAEMON_ARGS+=("--tag" "$2"); shift 2 ;;
     --help|-h)    echo "See 'bash run.sh --help' for usage."; exit 0 ;;
-    --list-flags|--list-groups) DAEMON_ARGS+=("$1"); shift ;;
+    --list-flags|--list-groups|--examples) DAEMON_ARGS+=("$1"); shift ;;
     *)            EXTRA_ARGS+=("$1"); shift ;;
   esac
 done
@@ -205,9 +207,9 @@ if [ "$QUIET" = false ]; then
   echo "║  • --examples: categorized usage patterns     ║"
   echo "║  • Shell tab-completion for all 80+ flags     ║"
   echo "║  • --list-flags and --list-groups quick ref    ║"
-  echo "║  • --quiet mode: compact output               ║"
+  echo "║  • [SUGGEST] smart fixes on errors/stuck      ║"
+  echo "║  • --quiet mode: compact per-iteration output ║"
   echo "║  • [BEAT] heartbeat during long iterations    ║"
-  echo "║  • Actionable [SUGGEST] on errors             ║"
   echo "╚══════════════════════════════════════════════╝"
   echo ""
   echo "  Config: .env"

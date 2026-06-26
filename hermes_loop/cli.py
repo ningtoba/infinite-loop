@@ -1090,6 +1090,9 @@ def main():
         _log("            git | goals-file | webhook | SSE dashboard | heartbeat")
         _log("            desktop/Pushbullet/ntfy | library mode | yolo | safe-mode")
         _log("            self-test | status-html | checkpoint | resume | archiving")
+        _log(
+            "            [SUMMARY] summary | [SUGGEST] smart fixes | --examples | --quiet"
+        )
         _log("═══════════════════════════════════════════════════════════════════")
 
     # Clean up stale heartbeat files from previous daemon instances

@@ -4,6 +4,7 @@ import concurrent.futures
 import json
 import os
 import subprocess
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -82,11 +83,32 @@ def _execute_iteration(
     git: bool,
     store_git_diff: bool,
     heartbeat_timeout: int = 0,
+    quiet: bool = False,
 ) -> tuple[list[dict], GoalSpec, bool]:
     """Spawn one or more Hermes sessions for the current iteration."""
     all_results: list[dict] = []
 
+    # Start a background thread for iteration heartbeat updates
+    _iter_heartbeat_stop = threading.Event()
+
+    def _iteration_heartbeat(interval: int = 120):
+        """Log periodic heartbeat while iteration is running."""
+        elapsed = 0
+        while not _iter_heartbeat_stop.is_set():
+            if _iter_heartbeat_stop.wait(timeout=interval):
+                break
+            elapsed += interval
+            _log(
+                f"[BEAT] Iteration #{iteration_count} still running ({elapsed}s elapsed)..."
+            )
+
     spawn_goal = spawn_goal if len(goals_list) > 1 else goals_list[0]
+
+    # Start iteration heartbeat thread (logs every 2 min during long-running spawns)
+    heartbeat_thread = threading.Thread(
+        target=_iteration_heartbeat, args=(120,), daemon=True
+    )
+    heartbeat_thread.start()
 
     if workers > 1:
         if use_library:
@@ -265,6 +287,8 @@ def _execute_iteration(
         all_results.append(result)
 
     state.pop("pending_iteration", None)
+    _iter_heartbeat_stop.set()  # stop the heartbeat thread
+    heartbeat_thread.join(timeout=2)
     return all_results, spawn_goal, use_library
 
 

@@ -89,12 +89,35 @@ def _log_startup_banner(
     track_goals: bool = False,
     reset_goals: bool = False,
     heartbeat_timeout: int = 0,
+    quiet: bool = False,
 ) -> None:
-    """Log a readable, categorized startup banner showing what's actually active."""
+    """Log a readable, categorized startup banner showing what's actually active.
+
+    When quiet=True, only a compact one-line status is shown.
+    """
     _log(f"[DAEMON] PID={os.getpid()}")
     _log(f"[DAEMON] ledger={LEDGER_PATH}")
     _log(f"[DAEMON] sentinel={SENTINEL_PATH_DEFAULT}")
     _log(f"[DAEMON] workdir={os.getcwd()}")
+
+    if quiet:
+        # Compact one-line status for quiet mode
+        parts = []
+        if max_iterations > 0:
+            parts.append(f"max={max_iterations}")
+        if workers > 1:
+            parts.append(f"workers={workers}")
+        if evolve:
+            parts.append("evolve")
+        if git:
+            parts.append("git")
+        _log(
+            f"[DAEMON] Running: goal={goal[:80]}{'...' if len(goal) > 80 else ''} | "
+            f"{' | '.join(parts) if parts else 'unlimited'} | "
+            f"tools={len(toolsets)} | type={task_type}"
+        )
+        _log("")
+        return
     _log(f"[DAEMON] ═════ v{LAUNCH_LOOP_VERSION} Configuration Overview ═════")
     # ── Category: Iteration ──────────────────────────────────────────────────
     parts = []

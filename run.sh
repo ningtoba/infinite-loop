@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.5.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.6.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -20,7 +20,7 @@ LEDGER_PATH="/tmp/infinite-loop-state.json"
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.4.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.6.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
@@ -36,7 +36,7 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "    --max-turns N         Max turns per session (default: 500)"
   echo "    --workers N           Concurrent Hermes sessions (default: 1)"
   echo "    --tag TEXT            Label for the run (e.g. 'fix-auth')"
-  echo "    --quiet / -q          Suppress banner output"
+  echo "    --quiet / -q          Suppress verbose startup banner and iteration headers"
   echo ""
   echo "  Actions:"
   echo "    --dry-run             Print config and exit"
@@ -138,6 +138,7 @@ fi
 [ -n "${INFINITE_LOOP_OUTPUT_SCHEMA:-}" ]   && DAEMON_ARGS+=("--output-schema" "$INFINITE_LOOP_OUTPUT_SCHEMA")
 [ -n "${INFINITE_LOOP_OUTPUT_SCHEMA_FILE:-}" ] && DAEMON_ARGS+=("--output-schema-file" "$INFINITE_LOOP_OUTPUT_SCHEMA_FILE")
 [ -n "${INFINITE_LOOP_STARTUP_DELAY:-}" ]   && DAEMON_ARGS+=("--startup-delay" "$INFINITE_LOOP_STARTUP_DELAY")
+[ "${INFINITE_LOOP_QUIET:-false}" == "true" ]         && DAEMON_ARGS+=("--quiet")
 [ -n "${INFINITE_LOOP_PROMPT_SUFFIX:-}" ]   && DAEMON_ARGS+=("--prompt-suffix" "$INFINITE_LOOP_PROMPT_SUFFIX")
 [ -n "${INFINITE_LOOP_WATCH_DIR:-}" ]       && DAEMON_ARGS+=("--watch-dir" "$INFINITE_LOOP_WATCH_DIR")
 [ -n "${INFINITE_LOOP_WATCH_POLL:-}" ]      && DAEMON_ARGS+=("--watch-poll" "$INFINITE_LOOP_WATCH_POLL")
@@ -177,7 +178,7 @@ while [[ $# -gt 0 ]]; do
     --dry-run)    DAEMON_ARGS+=("--dry-run"); DRY_RUN=true; shift ;;
     --force-reset) DAEMON_ARGS+=("--force-reset"); shift ;;
     --self-test)  DAEMON_ARGS+=("--self-test"); shift ;;
-    --quiet|-q)   QUIET=true; shift ;;
+    --quiet|-q)   DAEMON_ARGS+=("--quiet"); QUIET=true; shift ;;
     --version)    exec python3 "$SCRIPT_DIR/launch-loop.py" "--version" ;;
     --goal)       DAEMON_ARGS+=("--goal" "$2"); shift 2 ;;
     --context)    DAEMON_ARGS+=("--context" "$2"); shift 2 ;;
@@ -193,19 +194,20 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop Daemon v14.5.0                ║"
+  echo "║  Infinite Loop Daemon v14.6.0                ║"
   echo "║  run.sh — one command to start               ║"
   echo "║                                                ║"
   echo "║  What's new ⚡                                ║"
-  echo "║  • Actionable [SUGGEST] on iteration errors   ║"
+  echo "║  • --quiet mode: compact output              ║"
+  echo "║  • [BEAT] heartbeat during long iterations    ║"
+  echo "║  • Actionable [SUGGEST] on errors             ║"
   echo "║  • Suggests specific flags to adjust           ║"
-  echo "║  • Covers: timeout, network, schema, stuck     ║"
   echo "╚══════════════════════════════════════════════╝"
   echo ""
   echo "  Config: .env"
   echo "  Goal: ${INFINITE_LOOP_GOAL:0:80}..."
   echo "  Workers: ${INFINITE_LOOP_WORKERS:-1}  |  Max iters: ${INFINITE_LOOP_MAX_ITERATIONS:-∞}"
-  echo "  Git: ${INFINITE_LOOP_GIT:-off}  |  Evolve: ${INFINITE_LOOP_EVOLVE:-off}"
+  echo "  Mode: quiet=${INFINITE_LOOP_QUIET:-off}  |  Git: ${INFINITE_LOOP_GIT:-off}  |  Evolve: ${INFINITE_LOOP_EVOLVE:-off}"
   echo "  Toolsets: ${INFINITE_LOOP_TOOLSETS:-terminal,file,delegation,web}"
   echo ""
   echo "  Commands:"

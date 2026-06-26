@@ -7,6 +7,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [14.6.0] — 2026-06-26
+
+### Added
+- **`--quiet` flag**: Suppresses the verbose startup banner, per-iteration headers (`=== Iteration N ===`), and config dump. Shows only compact one-line status updates. Ideal for background daemon runs (`bash run.sh --quiet` or `INFINITE_LOOP_QUIET=true` in `.env`).
+- **Iteration heartbeat (`[BEAT]` messages)**: A background thread logs periodic `[BEAT] Iteration #N still running (120s elapsed)...` messages during long-running iterations (every 2 minutes). No more ambiguous silence: you can tell if the daemon is working or hung without cross-referencing logs.
+- **Bumped from v14.5.0 to v14.6.0**
+
+### Changed
+- `cli.py` — wrapped config dump (50+ lines) in `if not args.quiet:` block, added `quiet=` forwarding to `run_loop()` and `_log_startup_banner()`
+- `functions.py` — `_log_startup_banner()` accepts `quiet` parameter; when True, prints a compact one-line status instead of the full categorized banner
+- `loop.py` — iteration header is compact (`[ITER #N] goal`) in quiet mode; passes `quiet` to `_execute_iteration()`
+- `iteration.py` — new background heartbeat thread during spawned session execution; `_execute_iteration()` accepts `quiet` parameter
+- `run.sh` — `--quiet`/`-q` now forwards `--quiet` to daemon (was banner-only); `INFINITE_LOOP_QUIET` env var support; banner shows `quiet=on/off`
+- `.env.example` — documented `INFINITE_LOOP_QUIET` variable
+
+---
+
 ## [14.5.0] — 2026-06-26
 
 ### Added

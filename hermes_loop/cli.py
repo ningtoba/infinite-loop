@@ -640,7 +640,14 @@ def main():
     # ── 22. Startup & Debug ─────────────────────────────────────────────────
     group = parser.add_argument_group(
         "Startup & Debug",
-        "Preflight checks, dry-run, self-test, config loading, and startup delay",
+        "Preflight checks, dry-run, self-test, config loading, startup delay, and quiet output",
+    )
+    group.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress the verbose startup banner and per-iteration headers. Shows only compact "
+        "one-line status updates. Ideal for background daemon runs where output noise is "
+        "undesirable.",
     )
     group.add_argument(
         "--startup-delay",
@@ -753,106 +760,111 @@ def main():
     _log("═══════════════════════════════════════════════════════════════════")
     _log(f"  Infinite Loop Daemon v{LAUNCH_LOOP_VERSION}")
     _log("═══════════════════════════════════════════════════════════════════")
-    _log("  Features: evolve | workers | cooldown | convergence | preflight")
-    _log("            git | goals-file | webhook | SSE dashboard | heartbeat")
-    _log("            desktop/Pushbullet/ntfy | library mode | yolo | safe-mode")
-    _log("            self-test | status-html | checkpoint | resume | archiving")
-    _log("═══════════════════════════════════════════════════════════════════")
+    _log("  Passing through to run_loop()...")
+
+    if not args.quiet:
+        _log("  Features: evolve | workers | cooldown | convergence | preflight")
+        _log("            git | goals-file | webhook | SSE dashboard | heartbeat")
+        _log("            desktop/Pushbullet/ntfy | library mode | yolo | safe-mode")
+        _log("            self-test | status-html | checkpoint | resume | archiving")
+        _log("═══════════════════════════════════════════════════════════════════")
 
     # Clean up stale heartbeat files from previous daemon instances
     if args.heartbeat_timeout > 0:
         _cleanup_stale_heartbeats()
-    _log(f"  Goal:           {args.goal}")
-    _log(f"  Context:        {len(args.context)} chars")
-    _log(f"  Toolsets:       {toolsets_list}")
-    if args.context_file:
-        _log(f"  Context file:   {args.context_file}")
-    else:
-        _log(f"  Context file:   (none, using --context)")
-    _log(f"  Workdir:        {args.workdir or os.getcwd()}")
-    _log(
-        f"  Max iterations: {args.max_iterations if args.max_iterations > 0 else 'infinite'}"
-    )
-    _log(f"  Compact:        every {args.compact_every} iterations")
-    _log(f"  Max turns:      {args.max_turns} per spawned session")
-    _log(f"  Retry delay:    {args.retry_delay}s")
-    _log(f"  Session timeout: {args.session_timeout}s")
-    _log(f"  Hermes binary:  {hermes_bin}")
-    mode_str = args.worker_url if args.worker_url else "(none, direct subprocess)"
-    if args.worker_url == "auto":
-        mode_str = "auto (embedded worker)"
-    _log(f"  Worker URL:     {mode_str}")
-    _log(f"  Evolve:         {'yes' if args.evolve else 'no'}")
-    _log(f"  Git snapshots:  {'yes' if args.git else 'no'}")
-    _log(f"  Auto-commit:    {'yes' if args.git_commit else 'no'}")
-    _log(f"  Workers:        {args.workers}")
-    _log(f"  Notify cmd:     {args.notify_cmd or 'none'}")
-    _log(
-        f"  Output cap:     {args.max_output_chars if args.max_output_chars > 0 else 'unlimited'} chars"
-    )
-    _log(
-        f"  Max idle iters: {args.max_idle_iterations if args.max_idle_iterations > 0 else 'off'}"
-    )
-    _log(f"  Status file:    {args.status_file or 'none'}")
-    _log(f"  Profile:        {args.profile or '(default)'}")
-    _log(f"  Model:          {args.model or '(default)'}")
-    _log(f"  Provider:       {args.provider or '(default)'}")
-    _log(f"  HTTP callback:  {args.http_callback or 'none'}")
-    _log(
-        f"  Keep iterations:{args.keep_iterations if args.keep_iterations > 0 else 'all'}"
-    )
-    _log(f"  Archive dir:    {args.archive_dir or 'disabled'}")
-    _log(
-        f"  Archive retention: {args.archive_retention}d"
-        if args.archive_retention > 0
-        else "  Archive retention: forever"
-    )
-    _log(f"  Max retries:    {args.max_retries}")
-    _log(f"  On-error cmd:   {args.on_error_cmd or 'none'}")
-    _log(f"  Tag:            {args.tag or '(none)'}")
-    _log(f"  Prompt suffix:  {args.prompt_suffix or '(none)'}")
-    _log(f"  Force reset:    {'yes' if args.force_reset else 'no'}")
-    _log(f"  Auto toolsets:  {'yes' if not args.no_auto_toolsets else 'no'}")
-    _log(
-        f"  Auto task type: {args.task_type if args.task_type != 'auto' else 'auto-detect'}"
-    )
-    _log(f"  Failure learn:  {'yes' if not args.no_failure_learning else 'no'}")
-    _log(
-        f"  Webhook port:   {args.webhook_port if args.webhook_port > 0 else 'disabled'}"
-    )
-    _log(f"  Log file:       {args.log_file or 'stdout only'}")
-    _log(f"  HTML dashboard: {args.status_html or 'disabled'}")
-    _log(f"  Watch dir:      {args.watch_dir or 'disabled'}")
-    _log(f"  Watch poll:     {args.watch_poll}s")
-    _log(f"  Cooldown:       {args.cooldown}s, mode={args.cooldown_mode}")
-    _log(
-        f"  Convergence:    {'stop at threshold=' + str(args.convergence_threshold) if args.convergence_stop else 'disabled'}"
-    )
-    _log(f"  Store git diff: {'yes' if args.store_git_diff else 'no'}")
-    _log(f"  Use library:    {'yes' if args.use_library else 'no'}")
-    _log(f"  Pass session ID:{'yes' if args.pass_session_id else 'no'}")
-    _log(f"  Checkpoints:    {'yes' if args.checkpoints else 'no'}")
-    _log(f"  Resume sessions:{'yes' if args.resume else 'no'}")
-    _log(f"  Skills:         {args.skills or 'none'}")
-    _log(f"  Ignore rules:   {'yes' if args.ignore_rules else 'no'}")
-    _log(f"  YOLO mode:      {'yes' if args.yolo else 'no'}")
-    _log(f"  Ignore user cfg:{'yes' if args.ignore_user_config else 'no'}")
-    _log(f"  Spawn source:   {args.spawn_source or '(default)'}")
-    _log(f"  Safe mode:      {'yes' if args.safe_mode else 'no'}")
-    _log(f"  Accept hooks:   {'yes' if args.accept_hooks else 'no'}")
-    _log(f"  Worktree:       {'yes' if args.worktree else 'no'}")
-    _log(f"  Continue:       {'yes' if args.continue_session else 'no'}")
-    _log(
-        f"  Output schema:  {args.output_schema_file or 'inline' if args.output_schema else ('file: ' + args.output_schema_file) if args.output_schema_file else 'none'}"
-    )
-    _log(f"  Goals file:     {args.goals_file or 'none'}")
-    _log(f"  Stop at goals:  {'yes' if args.stop_at_goals_end else 'no (wrap)'}")
-    _log(f"  Track goals:    {'yes' if args.track_goals else 'no'}")
-    _log(f"  Reset goals:    {'yes' if args.reset_goals else 'no'}")
-    _log(f"  Dry run:        {'yes' if args.dry_run else 'no'}")
-    _log(f"  Ledger:         {LEDGER_PATH}")
-    _log(f"  Sentinel:       echo 'stop' > {args.shutdown_sentinel}")
-    _log("")
+
+    if not args.quiet:
+        _log(f"  Goal:           {args.goal}")
+        _log(f"  Context:        {len(args.context)} chars")
+        _log(f"  Toolsets:       {toolsets_list}")
+        if args.context_file:
+            _log(f"  Context file:   {args.context_file}")
+        else:
+            _log(f"  Context file:   (none, using --context)")
+        _log(f"  Workdir:        {args.workdir or os.getcwd()}")
+        _log(
+            f"  Max iterations: {args.max_iterations if args.max_iterations > 0 else 'infinite'}"
+        )
+        _log(f"  Compact:        every {args.compact_every} iterations")
+        _log(f"  Max turns:      {args.max_turns} per spawned session")
+        _log(f"  Retry delay:    {args.retry_delay}s")
+        _log(f"  Session timeout: {args.session_timeout}s")
+        _log(f"  Hermes binary:  {hermes_bin}")
+        mode_str = args.worker_url if args.worker_url else "(none, direct subprocess)"
+        if args.worker_url == "auto":
+            mode_str = "auto (embedded worker)"
+        _log(f"  Worker URL:     {mode_str}")
+        _log(f"  Evolve:         {'yes' if args.evolve else 'no'}")
+        _log(f"  Git snapshots:  {'yes' if args.git else 'no'}")
+        _log(f"  Auto-commit:    {'yes' if args.git_commit else 'no'}")
+        _log(f"  Workers:        {args.workers}")
+        _log(f"  Notify cmd:     {args.notify_cmd or 'none'}")
+        _log(
+            f"  Output cap:     {args.max_output_chars if args.max_output_chars > 0 else 'unlimited'} chars"
+        )
+        _log(
+            f"  Max idle iters: {args.max_idle_iterations if args.max_idle_iterations > 0 else 'off'}"
+        )
+        _log(f"  Status file:    {args.status_file or 'none'}")
+        _log(f"  Profile:        {args.profile or '(default)'}")
+        _log(f"  Model:          {args.model or '(default)'}")
+        _log(f"  Provider:       {args.provider or '(default)'}")
+        _log(f"  HTTP callback:  {args.http_callback or 'none'}")
+        _log(
+            f"  Keep iterations:{args.keep_iterations if args.keep_iterations > 0 else 'all'}"
+        )
+        _log(f"  Archive dir:    {args.archive_dir or 'disabled'}")
+        _log(
+            f"  Archive retention: {args.archive_retention}d"
+            if args.archive_retention > 0
+            else "  Archive retention: forever"
+        )
+        _log(f"  Max retries:    {args.max_retries}")
+        _log(f"  On-error cmd:   {args.on_error_cmd or 'none'}")
+        _log(f"  Tag:            {args.tag or '(none)'}")
+        _log(f"  Prompt suffix:  {args.prompt_suffix or '(none)'}")
+        _log(f"  Force reset:    {'yes' if args.force_reset else 'no'}")
+        _log(f"  Auto toolsets:  {'yes' if not args.no_auto_toolsets else 'no'}")
+        _log(
+            f"  Auto task type: {args.task_type if args.task_type != 'auto' else 'auto-detect'}"
+        )
+        _log(f"  Failure learn:  {'yes' if not args.no_failure_learning else 'no'}")
+        _log(
+            f"  Webhook port:   {args.webhook_port if args.webhook_port > 0 else 'disabled'}"
+        )
+        _log(f"  Log file:       {args.log_file or 'stdout only'}")
+        _log(f"  HTML dashboard: {args.status_html or 'disabled'}")
+        _log(f"  Watch dir:      {args.watch_dir or 'disabled'}")
+        _log(f"  Watch poll:     {args.watch_poll}s")
+        _log(f"  Cooldown:       {args.cooldown}s, mode={args.cooldown_mode}")
+        _log(
+            f"  Convergence:    {'stop at threshold=' + str(args.convergence_threshold) if args.convergence_stop else 'disabled'}"
+        )
+        _log(f"  Store git diff: {'yes' if args.store_git_diff else 'no'}")
+        _log(f"  Use library:    {'yes' if args.use_library else 'no'}")
+        _log(f"  Pass session ID:{'yes' if args.pass_session_id else 'no'}")
+        _log(f"  Checkpoints:    {'yes' if args.checkpoints else 'no'}")
+        _log(f"  Resume sessions:{'yes' if args.resume else 'no'}")
+        _log(f"  Skills:         {args.skills or 'none'}")
+        _log(f"  Ignore rules:   {'yes' if args.ignore_rules else 'no'}")
+        _log(f"  YOLO mode:      {'yes' if args.yolo else 'no'}")
+        _log(f"  Ignore user cfg:{'yes' if args.ignore_user_config else 'no'}")
+        _log(f"  Spawn source:   {args.spawn_source or '(default)'}")
+        _log(f"  Safe mode:      {'yes' if args.safe_mode else 'no'}")
+        _log(f"  Accept hooks:   {'yes' if args.accept_hooks else 'no'}")
+        _log(f"  Worktree:       {'yes' if args.worktree else 'no'}")
+        _log(f"  Continue:       {'yes' if args.continue_session else 'no'}")
+        _log(
+            f"  Output schema:  {args.output_schema_file or 'inline' if args.output_schema else ('file: ' + args.output_schema_file) if args.output_schema_file else 'none'}"
+        )
+        _log(f"  Goals file:     {args.goals_file or 'none'}")
+        _log(f"  Stop at goals:  {'yes' if args.stop_at_goals_end else 'no (wrap)'}")
+        _log(f"  Track goals:    {'yes' if args.track_goals else 'no'}")
+        _log(f"  Reset goals:    {'yes' if args.reset_goals else 'no'}")
+        _log(f"  Dry run:        {'yes' if args.dry_run else 'no'}")
+        _log(f"  Ledger:         {LEDGER_PATH}")
+        _log(f"  Sentinel:       echo 'stop' > {args.shutdown_sentinel}")
+        _log("")
 
     if not args.run:
         _log("  Run with --run to start the actual loop.")
@@ -1060,6 +1072,7 @@ def main():
             track_goals=args.track_goals,
             reset_goals=args.reset_goals,
             heartbeat_timeout=args.heartbeat_timeout,
+            quiet=args.quiet,
         )
 
     if args.notify_on_completion or args.notify_pushbullet or args.notify_ntfy:

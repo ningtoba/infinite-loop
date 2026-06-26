@@ -349,6 +349,7 @@ Default toolsets: `terminal,file,delegation,web,skills,browser,memory,session_se
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--startup-delay` | `0.0` | Wait N seconds before first iteration |
+| `--quiet` | `false` | Suppress verbose startup banner, iteration headers, and config dump. Shows only compact one-line status. Ideal for background runs. |
 | `--preflight` | `false` | Run preflight health checks before loop |
 | `--preflight-fail-fast` | `false` | Stop on first preflight failure |
 | `--dry-run` | `false` | Print config and exit (no loop) |
@@ -492,6 +493,46 @@ see the error + actionable fix in one glance:
 ```
 
 No extra flags needed — suggestions are always enabled.
+
+---
+
+### Quiet Mode (`--quiet`)
+
+Suppress the verbose startup banner, per-iteration headers (`=== Iteration N ===`),
+and 50+ line config dump. In quiet mode, you get only compact one-line status:
+
+```
+[DAEMON] Running: goal=Fix lint errors | max=10 | tools=11 | type=code-fix
+[ITER #1] Fix lint errors in src/
+...
+[DONE] ✓ Iteration 1 (45s, progress): Fixed 3 eslint errors in auth.ts
+```
+
+**Usage**:
+```bash
+bash run.sh --quiet
+# Or via .env:
+INFINITE_LOOP_QUIET=true
+```
+
+Ideal for background daemon runs or when the daemon logs to a file you already
+monitor via `tail -f`.
+
+---
+
+### Iteration Heartbeat (`[BEAT]` Messages)
+
+When a spawned Hermes session runs for more than 2 minutes, the daemon
+logs periodic heartbeat messages so you can tell it's still working:
+
+```
+[BEAT] Iteration #3 still running (120s elapsed)...
+[BEAT] Iteration #3 still running (240s elapsed)...
+```
+
+These appear automatically — no flags needed. The heartbeat interval is 120
+seconds. The thread is daemon-threaded and stops cleanly when the iteration
+completes or is killed.
 
 ---
 

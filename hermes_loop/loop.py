@@ -130,6 +130,7 @@ def run_loop(
     track_goals: bool = False,
     reset_goals: bool = False,
     heartbeat_timeout: int = 0,
+    quiet: bool = False,
 ) -> None:
     global _shutdown_requested
 
@@ -227,6 +228,7 @@ def run_loop(
         track_goals=track_goals,
         reset_goals=reset_goals,
         heartbeat_timeout=heartbeat_timeout,
+        quiet=quiet,
     )
 
     eta_tracker = ETATracker()
@@ -359,22 +361,27 @@ def run_loop(
         iterations: list[dict] = state.setdefault("iterations", [])
         iteration_start_time = datetime.now(timezone.utc).isoformat()
 
-        _log(f"{'=' * 60}")
-        _log(f"    Iteration {iteration_count}")
-        if max_iterations > 0:
-            pct = min(100.0 * iteration_count / max_iterations, 100.0)
-            bar_width = 25
-            filled = int(pct / 100.0 * bar_width)
-            bar = "█" * filled + "░" * (bar_width - filled)
-            _log(f"    [{bar}] {iteration_count}/{max_iterations} — {pct:.0f}%")
-        _log(f"    Goal: {goal[:100]}{'...' if len(goal) > 100 else ''}")
-        parts = [f"workers={workers}"]
-        if max_turns:
-            parts.append(f"turns={max_turns}")
-        _log(f"    {' | '.join(parts)}")
-        if len(goals_list) > 1:
-            _log(f"    Goals-file: {len(goals_list)} goals loaded")
-        _log(f"{'=' * 60}")
+        if quiet:
+            _log(
+                f"[ITER #{iteration_count}] {goal[:80]}{'...' if len(goal) > 80 else ''}"
+            )
+        else:
+            _log(f"{'=' * 60}")
+            _log(f"    Iteration {iteration_count}")
+            if max_iterations > 0:
+                pct = min(100.0 * iteration_count / max_iterations, 100.0)
+                bar_width = 25
+                filled = int(pct / 100.0 * bar_width)
+                bar = "█" * filled + "░" * (bar_width - filled)
+                _log(f"    [{bar}] {iteration_count}/{max_iterations} — {pct:.0f}%")
+            _log(f"    Goal: {goal[:100]}{'...' if len(goal) > 100 else ''}")
+            parts = [f"workers={workers}"]
+            if max_turns:
+                parts.append(f"turns={max_turns}")
+            _log(f"    {' | '.join(parts)}")
+            if len(goals_list) > 1:
+                _log(f"    Goals-file: {len(goals_list)} goals loaded")
+            _log(f"{'=' * 60}")
 
         if len(goals_list) > 1:
             idx = goals_index % len(goals_list)
@@ -447,6 +454,7 @@ def run_loop(
             git=git,
             store_git_diff=store_git_diff,
             heartbeat_timeout=heartbeat_timeout,
+            quiet=quiet,
         )
 
         state.pop("pending_iteration", None)

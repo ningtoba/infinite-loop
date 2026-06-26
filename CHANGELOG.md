@@ -4,6 +4,31 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.28.0] — 2026-06-26
+
+### Added
+- **`run.sh --demo` forwarding**: `bash run.sh --demo` now correctly forwards to
+  `python3 -m hermes_loop --demo`, making the interactive walkthrough accessible
+  from the one-command entrypoint. Added to `--help` (Actions & Info sections)
+  and examples. Pre-argparse — no `--goal` required.
+
+### Fixed
+- **Stale versions in `run.sh`**: `--help` line and startup banner both showed
+  stale versions (v14.24.0 and v14.26.0 respectively). Now consistently shows
+  v14.28.0. Removed duplicate `--doctor` entry and stale "90 flags" hardcoded
+  count in the banner's "Also available" section.
+- **Stale "90 flags" count in `run.sh --help`**: Changed "all 90 flags" to
+  "all flags" to stay correct as new flags are added.
+
+### Changed
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.27.0 to 14.28.0.
+- `run.sh` — Updated all version banners, added `--demo` forwarding (help text,
+  CLI handler, examples, startup banner "What's new" section), removed stale
+  hardcoded flag counts, removed duplicate `--doctor` listing.
+- `README.md` — Version bump to v14.28.0, added v14.28.0 changelog table.
+
+---
+
 ## [14.27.0] — 2026-06-26
 
 ### Added

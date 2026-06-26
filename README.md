@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.27.0
+# Infinite Loop Daemon — v14.28.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -483,6 +483,17 @@ kill $LOOP_PID
 | `make help-topic` | DX | `Makefile` | New convenience target: `make help-topic TOPIC=notifications`. |
 
 ---
+
+## [14.28.0] — 2026-06-26
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| `run.sh --demo` forwarding | DX | `run.sh` | `bash run.sh --demo` now works correctly — forwards to `--demo`, added to `--help` and examples |
+| Stale version cleanup | Docs | `run.sh`, `README.md` | Fixed v14.24.0→v14.28.0 and v14.26.0→v14.28.0 banners; removed stale "90 flags" and duplicate `--doctor` |
+
+---
+
+
 
 ## v14.27.0 Changelog
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.27.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.28.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -17,9 +17,15 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
 LEDGER_PATH="/tmp/infinite-loop-state.json"
 
-# ── Help ──────────────────────────────────────────────────────────────────────
+# ── Early-exit flags (no .env needed) ─────────────────────────────────────
+if [[ "${1:-}" == "--demo" ]]; then
+  exec python3 "$SCRIPT_DIR/launch-loop.py" "--demo"
+fi
+if [[ "${1:-}" == "--version" ]]; then
+  exec python3 "$SCRIPT_DIR/launch-loop.py" "--version"
+fi
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.24.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.28.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
@@ -38,6 +44,7 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "    --quiet / -q          Suppress verbose startup banner and iteration headers"
   echo ""
   echo "  Actions:"
+  echo "    --demo                Interactive walkthrough of the daemon lifecycle"
   echo "    --dry-run             Print config and exit"
   echo "    --force-reset         Clear existing ledger, start fresh"
   echo "    --self-test           Run in-process unit tests and exit"
@@ -46,17 +53,19 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "  Info:"
   echo "    --help / -h           Show this help message"
   echo "    --version             Print daemon version and exit"
-  echo "    --list-flags          Print all 90 flags organized by group with help text"
+  echo "    --list-flags          Print all flags organized by group with help text"
   echo "    --list-groups         Print compact group names with flag counts"
   echo "    --examples            Print categorized real-world usage examples (7 categories)"
   echo "    --check-env           Validate .env file for typos and unknown variables"
-  echo "    --completion-script {bash|zsh}  Generate shell completion (pipe to source)"
   echo "    --doctor              Run comprehensive self-diagnosis"
+  echo "    --completion-script {bash|zsh}  Generate shell completion (pipe to source)"
+  echo "    --demo                Interactive daemon lifecycle walkthrough"
   echo ""
   echo "EXAMPLES:"
   echo "  bash run.sh                           # Run with .env config"
   echo "  bash run.sh --dry-run                 # Preview what would run"
   echo "  bash run.sh --self-test               # Run self-tests"
+  echo "  bash run.sh --demo                    # Interactive lifecycle walkthrough"
   echo "  bash run.sh --goal 'Fix tests'        # Override .env goal"
   echo "  bash run.sh --force-reset --quiet     # Clean start, no banner"
   echo "  bash run.sh --git --git-commit        # Enable git auto-commit"
@@ -197,6 +206,7 @@ while [[ $# -gt 0 ]]; do
     --list-flags|--list-groups|--examples) DAEMON_ARGS+=("$1"); shift ;;
     --check-env)  DAEMON_ARGS+=("--check-env"); shift ;;
     --doctor)     DAEMON_ARGS+=("--doctor"); shift ;;
+    --demo)       DAEMON_ARGS+=("--demo"); shift ;;
     --completion-script) DAEMON_ARGS+=("$1" "$2"); shift 2 ;;
     *)            EXTRA_ARGS+=("$1"); shift ;;
   esac
@@ -205,10 +215,11 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo '╔══════════════════════════════════════════════╗'
-  echo '║  Infinite Loop Daemon v14.26.0               ║'
+  echo '║  Infinite Loop Daemon v14.28.0               ║'
   echo '║  run.sh — one command to start               ║'
   echo '║                                                ║'
   echo '║  What is new ⚡                              ║'
+  echo '║  • --demo: interactive lifecycle walkthrough ║'
   echo '║  • --help-topic: group-filtered flag help     ║'
   echo '║  • --doctor: comprehensive self-diagnosis    ║'
   echo '║  • --init wizard: 13 config steps            ║'
@@ -221,13 +232,12 @@ if [ "$QUIET" = false ]; then
   echo '║  • Shows git changes, CPU/mem per iteration   ║'
   echo '║  • Worker breakdown for multi-worker runs     ║'
   echo '║  • --examples: categorized usage patterns     ║'
-  echo '║  • Shell tab-completion for all 90+ flags     ║'
+  echo '║  • Shell tab-completion for all flags          ║'
   echo '║  • --list-flags and --list-groups quick ref    ║'
   echo '║  • [SUGGEST] smart fixes on errors/stuck      ║'
   echo '║  • --quiet mode: compact per-iteration output ║'
   echo '║  • [BEAT] heartbeat during long iterations    ║'
   echo '║  • --self-test count auto-detected             ║'
-  echo '║  • --doctor: comprehensive self-diagnosis     ║'
   echo '╚══════════════════════════════════════════════╝'
   echo ""
   echo "  Config: .env"

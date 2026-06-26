@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.30.0
+# Infinite Loop Daemon — v14.31.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -1180,7 +1180,7 @@ infinite-loop/
 │
 ├── hermes_loop/                 ← Main daemon package (36 modules) ★
 │   ├── __init__.py
-│   ├── __main__.py              ← `python3 -m hermes_loop` entry point
+│   ├── __main__.py              ← `hermes_loop` console script entry point
 │   ├── cli.py                   ← Argparse + main() entry point
 │   ├── loop.py                  ← run_loop() iteration logic
 │   ├── functions.py             ← Helper functions (execute, merge, notify)

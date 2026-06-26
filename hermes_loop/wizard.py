@@ -6,8 +6,8 @@ interactively, generating a .env file at the end. Drastically lowers
 the onboarding barrier for users facing 90+ CLI flags.
 
 Usage:
-    python3 -m hermes_loop --init       # walk through interactive setup
-    python3 -m hermes_loop --wizard     # alias for --init
+    hermes_loop --init       # walk through interactive setup
+    hermes_loop --wizard     # alias for --init
 
 The wizard asks about:
   1. Goal / goals-file
@@ -403,7 +403,7 @@ def run_wizard() -> None:
             print()
             print("  To use these settings, pass them as CLI flags:")
             print()
-            print("    python3 -m hermes_loop \\")
+            print("    hermes_loop \\")
             for line in env_lines:
                 if line.startswith("INFINITE_LOOP_RUN="):
                     continue  # skip --run, added automatically
@@ -433,24 +433,150 @@ def run_wizard() -> None:
         print("    bash run.sh")
         print("    # or: make run")
     else:
-        print("    python3 -m hermes_loop --goal '<your goal>' --run")
+        print("    hermes_loop --goal '<your goal>' --run")
     print()
     print("  To check the current status:")
-    print("    python3 -m hermes_loop --status")
+    print("    hermes_loop --status")
     print()
     print("  To stop the daemon:")
     print("    echo 'stop' > /tmp/infinite-loop-stop")
     print()
     print("  For help:")
-    print("    python3 -m hermes_loop --help")
-    print("    python3 -m hermes_loop --examples")
-    print("    python3 -m hermes_loop --explain <flag>")
+    print("    hermes_loop --help")
+    print("    hermes_loop --examples")
+    print("    hermes_loop --explain <flag>")
     print("    make help")
+    print()
+
+    # ── Readiness check ───────────────────────────────────────────
+    _run_readiness_check(env_lines)
+
+
+def _run_readiness_check(env_lines: list[str]) -> None:
+    """Run lightweight readiness checks after wizard completes.
+
+    Verifies that key dependencies and paths referenced in the
+    wizard configuration are actually available. Reports each
+    check with a pass/warn/fail icon. Does NOT exit on failure
+    — the user can fix issues and re-run.
+    """
+    print("  ── Readiness Check ────────────────────────────────")
+    print()
+
+    checks: list[tuple[str, bool | None, str]] = []
+
+    # Parse the env lines into a dict
+    env: dict[str, str] = {}
+    for line in env_lines:
+        if "=" in line:
+            key, val = line.split("=", 1)
+            env[key.strip()] = val.strip().strip('"')
+
+    # Check 1: hermes binary
+    import shutil
+
+    hermes_found = shutil.which("hermes")
+    if hermes_found:
+        checks.append(("hermes binary on PATH", True, hermes_found))
+    else:
+        checks.append(
+            (
+                "hermes binary on PATH",
+                None,
+                "Not found - install Hermes Agent first (hermes setup)",
+            )
+        )
+
+    # Check 2: workdir (if specified)
+    workdir = env.get("INFINITE_LOOP_WORKDIR", "")
+    if workdir:
+        workdir = os.path.expanduser(workdir)
+        if os.path.isdir(workdir):
+            checks.append(("Working directory exists", True, workdir))
+        else:
+            checks.append(
+                ("Working directory exists", False, f"{workdir} - directory not found")
+            )
+
+    # Check 3: goal or goals-file
+    has_goal = bool(env.get("INFINITE_LOOP_GOAL", ""))
+    has_goals_file = bool(env.get("INFINITE_LOOP_GOALS_FILE", ""))
+    if has_goal or has_goals_file:
+        src = "goal" if has_goal else "goals-file"
+        checks.append(("Task definition", True, f"via --{src}"))
+    else:
+        checks.append(
+            ("Task definition", None, "No goal set - pass --goal or --goals-file")
+        )
+
+    # Check 4: git repo (if --git is enabled)
+    use_git = env.get("INFINITE_LOOP_GIT", "").lower() == "true"
+    if use_git:
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--is-inside-work-tree"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                checks.append(
+                    ("Git repository (--git enabled)", True, "Inside a git repo")
+                )
+            else:
+                checks.append(
+                    (
+                        "Git repository (--git enabled)",
+                        False,
+                        "Not inside a git repository",
+                    )
+                )
+        except FileNotFoundError:
+            checks.append(
+                (
+                    "Git repository (--git enabled)",
+                    False,
+                    "git binary not found on PATH",
+                )
+            )
+
+    # Print results
+    for desc, passed, details in checks:
+        if passed is True:
+            icon = "\033[32m\u2713\033[0m"  # green check
+        elif passed is False:
+            icon = "\033[31m\u2717\033[0m"  # red cross
+        else:
+            icon = "\033[33m?\033[0m"  # yellow question mark
+        print(f"  {icon}  {desc}")
+        indent = " " * 6
+        if details:
+            max_d = 72
+            detail = details if len(details) <= max_d else details[: max_d - 3] + "..."
+            print(f"{indent}{detail}")
+    print()
+
+    # Summary
+    passed = sum(1 for _, p, _ in checks if p is True)
+    warned = sum(1 for _, p, _ in checks if p is None)
+    failed = sum(1 for _, p, _ in checks if p is False)
+    total = len(checks)
+    if failed == 0 and warned == 0:
+        print(f"  \033[32mAll {total} checks passed\033[0m - ready to run!")
+    elif failed == 0:
+        print(f"  \033[33m{passed} passed, {warned} warnings\033[0m - can still run")
+    else:
+        print(
+            f"  \033[31m{failed} failed, {warned} warnings, {passed} passed"
+            f"\033[0m - fix issues before running"
+        )
     print()
 
 
 def main() -> None:
-    """Entry point for `python3 -m hermes_loop --init`."""
+    """Entry point for `hermes_loop --init`."""
     run_wizard()
     sys.exit(0)
 

@@ -4,6 +4,31 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.31.0] — 2026-06-26
+
+### Added
+- **Post-wizard readiness verification in `--init`**: After generating .env, the
+  wizard now runs lightweight environment checks (hermes binary on PATH, working
+  directory exists, task definition present, git repository if --git is enabled)
+  and reports pass/warn/fail per check with colorized icons. Users see instantly
+  whether they're ready to run or need to fix something first, without having to
+  discover issues at runtime.
+
+### Changed
+- `hermes_loop/wizard.py` — Replaced all 7 remaining `python3 -m hermes_loop`
+  references with the unified `hermes_loop` command (docstring, Next Steps
+  section, CLI flag fallback instructions, and main() docstring). This
+  completes the migration started in v14.30.0.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.30.0 to 14.31.0.
+
+### Fixed
+- **Stale `python3 -m hermes_loop` in wizard output**: After v14.29.0 added the
+  `hermes_loop` console command, the setup wizard's "Next Steps" section and
+  CLI flag fallback instructions still showed `python3 -m hermes_loop`. Now
+  consistently uses `hermes_loop` everywhere.
+
+---
+
 ## [14.30.0] — 2026-06-26
 
 ### Added

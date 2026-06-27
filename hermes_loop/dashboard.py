@@ -385,7 +385,11 @@ function createTag(text, cls) {
 function addIterationRow(iter) {
     if (!iter || !iter.n) return;
     var tbody = document.getElementById('iterations-body');
+    // Dedup: skip if a row with this iteration N already exists
+    var existing = tbody.querySelector('tr[data-iter-n="' + iter.n + '"]');
+    if (existing) return;
     var tr = document.createElement('tr');
+    tr.setAttribute('data-iter-n', iter.n);
     if (iter.error && iter.error !== 'none' && iter.error !== '') {
         tr.className = 'error-row';
     }
@@ -416,18 +420,18 @@ function addIterationRow(iter) {
     var tdErr = document.createElement('td');
     tdErr.textContent = iter.error && iter.error !== 'none' ? iter.error.substring(0, 60) + '...' : '';
     tr.appendChild(tdErr);
-    // Worktree merge indicator
+    // Worktree merge indicator — always emit a WT td to match table header
+    var tdWt = document.createElement('td');
+    tdWt.style.fontSize = '0.75rem';
+    tdWt.style.color = 'var(--muted)';
     if (iter.worktree_merge) {
         var wt = iter.worktree_merge;
-        var tdWt = document.createElement('td');
-        tdWt.style.fontSize = '0.75rem';
-        tdWt.style.color = 'var(--muted)';
         var wtParts = [];
         if (wt.merged > 0) wtParts.push('m' + wt.merged);
         if (wt.failed > 0) wtParts.push('f' + wt.failed);
         tdWt.textContent = wtParts.length ? 'wt:' + wtParts.join('/') : '';
-        tr.appendChild(tdWt);
     }
+    tr.appendChild(tdWt);
     tbody.insertBefore(tr, tbody.firstChild);
     while (tbody.children.length > 100) {
         tbody.removeChild(tbody.lastChild);

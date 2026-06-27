@@ -176,59 +176,86 @@ function updateLatestIteration(latest) {
 
 function updateRecentIterations(data) {
   const count = (data.ledger && data.ledger.total_iterations) || 0;
+  const tbody = document.getElementById('recent-iterations-body');
+
+  // Reset scenario: count dropped below last seen — clear existing rows
+  if (count < _lastSeenIterationCount) {
+    tbody.innerHTML = '';
+    _lastSeenIterationCount = 0;
+  }
   if (count <= _lastSeenIterationCount) return;
   _lastSeenIterationCount = count;
+
   // Use latest_iteration from SSE data to avoid a separate fetch race
   const latest = data.latest_iteration;
   if (latest && latest.n) {
-    const tbody = document.getElementById('recent-iterations-body');
-    const iters = [latest]; // prepend latest, keep rest from previous render
-    const existingRows = tbody.querySelectorAll('tr');
-    let merged = false;
-    tbody.innerHTML = iters.map(it => {
-      const cls = it.error ? 'error-row' : '';
-      const tagCls = it.error ? 'tag-err' : 'tag-ok';
-      const wt = it.worktree_merge;
-      const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
-        ? `<span class="tag tag-wt" title="merged:${wt.merged} failed:${wt.failed}${wt.skipped != null ? ' skipped:'+wt.skipped : ''}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
-        : '';
-      return `<tr class="${cls}">
-        <td>${it.n}</td><td><span class="tag tag-info">${escapeHtml(it.task_type || '')}</span></td>
-        <td>${it.duration_seconds || 0}s</td>
-        <td class="summary-col" title="${escapeHtml(it.summary || '')}">${escapeHtml((it.summary || '').substring(0, 80))}</td>
-        <td><span class="tag ${tagCls}">${it.error ? 'ERR' : (it.classification || 'OK')}</span></td>
-        <td style="font-size:0.78rem">${wtHtml}</td>
-      </tr>`;
-    }).join('');
-    // Append existing rows that aren't the latest (dedup by n)
-    const latestN = latest.n;
-    existingRows.forEach(row => {
+    // Collect Ns already in the DOM to prevent duplicates
+    const seenNs = new Set();
+    tbody.querySelectorAll('tr').forEach(row => {
       const td = row.querySelector('td');
       if (td) {
         const rowN = parseInt(td.textContent, 10);
-        if (rowN !== latestN) tbody.appendChild(row.cloneNode(true));
+        if (!isNaN(rowN)) seenNs.add(rowN);
       }
     });
+
+    // Only add the latest row if it's not already present
+    if (!seenNs.has(latest.n)) {
+      const cls = latest.error ? 'error-row' : '';
+      const tagCls = latest.error ? 'tag-err' : 'tag-ok';
+      const wt = latest.worktree_merge;
+      const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
+        ? `<span class="tag tag-wt" title="merged:${wt.merged} failed:${wt.failed}${wt.skipped != null ? ' skipped:'+wt.skipped : ''}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
+        : '';
+      const rowHtml = `<tr class="${cls}">
+        <td>${latest.n}</td><td><span class="tag tag-info">${escapeHtml(latest.task_type || '')}</span></td>
+        <td>${latest.duration_seconds || 0}s</td>
+        <td class="summary-col" title="${escapeHtml(latest.summary || '')}">${escapeHtml((latest.summary || '').substring(0, 80))}</td>
+        <td><span class="tag ${tagCls}">${latest.error ? 'ERR' : (latest.classification || 'OK')}</span></td>
+        <td style="font-size:0.78rem">${wtHtml}</td>
+      </tr>`;
+      // Prepend to tbody (insert after any existing header-like content, if any)
+      const temp = document.createElement('tbody');
+      temp.innerHTML = rowHtml;
+      tbody.insertBefore(temp.firstChild, tbody.firstChild);
+    }
   } else {
     // Fallback: fetch full list if latest_iteration isn't available
     fetch(API.iterations + '?limit=10').then(r => r.json()).then(result => {
-      const tbody = document.getElementById('recent-iterations-body');
       const iters = result.iterations || [];
-      tbody.innerHTML = iters.map(it => {
+      const seenNs = new Set();
+      tbody.querySelectorAll('tr').forEach(row => {
+        const td = row.querySelector('td');
+        if (td) {
+          const rowN = parseInt(td.textContent, 10);
+          if (!isNaN(rowN)) seenNs.add(rowN);
+        }
+      });
+      const frag = document.createDocumentFragment();
+      iters.forEach(it => {
+        if (seenNs.has(it.n)) return;
+        seenNs.add(it.n);
         const cls = it.error ? 'error-row' : '';
         const tagCls = it.error ? 'tag-err' : 'tag-ok';
         const wt = it.worktree_merge;
         const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
           ? `<span class="tag tag-wt" title="merged:${wt.merged} failed:${wt.failed}${wt.skipped != null ? ' skipped:'+wt.skipped : ''}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
           : '';
-        return `<tr class="${cls}">
+        const temp = document.createElement('tbody');
+        temp.innerHTML = `<tr class="${cls}">
           <td>${it.n}</td><td><span class="tag tag-info">${escapeHtml(it.task_type || '')}</span></td>
           <td>${it.duration_seconds || 0}s</td>
           <td class="summary-col" title="${escapeHtml(it.summary || '')}">${escapeHtml((it.summary || '').substring(0, 80))}</td>
           <td><span class="tag ${tagCls}">${it.error ? 'ERR' : (it.classification || 'OK')}</span></td>
           <td style="font-size:0.78rem">${wtHtml}</td>
         </tr>`;
-      }).join('');
+        frag.insertBefore(temp.firstChild, frag.firstChild);
+      });
+      tbody.insertBefore(frag, tbody.firstChild);
+      // Update _lastSeenIterationCount from fetched data
+      if (result.total_iterations != null) {
+        _lastSeenIterationCount = result.total_iterations;
+      }
     }).catch(() => {});
   }
 }

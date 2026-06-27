@@ -241,6 +241,8 @@ def _abort_merge(workdir: str | None) -> None:
 
 def _branch_exists(workdir: str | None, branch: str) -> bool:
     """Check if a local git branch exists."""
+    if not branch:
+        return False
     try:
         r = subprocess.run(
             ["git", "branch", "--list", branch],
@@ -259,6 +261,8 @@ def _delete_worktree_branch(workdir: str | None, branch: str) -> bool:
 
     Returns True if the branch was deleted or didn't exist.
     """
+    if not branch:
+        return True
     try:
         # Check if branch exists first
         check = subprocess.run(

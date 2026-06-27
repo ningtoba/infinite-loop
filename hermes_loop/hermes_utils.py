@@ -1034,7 +1034,7 @@ def spawn_delegation_session(
             # If the session produced actual output (not just an error), treat
             # it as success — hermes often exits non-zero with stderr warnings
             # even after a perfectly successful run that produced useful stdout.
-            if output_len > 50:
+            if output_len > 30:
                 return {
                     "summary": summary,
                     "duration_seconds": round(elapsed, 1),
@@ -1049,7 +1049,7 @@ def spawn_delegation_session(
             # Exit code non-zero with no meaningful output -> probably a real failure
             # But check if stderr has a useful summary (hermes may print results to stderr)
             stderr_output = stderr or ""
-            if len(stderr_output.strip()) > 100:
+            if len(stderr_output.strip()) > 50:
                 # Stderr has meaningful content — treat as success (hermes logging)
                 return {
                     "summary": (

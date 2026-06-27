@@ -24,6 +24,7 @@ function _wtTooltip(wt) {
   if (!wt) return '';
   let parts = [`merged:${wt.merged} failed:${wt.failed}`];
   if (wt.skipped != null && wt.skipped > 0) parts.push(`skipped:${wt.skipped}`);
+  if (wt.conflicts != null && wt.conflicts > 0) parts.push(`conflicts:${wt.conflicts}`);
   // Per-worker details
   const pw = wt.per_worker;
   if (pw) {
@@ -234,6 +235,14 @@ function updateRecentIterations(data) {
       }
     });
 
+    // If there's a gap (>1 unseen iteration), fetch the full batch
+    // instead of adding only the latest — prevents missing intermediate
+    // iterations when multiple complete between SSE ticks.
+    if (!seenNs.has(latest.n) && (latest.n - (seenNs.size > 0 ? Math.max(...seenNs) : 0)) > 1) {
+      _fetchAndAppendMissingIterations(tbody, seenNs);
+      return;
+    }
+
     // Only add the latest row if it's not already present
     if (!seenNs.has(latest.n)) {
       const cls = latest.error ? 'error-row' : '';
@@ -267,37 +276,52 @@ function updateRecentIterations(data) {
           if (!isNaN(rowN)) seenNs.add(rowN);
         }
       });
-      const frag = document.createDocumentFragment();
-      // iters is already newest-first from the API
-      iters.forEach(it => {
-        if (seenNs.has(it.n)) return;
-        seenNs.add(it.n);
-        const cls = it.error ? 'error-row' : '';
-        const tagCls = it.error ? 'tag-err' : 'tag-ok';
-        const wt = it.worktree_merge;
-        const wtTitle = wt ? _wtTooltip(wt) : '';
-        const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
-          ? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
-          : '';
-        const temp = document.createElement('tbody');
-        temp.innerHTML = `<tr class="${cls}">
-          <td>${it.n}</td><td><span class="tag tag-info">${escapeHtml(it.task_type || '')}</span></td>
-          <td>${it.duration_seconds || 0}s</td>
-          <td class="summary-col" title="${escapeHtml(it.summary || '')}">${escapeHtml((it.summary || '').substring(0, 80))}</td>
-          <td><span class="tag ${tagCls}">${it.error ? 'ERR' : (it.classification || 'OK')}</span></td>
-          <td style="font-size:0.78rem">${wtHtml}</td>
-        </tr>`;
-        // Append to fragment to preserve newest-first order
-        frag.appendChild(temp.firstChild);
-      });
-      tbody.insertBefore(frag, tbody.firstChild);
+      _appendIterationRows(tbody, iters, seenNs);
       // Update _lastSeenIterationCount from fetched data
-      // /api/iterations returns {iterations: [...], total: N}
       if (result.total != null) {
         _lastSeenIterationCount = result.total;
       }
     }).catch(() => {});
   }
+}
+
+// ── Helper: fetch and append missing iterations from the API ────────────
+function _fetchAndAppendMissingIterations(tbody, seenNs) {
+  fetch(API.iterations + '?limit=10').then(r => r.json()).then(result => {
+    const iters = result.iterations || [];
+    _appendIterationRows(tbody, iters, seenNs);
+    if (result.total != null) {
+      _lastSeenIterationCount = result.total;
+    }
+  }).catch(() => {});
+}
+
+// ── Helper: append new iteration rows preserving newest-first order ─────
+function _appendIterationRows(tbody, iters, seenNs) {
+  const frag = document.createDocumentFragment();
+  // iters is already newest-first from the API
+  iters.forEach(it => {
+    if (seenNs.has(it.n)) return;
+    seenNs.add(it.n);
+    const cls = it.error ? 'error-row' : '';
+    const tagCls = it.error ? 'tag-err' : 'tag-ok';
+    const wt = it.worktree_merge;
+    const wtTitle = wt ? _wtTooltip(wt) : '';
+    const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
+      ? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
+      : '';
+    const temp = document.createElement('tbody');
+    temp.innerHTML = `<tr class="${cls}">
+      <td>${it.n}</td><td><span class="tag tag-info">${escapeHtml(it.task_type || '')}</span></td>
+      <td>${it.duration_seconds || 0}s</td>
+      <td class="summary-col" title="${escapeHtml(it.summary || '')}">${escapeHtml((it.summary || '').substring(0, 80))}</td>
+      <td><span class="tag ${tagCls}">${it.error ? 'ERR' : (it.classification || 'OK')}</span></td>
+      <td style="font-size:0.78rem">${wtHtml}</td>
+    </tr>`;
+    // Append to fragment to preserve newest-first order
+    frag.appendChild(temp.firstChild);
+  });
+  tbody.insertBefore(frag, tbody.firstChild);
 }
 
 function updateLiveIteration(live) {

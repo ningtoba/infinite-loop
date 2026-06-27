@@ -703,6 +703,7 @@ def run_loop(
                 "failed": worktree_merge_result.get("failed", 0),
                 "skipped": worktree_merge_result.get("skipped", 0),
                 "per_worker": worktree_merge_result.get("per_worker", {}),
+                "conflicts": (worktree_merge_result.get("total_conflicts", 0)),
             }
 
         state["iterations"].append(record)
@@ -800,12 +801,15 @@ def run_loop(
         if worktree and worktree_merge_result:
             wt_merged = worktree_merge_result.get("merged", 0)
             wt_failed = worktree_merge_result.get("failed", 0)
-            if wt_merged > 0 or wt_failed > 0:
+            wt_conflicts = worktree_merge_result.get("total_conflicts", 0)
+            if wt_merged > 0 or wt_failed > 0 or wt_conflicts > 0:
                 wt_parts = []
                 if wt_merged > 0:
                     wt_parts.append(f"{wt_merged} merged")
                 if wt_failed > 0:
                     wt_parts.append(f"{wt_failed} failed")
+                if wt_conflicts > 0:
+                    wt_parts.append(f"{wt_conflicts} conflicts")
                 summary_parts.append(f"wtree={'/'.join(wt_parts)}")
 
         # Task type

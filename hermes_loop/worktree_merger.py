@@ -157,15 +157,43 @@ def _try_fast_forward_merge(workdir: str | None, branch: str, main_branch: str) 
         return False
 
 
-def _try_recursive_merge(
+def _pull_main_branch(workdir: str | None, main_branch: str) -> bool:
+    """Pull the latest main/master from remote before attempting merge.
+
+    Returns True if pull succeeded or remote is unavailable (best-effort).
+    """
+    try:
+        r = subprocess.run(
+            ["git", "pull", "--ff-only", "origin", main_branch],
+            capture_output=True,
+            text=True,
+            cwd=workdir,
+            timeout=30,
+        )
+        # Non-zero exit on pull is normal if no remote or network issues
+        if r.returncode == 0:
+            _log(f"[WORKTREE-MERGE] ✓ Pulled latest '{main_branch}' from origin")
+            return True
+        # "Already up to date" is fine
+        if "already up to date" in (r.stderr + r.stdout).lower():
+            return True
+        _log(f"[WORKTREE-MERGE] Pull skipped (non-fatal): {r.stderr.strip()[:80]}")
+        return False
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
+def _merge_with_conflict_tracking(
     workdir: str | None, branch: str, worker_id: int, iteration_count: int
-) -> bool:
-    """Attempt a recursive merge with conflict detection.
+) -> dict:
+    """Attempt a recursive merge with conflict detection and file tracking.
 
     Uses ``--no-commit --no-ff`` to preview conflicts first. If conflicts
     exist, they are logged and committed with conflict markers left in place.
-    Returns True if the merge was committed (or conflicts were committed).
+
+    Returns a dict with ``{"success": bool, "conflict_files": list[str]}``.
     """
+    result: dict = {"success": False, "conflict_files": []}
     try:
         # Preview merge
         r = subprocess.run(
@@ -181,6 +209,7 @@ def _try_recursive_merge(
         if has_conflicts:
             # Log conflict information
             conflict_files = _get_conflicted_files(workdir)
+            result["conflict_files"] = conflict_files
             if conflict_files:
                 _log(
                     f"[WORKTREE-MERGE] Conflict(s) in: {', '.join(conflict_files[:10])}"
@@ -203,10 +232,11 @@ def _try_recursive_merge(
             cwd=workdir,
             timeout=30,
         )
-        return True
+        result["success"] = True
+        return result
 
     except (subprocess.TimeoutExpired, FileNotFoundError):
-        return False
+        return result
 
 
 def _get_conflicted_files(workdir: str | None) -> list[str]:
@@ -378,6 +408,7 @@ def _merge_worktree_branches(
         "skipped": 0,
         "details": [],
         "per_worker": {},
+        "total_conflicts": 0,
     }
 
     if not os.path.isdir(os.path.join(cwd, ".git")):
@@ -440,7 +471,10 @@ def _merge_worktree_branches(
         result["failed"] = len(branches)
         return result
 
-    # 4. Merge each worktree branch
+    # 4. Pull latest main from remote (best-effort) to reduce merge conflicts
+    _pull_main_branch(cwd, main_branch)
+
+    # 5. Merge each worktree branch
     for idx, branch_info in enumerate(branches):
         branch = branch_info["name"]
         # Extract worker ID from branch name for accurate tracking
@@ -482,6 +516,7 @@ def _merge_worktree_branches(
 
         # Try fast-forward first
         merged = _try_fast_forward_merge(cwd, branch, main_branch)
+        merge_cf = []
         if not merged:
             _log(
                 f"[WORKTREE-MERGE] Fast-forward failed for '{branch}', "
@@ -489,11 +524,13 @@ def _merge_worktree_branches(
             )
             # Abort any partial state from the failed ff attempt
             _abort_merge(cwd)
-            merged = _try_recursive_merge(cwd, branch, worker_id, iteration_count)
-            if not merged:
+            merge_result = _merge_with_conflict_tracking(
+                cwd, branch, worker_id, iteration_count
+            )
+            if not merge_result.get("success"):
                 _log(
-                    f"[WORKTREE-MERGE] Recursive merge also failed for '{branch}' — "
-                    "skipping"
+                    f"[WORKTREE-MERGE] Recursive merge also failed for "
+                    f"'{branch}' — skipping"
                 )
                 result["failed"] += 1
                 result["details"].append(
@@ -509,21 +546,36 @@ def _merge_worktree_branches(
                     "reason": "both ff and recursive merge failed",
                 }
                 continue
+            # Recursive merge succeeded — store conflict files if any
+            merge_cf = merge_result.get("conflict_files", [])
+            if merge_cf:
+                _log(
+                    f"[WORKTREE-MERGE] Merged '{branch}' with "
+                    f"{len(merge_cf)} conflict file(s): "
+                    f"{', '.join(merge_cf[:5])}"
+                )
 
         # Successful merge — delete branch and remove worktree
         _delete_worktree_branch(cwd, branch)
         _remove_worktree_directory(cwd, branch, branch_info.get("worktree_path"))
         result["merged"] += 1
-        result["details"].append(
-            {
-                "branch": branch,
-                "status": "merged",
-            }
-        )
+        detail_entry = {
+            "branch": branch,
+            "status": "merged",
+        }
+        # Capture conflict file info from the recursive merge result
+        if merge_cf:
+            detail_entry["conflict_files"] = merge_cf
+        result["details"].append(detail_entry)
         result["per_worker"][wid_str] = {"status": "merged", "branch": branch}
         _log(f"[WORKTREE-MERGE] ✓ '{branch}' merged and cleaned up")
 
-    # 5. Push merged changes to remote if we merged anything
+    # Aggregate total conflict count across all merge results
+    for d in result["details"]:
+        if d.get("conflict_files"):
+            result["total_conflicts"] += len(d["conflict_files"])
+
+    # 6. Push merged changes to remote if we merged anything
     if result["merged"] > 0:
         try:
             r = subprocess.run(
@@ -542,8 +594,8 @@ def _merge_worktree_branches(
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
             _log(f"[WORKTREE-MERGE] Push skipped: {e}")
 
-    # 6. Re-run merge with remaining unmerged branches if any failed
-    #    (second pass: try recursive merge for any FF failures)
+    # 7. Re-run merge with remaining unmerged branches if any failed
+    #    (second pass: try recursive merge, then pull+rebase, for any FF failures)
     failed_branches = [d for d in result["details"] if d["status"] == "failed"]
     if failed_branches and not any(d.get("retried") for d in result["details"]):
         _log(
@@ -577,8 +629,10 @@ def _merge_worktree_branches(
             _abort_merge(cwd)
             extracted_wid = _extract_worker_from_branch(branch)
             worker_id = extracted_wid if extracted_wid is not None else 0
-            merged = _try_recursive_merge(cwd, branch, worker_id, iteration_count)
-            if merged:
+            merge_result = _merge_with_conflict_tracking(
+                cwd, branch, worker_id, iteration_count
+            )
+            if merge_result.get("success"):
                 _delete_worktree_branch(cwd, branch)
                 _remove_worktree_directory(
                     cwd, branch, branch_info.get("worktree_path")
@@ -612,7 +666,7 @@ def _merge_worktree_branches(
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
 
-    # 7. Return to original branch if it still exists
+    # 8. Return to original branch if it still exists
     if original_branch and original_branch != main_branch:
         if not _branch_exists(cwd, original_branch):
             _log(

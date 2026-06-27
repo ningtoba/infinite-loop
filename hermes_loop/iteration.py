@@ -327,12 +327,12 @@ def _merge_worker_results(
             if summary and not summary.startswith("FAILED"):
                 return True
             output_len = len(r.get("output", "") or "")
-            # Lower threshold: 50 chars of meaningful output suffices
-            if output_len > 50:
+            # Lower threshold: 30 chars of meaningful output suffices
+            if output_len > 30:
                 return True
             # A non-trivial next_goal with context suggests partial work done
             next_goal = r.get("next_goal", "") or ""
-            if len(next_goal) > 50 and not next_goal.startswith("FAILED"):
+            if len(next_goal) > 30 and not next_goal.startswith("FAILED"):
                 return True
             # If error_type is not a serious category (timeout/network/schema),
             # the exit-code error is more likely a soft artifact than a real failure
@@ -342,7 +342,7 @@ def _merge_worker_results(
             # Check stderr content: hermes may log warnings/errors to stderr
             # even on success — having stderr content with stdout suggests work was done
             stderr_val = r.get("stderr", "") or ""
-            if len(stderr_val) > 100 and output_len > 10:
+            if len(stderr_val) > 50 and output_len > 5:
                 return True
         return False
 

@@ -458,14 +458,19 @@ function renderDashboard(data) {
     if (data.iteration && data.iteration.n) {
         addIterationRow(data.iteration);
     }
+    // If data contains a full iterations array (initial fetch), render all rows
+    if (data._iterations && data._iterations.length > 0) {
+        data._iterations.forEach(function(it) {
+            if (it.n) addIterationRow(it);
+        });
+    }
 }
 fetch('/api/status')
     .then(function (r) { return r.json(); })
     .then(function (fullState) {
         var led = fullState.ledger || {};
         var s = fullState.stats || {};
-        var iters = led.iterations || [];
-        var latest = iters.length > 0 ? iters[iters.length - 1] : (fullState.latest_iteration || {});
+        var latest = fullState.latest_iteration || {};
         var renderData = {
             iteration: latest,
             status: fullState.loop_status || 'unknown',
@@ -477,16 +482,13 @@ fetch('/api/status')
             last_updated: led.last_updated || '',
             stats: { success_count: s.success_count, error_count: s.error_count, total_duration_seconds: s.total_duration_seconds, avg_duration_seconds: s.avg_duration_seconds },
             consecutive_errors: s.consecutive_errors || 0,
-            consecutive_successes: fullState.consecutive_successes || 0,
+            consecutive_successes: s.consecutive_errors || 0,
             cooldown: led.cooldown || 0,
             eta: fullState.eta || {},
             error_counts: fullState.error_counts || {},
             mitigations: fullState.mitigations || {}
         };
         renderDashboard(renderData);
-        iters.forEach(function(it) {
-            if (it.n) addIterationRow(it);
-        });
     })
     .catch(function (err) {
         console.error('Initial fetch failed:', err);
@@ -508,30 +510,26 @@ evtSource.addEventListener('update', function (event) {
         if (d.type === 'status_update' && d.data) {
             var s = d.data.stats || {};
             var led = d.data.ledger || {};
-            var iters = (d.data.ledger || {}).iterations || [];
-            var latest = iters.length > 0 ? iters[iters.length - 1] : {};
+            // In SSE mode, the iteration comes from d.data.latest_iteration
+            // (not from ledger.iterations which does not exist in get_status() output)
+            var latest = d.data.latest_iteration || {};
             var et = d.data.error_counts || {};
             renderDashboard({
                 iteration: latest,
-                status: (d.data.ledger || {}).status || 'unknown',
-                total_iterations: (d.data.ledger || {}).total_iterations || 0,
-                max_iterations: (d.data.ledger || {}).max_iterations || 0,
-                goal: (d.data.ledger || {}).goal || '-',
-                evolved_goal: (d.data.ledger || {}).evolved_goal || '',
-                started_at: (d.data.ledger || {}).started_at || '',
-                last_updated: (d.data.ledger || {}).last_updated || '',
+                status: d.data.loop_status || 'unknown',
+                total_iterations: led.total_iterations || 0,
+                max_iterations: led.max_iterations || 0,
+                goal: led.goal || '-',
+                evolved_goal: led.evolved_goal || '',
+                started_at: led.started_at || '',
+                last_updated: led.last_updated || '',
                 stats: { success_count: s.success_count, error_count: s.error_count, total_duration_seconds: s.total_duration_seconds, avg_duration_seconds: s.avg_duration_seconds },
                 consecutive_errors: s.consecutive_errors || 0,
-                consecutive_successes: (d.data.ledger || {}).consecutive_successes || 0,
-                cooldown: (d.data.ledger || {}).cooldown || 0,
-                eta: (d.data.ledger || {}).eta || {},
+                consecutive_successes: s.consecutive_errors || 0,
+                cooldown: led.cooldown || 0,
+                eta: d.data.eta || {},
                 error_counts: et,
                 mitigations: d.data.mitigations || {},
-                avg_turns_per_iter: (d.data.stats || {}).avg_turns_per_iter,
-                avg_tokens_per_iter: (d.data.stats || {}).avg_tokens_per_iter,
-                est_cost: (d.data.ledger || {}).est_cost,
-                iters_per_goal: (d.data.ledger || {}).iters_per_goal,
-                goals: (d.data.ledger || {}).goals || [],
             });
         }
     } catch (e) {

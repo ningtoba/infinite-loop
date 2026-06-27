@@ -268,6 +268,7 @@ function updateRecentIterations(data) {
         }
       });
       const frag = document.createDocumentFragment();
+      // iters is already newest-first from the API
       iters.forEach(it => {
         if (seenNs.has(it.n)) return;
         seenNs.add(it.n);
@@ -286,12 +287,14 @@ function updateRecentIterations(data) {
           <td><span class="tag ${tagCls}">${it.error ? 'ERR' : (it.classification || 'OK')}</span></td>
           <td style="font-size:0.78rem">${wtHtml}</td>
         </tr>`;
-        frag.insertBefore(temp.firstChild, frag.firstChild);
+        // Append to fragment to preserve newest-first order
+        frag.appendChild(temp.firstChild);
       });
       tbody.insertBefore(frag, tbody.firstChild);
       // Update _lastSeenIterationCount from fetched data
-      if (result.total_iterations != null) {
-        _lastSeenIterationCount = result.total_iterations;
+      // /api/iterations returns {iterations: [...], total: N}
+      if (result.total != null) {
+        _lastSeenIterationCount = result.total;
       }
     }).catch(() => {});
   }

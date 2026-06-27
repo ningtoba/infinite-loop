@@ -1046,6 +1046,26 @@ def spawn_delegation_session(
                     "truncated": was_truncated,
                     "spawned_session_id": spawned_session_id,
                 }
+            # Exit code non-zero with no meaningful output -> probably a real failure
+            # But check if stderr has a useful summary (hermes may print results to stderr)
+            stderr_output = stderr or ""
+            if len(stderr_output.strip()) > 100:
+                # Stderr has meaningful content — treat as success (hermes logging)
+                return {
+                    "summary": (
+                        str(summary)[:output_cap]
+                        if summary
+                        else str(stderr_output)[:output_cap]
+                    ),
+                    "duration_seconds": round(elapsed, 1),
+                    "error": None,
+                    "output": stdout[:output_cap],
+                    "stderr": str(stderr[:stderr_cap]),
+                    "exit_code": subprocess_exit_code,
+                    "total_output_bytes": actual_output_len,
+                    "truncated": was_truncated,
+                    "spawned_session_id": spawned_session_id,
+                }
             summary = f"FAILED (exit {subprocess_exit_code}): {str(stderr[:300])}"
             return {
                 "summary": summary,

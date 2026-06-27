@@ -542,7 +542,77 @@ def _merge_worktree_branches(
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
             _log(f"[WORKTREE-MERGE] Push skipped: {e}")
 
-    # 6. Return to original branch if it still exists
+    # 6. Re-run merge with remaining unmerged branches if any failed
+    #    (second pass: try recursive merge for any FF failures)
+    failed_branches = [d for d in result["details"] if d["status"] == "failed"]
+    if failed_branches and not any(d.get("retried") for d in result["details"]):
+        _log(
+            f"[WORKTREE-MERGE] Retrying {len(failed_branches)} failed branch(es) "
+            "with recursive merge as second attempt..."
+        )
+        for branch_info in branches:
+            branch = branch_info["name"]
+            # Check if this branch already failed
+            failed_detail = next(
+                (
+                    d
+                    for d in result["details"]
+                    if d["branch"] == branch and d["status"] == "failed"
+                ),
+                None,
+            )
+            if not failed_detail:
+                continue
+            if not _branch_exists(cwd, branch):
+                _log(
+                    f"[WORKTREE-MERGE] Branch '{branch}' no longer exists "
+                    "locally on retry — skipping"
+                )
+                failed_detail["status"] = "skipped"
+                failed_detail["reason"] = "no longer exists on retry"
+                result["failed"] -= 1
+                result["skipped"] += 1
+                continue
+            _log(f"[WORKTREE-MERGE] Retrying '{branch}' with recursive merge...")
+            _abort_merge(cwd)
+            extracted_wid = _extract_worker_from_branch(branch)
+            worker_id = extracted_wid if extracted_wid is not None else 0
+            merged = _try_recursive_merge(cwd, branch, worker_id, iteration_count)
+            if merged:
+                _delete_worktree_branch(cwd, branch)
+                _remove_worktree_directory(
+                    cwd, branch, branch_info.get("worktree_path")
+                )
+                result["merged"] += 1
+                result["failed"] -= 1
+                failed_detail["status"] = "merged"
+                failed_detail["retried"] = True
+                _log(f"[WORKTREE-MERGE] ✓ '{branch}' merged on retry")
+                # Update per_worker status
+                wid_str = str(worker_id)
+                if wid_str in result["per_worker"]:
+                    result["per_worker"][wid_str] = {
+                        "status": "merged",
+                        "branch": branch,
+                    }
+            else:
+                _abort_merge(cwd)
+                failed_detail["retried"] = True
+                _log(f"[WORKTREE-MERGE] ✗ '{branch}' still failing after retry")
+        # Push again if new merges succeeded on retry
+        if result["merged"] > 0:
+            try:
+                subprocess.run(
+                    ["git", "push", "origin", main_branch],
+                    capture_output=True,
+                    text=True,
+                    cwd=cwd,
+                    timeout=30,
+                )
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+
+    # 7. Return to original branch if it still exists
     if original_branch and original_branch != main_branch:
         if not _branch_exists(cwd, original_branch):
             _log(

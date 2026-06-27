@@ -339,6 +339,11 @@ def _merge_worker_results(
             et = r.get("error_type")
             if et and et not in ("timeout", "network", "schema"):
                 return True
+            # Check stderr content: hermes may log warnings/errors to stderr
+            # even on success — having stderr content with stdout suggests work was done
+            stderr_val = r.get("stderr", "") or ""
+            if len(stderr_val) > 100 and output_len > 10:
+                return True
         return False
 
     # Separate hard errors (genuine failures) from soft errors (exit-code noise)

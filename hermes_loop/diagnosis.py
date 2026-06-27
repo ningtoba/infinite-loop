@@ -6,7 +6,7 @@ configuration, filesystem, and optional extras. Produces a structured
 pass/warn/fail report with actionable suggestions for each issue found.
 
 Usage:
-    python3 -m hermes_loop --doctor
+    hermes_loop --doctor
 """
 
 import os

@@ -259,9 +259,14 @@ def _mask_sensitive(key: str, value: str) -> str:
     """Mask sensitive values (tokens, keys) for display."""
     sensitive_patterns = ("TOKEN", "KEY", "SECRET", "PASSWORD", "PUSHBULLET")
     if any(p in key.upper() for p in sensitive_patterns):
-        if len(value) > 8:
-            return value[:4] + "****" + value[-4:]
-        return "****"
+        if not value:
+            return "****"
+        if len(value) <= 4:
+            return "****"
+        # Keep only first 2 and last 2 chars; replace the middle with ****
+        if len(value) <= 8:
+            return value[:2] + "****" + value[-2:]
+        return value[:3] + "****" + value[-3:]
     return value
 
 

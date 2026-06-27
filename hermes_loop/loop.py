@@ -11,10 +11,12 @@ from .file_utils import _log, write_ledger, write_status_file
 from .signal_handlers import (
     _shutdown_requested,
     _check_auto_reload,
+    init_auto_reload,
 )
 from .goal_utils import GoalSpec, _is_goal_completed, _mark_goal_completed
 from .error_recovery import (
     _adapt_to_error,
+    _set_originals,
 )
 from .error_utils import _suggest_actionable_fix
 from .tracker import ETATracker
@@ -224,12 +226,8 @@ def run_loop(
     consecutive_errors = state.get("stats", {}).get("consecutive_errors", 0)
     consecutive_idle = 0
 
-    global _ORIGINAL_SESSION_TIMEOUT, _ORIGINAL_COOLDOWN
-    global _ORIGINAL_USE_LIBRARY, _ORIGINAL_WORKERS
-    _ORIGINAL_SESSION_TIMEOUT = session_timeout
-    _ORIGINAL_COOLDOWN = cooldown
-    _ORIGINAL_USE_LIBRARY = use_library
-    _ORIGINAL_WORKERS = workers
+    # Pass original baseline values to error_recovery for mitigation comparisons
+    _set_originals(session_timeout, cooldown, use_library, workers)
 
     # Auto-detect task type
     task_type, task_type_desc, extra_tools = detect_task_type(goal)
@@ -336,6 +334,9 @@ def run_loop(
     # Clean up stale worktree branches from previous runs before spawning
     if worktree and workdir:
         cleanup_stale_worktrees(workdir)
+
+    # Initialize auto-reload file snapshots (must be before main loop)
+    init_auto_reload(workdir)
 
     while True:
         if _shutdown_requested:

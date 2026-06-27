@@ -87,7 +87,7 @@ def load_or_create_ledger(
 
     return {
         "version": 11,
-        "version_detail": f"v{LAUNCH_LOOP_VERSION} -- Worktree cleanup, stale branch pruning, SSE dashboard fixes, bug fixes, self-test mode.",
+        "version_detail": f"v{LAUNCH_LOOP_VERSION} -- Self-healing sessions, WebUI dashboard, SSE live updates, smart worktree merging, goal tracking, error recovery, auto-completions, self-test mode.",
         "initial_command": goal,
         "initial_context": context,
         "started_at": datetime.now(timezone.utc).isoformat(),

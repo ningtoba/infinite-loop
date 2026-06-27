@@ -19,7 +19,9 @@ _shutdown_state_ref: dict | None = None
 _hermes_worker_ref: object | None = None
 
 # Module-level cache: store file mtime and size at daemon startup
+# Populated once via init_auto_reload() — never {} at runtime
 _startup_file_snapshots: dict[str, tuple[float, int]] = {}
+_startup_file_snapshots_initialized: bool = False
 
 
 def _handle_shutdown(signum, frame):
@@ -49,7 +51,6 @@ def _handle_shutdown(signum, frame):
             worker.stop()
         except Exception:
             pass
-
 
     try:
         _subprocess.run(
@@ -96,6 +97,32 @@ def _snapshot_file(path: str) -> tuple[float, int] | None:
         return (s.st_mtime, s.st_size)
     except (FileNotFoundError, OSError):
         return None
+
+
+def init_auto_reload(workdir: str | None) -> None:
+    """Initialize the file snapshots for auto-reload detection.
+
+    Must be called once at daemon startup (from run_loop or equivalent).
+    Snapshots the current mtime/size of launch-loop.py, run.sh, and .env
+    so _check_auto_reload can detect subsequent changes.
+    """
+    global _startup_file_snapshots, _startup_file_snapshots_initialized
+    if not workdir:
+        return
+    files_to_check = [
+        os.path.join(workdir, "launch-loop.py"),
+        os.path.join(workdir, "run.sh"),
+        os.path.join(workdir, ".env"),
+    ]
+    for fpath in files_to_check:
+        snap = _snapshot_file(fpath)
+        if snap is not None:
+            _startup_file_snapshots[fpath] = snap
+    _startup_file_snapshots_initialized = True
+    if _startup_file_snapshots:
+        _log(
+            f"[AUTO-RELOAD] Watching {len(_startup_file_snapshots)} file(s) for changes"
+        )
 
 
 def _check_auto_reload(

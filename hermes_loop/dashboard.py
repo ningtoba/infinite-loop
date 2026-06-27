@@ -39,6 +39,8 @@ _STATUS_HTML_TPL = """<!DOCTYPE html>
   .running { background: #1f6feb; color: #fff; }
   .stopped { background: #da3633; color: #fff; }
   .paused { background: #d29922; color: #000; }
+  .reloading { background: #da3633; color: #fff; }
+  .no_ledger { background: var(--dim); color: #fff; }
   table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
   th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); color: var(--muted); text-transform: uppercase; font-size: 0.75rem; }
   td { padding: 8px 6px; border-bottom: 1px solid var(--border-row); }
@@ -319,7 +321,7 @@ function updateGoalsPanel(data) {
         row.appendChild(idxSpan);
         var stSpan = document.createElement('span');
         stSpan.className = 'gstatus';
-        stSpan.textContent = g.done ? '\\u2713' : (g.active ? '\\u25b6' : '\\u25cb');
+        stSpan.textContent = g.done ? '\u2713' : (g.active ? '\u25b6' : '\u25cb');
         row.appendChild(stSpan);
         var txtSpan = document.createElement('span');
         txtSpan.className = 'gtext';
@@ -505,7 +507,13 @@ fetch('/api/status')
             cooldown: led.cooldown || 0,
             eta: fullState.eta || {},
             error_counts: fullState.error_counts || {},
-            mitigations: fullState.mitigations || {}
+            mitigations: fullState.mitigations || {},
+            goals: fullState.goals || [],
+            avg_turns_per_iter: fullState.avg_turns_per_iter,
+            avg_tokens_per_iter: fullState.avg_tokens_per_iter,
+            est_cost: fullState.est_cost,
+            iters_per_goal: fullState.iters_per_goal,
+            metrics_summary: fullState.metrics_summary || '',
         };
         renderDashboard(renderData);
         // Also fetch recent iterations for initial table render
@@ -522,7 +530,7 @@ fetch('/api/status')
     })
     .catch(function (err) {
         console.error('Initial fetch failed:', err);
-        document.getElementById('connection-status').textContent = '\\u25CF fetch error';
+        document.getElementById('connection-status').textContent = '\u25cf fetch error';
         document.getElementById('connection-status').className = 'disconnected';
     });
 var evtSource = new EventSource('/live');
@@ -560,6 +568,12 @@ evtSource.addEventListener('update', function (event) {
                 eta: d.data.eta || {},
                 error_counts: et,
                 mitigations: d.data.mitigations || {},
+                goals: d.data.goals || [],
+                avg_turns_per_iter: d.data.avg_turns_per_iter,
+                avg_tokens_per_iter: d.data.avg_tokens_per_iter,
+                est_cost: d.data.est_cost,
+                iters_per_goal: d.data.iters_per_goal,
+                metrics_summary: d.data.metrics_summary || '',
             });
         }
     } catch (e) {
@@ -568,12 +582,12 @@ evtSource.addEventListener('update', function (event) {
 });
 evtSource.addEventListener('heartbeat', function () {});
 evtSource.onopen = function () {
-    document.getElementById('connection-status').textContent = '\\u25CF connected';
+    document.getElementById('connection-status').textContent = '\u25cf connected';
     document.getElementById('connection-status').className = 'connected';
 };
 evtSource.onerror = function (err) {
     console.error('SSE error, reconnecting...', err);
-    document.getElementById('connection-status').textContent = '\\u25CF disconnected (reconnecting...)';
+    document.getElementById('connection-status').textContent = '\u25cf disconnected (reconnecting...)';
     document.getElementById('connection-status').className = 'disconnected';
 };
 </script>
@@ -584,7 +598,11 @@ evtSource.onerror = function (err) {
 def _generate_status_html(state: dict, compact: bool = False) -> str:
     """Generate a self-contained HTML page from the current ledger state."""
     status = state.get("status", "unknown")
-    status_cls = {"running": "running", "paused": "paused"}.get(status, "stopped")
+    status_cls = {
+        "running": "running",
+        "paused": "paused",
+        "reloading": "reloading",
+    }.get(status, "stopped")
     total = state.get("total_iterations", 0)
     goal = (state.get("initial_command") or "(none)")[:80]
     started = (state.get("started_at") or "?")[:19]
@@ -794,7 +812,7 @@ def _build_sse_payload(state: dict) -> dict:
             "avg_duration_seconds": stats.get("avg_duration_seconds", 0),
         },
         "consecutive_errors": stats.get("consecutive_errors", 0),
-        "consecutive_successes": state.get("consecutive_successes", 0),
+        "consecutive_successes": stats.get("consecutive_successes", 0),
         "cooldown": state.get("cooldown", 0),
         "eta": state.get("eta", {}),
         "error_counts": {

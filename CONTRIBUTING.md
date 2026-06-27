@@ -293,7 +293,7 @@ child Hermes sessions. All tests should pass (exit code 0).
 | `calc_adaptive_cooldown()` | 4 | Duration ranges: zero, long, short, interpolated |
 | `GoalSpec` parsing | 3 | Simple goal, profile, full spec with model/provider |
 | `_classify_progress()` | 4 | Completed, regression, stuck, progress with git changes |
-| `_suggest_actionable_fix()` | 9 | Timeout, network, stuck (workers/library), regression, consecutive errors, completed/progress (no suggestion), unknown |
+| `_suggest_actionable_fix()` | 11 | Timeout, network, stuck (workers/library), regression, consecutive errors, completed/progress (no suggestion), unknown, error-on-stderr, rate-limit |
 | `validate_env_vars()` | 7 | Unknown vars, typo detection, valid prefix, empty value, edge cases |
 
 **If you're adding a new function**, consider adding a self-test for it in the

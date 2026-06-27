@@ -6,11 +6,23 @@ from collections.abc import Callable
 from .config import _ERROR_SEVERITY, _ERROR_THRESHOLDS
 from .file_utils import _log
 
-# Original values snapshot (set in run_loop)
+# Original values snapshot (set via _set_originals, called from run_loop)
 _ORIGINAL_SESSION_TIMEOUT: int = 0
 _ORIGINAL_COOLDOWN: int = 0
 _ORIGINAL_USE_LIBRARY: bool = False
 _ORIGINAL_WORKERS: int = 1
+
+
+def _set_originals(
+    session_timeout: int, cooldown: int, use_library: bool, workers: int
+) -> None:
+    """Set original baseline values from run_loop for mitigation comparisons."""
+    global _ORIGINAL_SESSION_TIMEOUT, _ORIGINAL_COOLDOWN
+    global _ORIGINAL_USE_LIBRARY, _ORIGINAL_WORKERS
+    _ORIGINAL_SESSION_TIMEOUT = session_timeout
+    _ORIGINAL_COOLDOWN = cooldown
+    _ORIGINAL_USE_LIBRARY = use_library
+    _ORIGINAL_WORKERS = workers
 
 
 def _pick_primary_error(types: list[str]) -> str:

@@ -134,7 +134,7 @@ def _send_completion_notification(
     notify_bin = shutil.which("notify-send")
     if notify_bin:
         try:
-            subprocess.run(["notify-send", "Infinite Loop Complete", msg], timeout=5)
+            subprocess.run([notify_bin, "--", "Infinite Loop Complete", msg], timeout=5)
         except (subprocess.TimeoutExpired, OSError):
             pass
 

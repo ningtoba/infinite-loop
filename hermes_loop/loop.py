@@ -718,8 +718,12 @@ def run_loop(
             write_status_file(status_file, state, iteration_count, "reloading")
             if worker_manager:
                 worker_manager.stop()
+            if sys.argv[0] == "-m":
+                exec_argv = [sys.executable, "-m"] + sys.argv[1:]
+            else:
+                exec_argv = [sys.executable] + sys.argv
             _log("[RELOAD] Executing os.execv() with updated code...")
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            os.execv(sys.executable, exec_argv)
 
         _recalc_stats(state)
         eta_tracker.record_iteration(task_type, total_duration)

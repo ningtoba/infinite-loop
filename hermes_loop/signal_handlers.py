@@ -140,8 +140,14 @@ def _check_auto_reload(
             worker_manager.stop()
         except Exception:
             pass
+    # Reconstruct argv for -m invocation: sys.argv is ['-m', 'hermes_loop', ...]
+    # os.execv replaces the process — everything (env, cwd, fd) is preserved.
+    if sys.argv[0] == "-m":
+        exec_argv = [sys.executable, "-m"] + sys.argv[1:]
+    else:
+        exec_argv = [sys.executable] + sys.argv
     _log("[AUTO-RELOAD] Executing os.execv() with updated code...")
-    os.execv(sys.executable, [sys.executable] + sys.argv)
+    os.execv(sys.executable, exec_argv)
 
 
 # Register signal handlers at module level (must happen before any imports

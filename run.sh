@@ -242,7 +242,8 @@ if [ "$QUIET" = false ]; then
   echo '╚══════════════════════════════════════════════╝'
   echo ""
   echo "  Config: .env"
-  echo "  Goal: ${INFINITE_LOOP_GOAL:0:80}..."
+  GOAL_DISPLAY="${INFINITE_LOOP_GOAL:-(not set)}"
+  echo "  Goal: ${GOAL_DISPLAY:0:80}..."
   echo "  Workers: ${INFINITE_LOOP_WORKERS:-1}  |  Max iters: ${INFINITE_LOOP_MAX_ITERATIONS:-∞}"
   echo "  Mode: quiet=${INFINITE_LOOP_QUIET:-off}  |  Git: ${INFINITE_LOOP_GIT:-off}  |  Evolve: ${INFINITE_LOOP_EVOLVE:-off}"
   echo "  Toolsets: ${INFINITE_LOOP_TOOLSETS:-terminal,file,delegation,web}"

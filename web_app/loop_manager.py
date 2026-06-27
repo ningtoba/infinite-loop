@@ -262,6 +262,7 @@ class LoopManager:
                 "total_duration_seconds": stats.get("total_duration_seconds", 0),
                 "avg_duration_seconds": stats.get("avg_duration_seconds", 0),
                 "consecutive_errors": stats.get("consecutive_errors", 0),
+                "consecutive_successes": stats.get("consecutive_successes", 0),
             },
             "error_counts": ledger.get("error_type_counts", {}),
             "mitigations": ledger.get("mitigations", {}),

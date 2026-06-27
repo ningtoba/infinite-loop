@@ -77,7 +77,7 @@ def _handle_shutdown(signum, frame):
         _log(
             f"    {c.dim('Errors:')}          bash scripts/inspect-ledger.sh --errors-only"
         )
-        _log(f"    {c.dim('Resume:')}          bash run.sh")
+        _log(f"    {c.dim('Resume:')}          bash scripts/run-loop.sh")
         _log(
             f"    {c.dim('Check status:')}    cat /tmp/infinite-loop-state.json | python3 -m json.tool"
         )

@@ -147,12 +147,6 @@ def _log_startup_banner(
     parts = []
     if notify_cmd:
         parts.append("shell-cmd")
-    if use_library and pass_session_id:
-        parts.append("session-id")
-    _log(f"[DAEMON]   Notify:     {notify_cmd or 'none'}")
-    parts = []
-    if notify_cmd:
-        parts.append("shell-cmd")
     if pass_session_id:
         parts.append("session-id")
     if checkpoints:

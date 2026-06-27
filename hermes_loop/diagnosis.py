@@ -329,14 +329,16 @@ def _check_shell() -> list[dict]:
                 "",
             )
         )
-        # Check for completion
+        # Check for completion (look at project scripts/completion dir)
+        script_dir = Path(__file__).parent.resolve()
+        project_root = script_dir.parent
+        has_completion = False
+        completion_path = None
         if shell_name == "bash":
-            completion_path = (
-                Path.home() / ".local/share/bash-completion/completions/hermes-loop"
-            )
-            has_completion = completion_path.exists()
+            completion_path = project_root / "scripts/completion/bash"
         elif shell_name == "zsh":
-            completion_path = Path.home() / ".zsh/completion/_hermes_loop"
+            completion_path = project_root / "scripts/completion/zsh"
+        if completion_path:
             has_completion = completion_path.exists()
         else:
             completion_path = None

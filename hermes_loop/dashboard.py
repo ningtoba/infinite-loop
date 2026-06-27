@@ -217,8 +217,8 @@ _SSE_DASHBOARD_HTML_TPL = """<!DOCTYPE html>
 
 <h2>Metrics <span id="metrics-summary" style="font-size:0.75rem;color:var(--muted);font-weight:400;"></span></h2>
 <div id="metrics-panel" class="stats-grid" style="margin-bottom:0.5rem;">
-  <div class="stat-card"><div class="num" id="metric-avg-turns">-</div><div class="label">Avg Turns</div></div>
-  <div class="stat-card"><div class="num" id="metric-tokens">-</div><div class="label">Tokens/Iter</div></div>
+  <div class="stat-card"><div class="num" id="metric-chars-per-iter">-</div><div class="label">Chars/Iter</div></div>
+  <div class="stat-card"><div class="num" id="metric-throughput">-</div><div class="label">Throughput</div></div>
   <div class="stat-card"><div class="num" id="metric-est-cost">-</div><div class="label">Est Cost</div></div>
   <div class="stat-card"><div class="num" id="metric-iters-per-goal">-</div><div class="label">Iters/Goal</div></div>
 </div>
@@ -269,11 +269,12 @@ function updateErrorPanel(data) {
     mc.innerHTML = '';
     var m = data.mitigations || {};
     var mItems = [];
-    if (m.timeout_increased) mItems.push('timeout+' + (m.timeout_mult || ''));
+    if (m.timeout_increased) mItems.push('timeout+');
     if (m.cooldown_elevated) mItems.push('cooldown+');
     if (m.force_subprocess) mItems.push('no-library');
     if (m.reduced_workers) mItems.push('workers-');
-    if (m.consecutive_errors > 1) mItems.push(m.consecutive_errors + ' consec errs');
+    var consec = data.consecutive_errors || 0;
+    if (consec > 1) mItems.push(consec + ' consec errs');
     if (mItems.length === 0) mItems.push('none active');
     mItems.forEach(function(t) {
         var sp = document.createElement('span');
@@ -283,8 +284,8 @@ function updateErrorPanel(data) {
     });
 }
 function updateMetricsPanel(data) {
-    document.getElementById('metric-avg-turns').textContent = data.avg_turns_per_iter != null ? data.avg_turns_per_iter : '-';
-    document.getElementById('metric-tokens').textContent = data.avg_tokens_per_iter != null ? data.avg_tokens_per_iter : '-';
+    document.getElementById('metric-chars-per-iter').textContent = data.avg_chars_per_iter != null ? data.avg_chars_per_iter : '-';
+    document.getElementById('metric-throughput').textContent = data.avg_throughput != null ? data.avg_throughput + ' cps' : '-';
     document.getElementById('metric-est-cost').textContent = data.est_cost || '-';
     document.getElementById('metric-iters-per-goal').textContent = data.iters_per_goal != null ? data.iters_per_goal : '-';
     document.getElementById('metrics-summary').textContent = data.metrics_summary || '';
@@ -509,8 +510,8 @@ fetch('/api/status')
             error_counts: fullState.error_counts || {},
             mitigations: fullState.mitigations || {},
             goals: fullState.goals || [],
-            avg_turns_per_iter: fullState.avg_turns_per_iter,
-            avg_tokens_per_iter: fullState.avg_tokens_per_iter,
+            avg_chars_per_iter: fullState.avg_chars_per_iter,
+            avg_throughput: fullState.avg_throughput,
             est_cost: fullState.est_cost,
             iters_per_goal: fullState.iters_per_goal,
             metrics_summary: fullState.metrics_summary || '',
@@ -569,8 +570,8 @@ evtSource.addEventListener('update', function (event) {
                 error_counts: et,
                 mitigations: d.data.mitigations || {},
                 goals: d.data.goals || [],
-                avg_turns_per_iter: d.data.avg_turns_per_iter,
-                avg_tokens_per_iter: d.data.avg_tokens_per_iter,
+                avg_chars_per_iter: d.data.avg_chars_per_iter,
+                avg_throughput: d.data.avg_throughput,
                 est_cost: d.data.est_cost,
                 iters_per_goal: d.data.iters_per_goal,
                 metrics_summary: d.data.metrics_summary || '',
@@ -788,10 +789,31 @@ def _build_sse_payload(state: dict) -> dict:
             active = idx == state["goal_index"]
         goals_list.append({"text": gtext[:100], "done": done, "active": active})
     total_iters = state.get("total_iterations", 0)
-    avg_turns = stats.get("avg_turns_per_iter", None) or latest.get("turns_used", None)
-    avg_tokens = stats.get("avg_tokens_per_iter", None) or latest.get(
-        "tokens_used", None
-    )
+
+    # Compute throughput metrics from available iteration data
+    # (iteration records carry output_chars and chars_per_second but not turns/tokens)
+    avg_chars_per_iter = None
+    avg_throughput = None
+    if iterations:
+        chars_list = [it.get("output_chars", 0) or 0 for it in iterations]
+        if chars_list:
+            avg_chars_per_iter = int(sum(chars_list) // len(chars_list))
+        cps_list = [
+            it.get("chars_per_second", 0) or 0
+            for it in iterations
+            if it.get("chars_per_second", 0)
+        ]
+        if cps_list:
+            avg_throughput = round(sum(cps_list) / len(cps_list), 1)
+    metrics_summary_parts = []
+    if avg_chars_per_iter:
+        metrics_summary_parts.append(f"{avg_chars_per_iter} chars/iter")
+    if avg_throughput:
+        metrics_summary_parts.append(f"{avg_throughput} cps avg")
+    if stats.get("avg_duration_seconds", 0):
+        metrics_summary_parts.append(f'{stats["avg_duration_seconds"]:.0f}s avg')
+    metrics_summary = ", ".join(metrics_summary_parts) if metrics_summary_parts else ""
+
     iters_per_goal = None
     if goals_list and total_iters > 0:
         iters_per_goal = max(1, total_iters // max(len(goals_list), 1))
@@ -823,9 +845,9 @@ def _build_sse_payload(state: dict) -> dict:
         },
         "mitigations": mitigations,
         "goals": goals_list,
-        "avg_turns_per_iter": avg_turns,
-        "avg_tokens_per_iter": avg_tokens,
+        "avg_chars_per_iter": avg_chars_per_iter,
+        "avg_throughput": avg_throughput,
         "est_cost": state.get("est_cost", None),
         "iters_per_goal": iters_per_goal,
-        "metrics_summary": "",
+        "metrics_summary": metrics_summary,
     }

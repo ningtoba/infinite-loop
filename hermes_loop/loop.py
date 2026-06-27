@@ -48,7 +48,6 @@ from .iteration import (
 )
 from .worktree_merger import _merge_worktree_branches, cleanup_stale_worktrees
 from .stats import _recalc_stats
-from .color_utils import colorizer as _shutdown_colorizer
 
 
 def _print_shutdown_summary(
@@ -86,7 +85,7 @@ def _print_shutdown_summary(
         if cnt:
             err_types.append(f"{err_type}={cnt}")
 
-    c = _shutdown_colorizer
+    c = colorizer
     _slog("")
     _slog(f"{c.header('═══════════════ SHUTDOWN SUMMARY ═══════════════')}")
     _slog(f"  {c.value('Status:')}       {c.flag(stop_reason)}")
@@ -114,7 +113,7 @@ def _print_shutdown_summary(
     _slog(
         f"    {c.dim('Errors:')}          bash scripts/inspect-ledger.sh --errors-only"
     )
-    _slog(f"    {c.dim('Re-run:')}          bash run.sh")
+    _slog(f"    {c.dim('Re-run:')}          bash scripts/run-loop.sh")
     _slog(f"    {c.dim('Restart with:')}  python3 -m hermes_loop --goal \"...\" --run")
     _slog(f"    {c.dim('Help:')}           python3 -m hermes_loop --help")
     _slog(f"    {c.dim('Examples:')}       python3 -m hermes_loop --examples")
@@ -329,7 +328,9 @@ def run_loop(
 
     if startup_delay > 0 and iteration_count == 0:
         _log(f"[DAEMON] Startup delay: {startup_delay}s before first iteration")
-        _sleep_with_shutdown_check(startup_delay)
+        if _sleep_with_shutdown_check(startup_delay):
+            _log("[STOP] Shutdown during startup delay.")
+            return
 
     # Clean up stale worktree branches from previous runs before spawning
     if worktree and workdir:
@@ -604,7 +605,7 @@ def run_loop(
                 _log(f"[GIT] Committed as {git_commit_hash}")
                 # Also push committed changes to remote (best-effort)
                 try:
-                    import subprocess as _sp
+                    import subprocess as _sp  # noqa: F401
 
                     _sp.run(
                         ["git", "push", "origin", "HEAD"],

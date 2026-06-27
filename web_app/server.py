@@ -58,6 +58,7 @@ async def index():
 
 # ── Config API ──────────────────────────────────────────────────────────────
 
+
 @app.get("/api/config")
 async def get_config():
     """Get the full configuration with current values."""
@@ -103,6 +104,7 @@ async def preview_cli_args():
 
 # ── Loop Control API ────────────────────────────────────────────────────────
 
+
 @app.post("/api/loop/start")
 async def start_loop():
     """Start the infinite loop daemon."""
@@ -144,7 +146,25 @@ async def resume_loop():
     return result
 
 
+@app.post("/api/loop/reset")
+async def reset_ledger():
+    """Reset the ledger — deletes iteration history so the next start is fresh."""
+    import os
+
+    ledger_path = "/tmp/infinite-loop-state.json"
+    lock_path = "/tmp/infinite-loop-state.lock"
+    try:
+        if os.path.exists(ledger_path):
+            os.remove(ledger_path)
+        if os.path.exists(lock_path):
+            os.remove(lock_path)
+        return {"success": True, "message": "Ledger reset — next start will be fresh"}
+    except OSError as e:
+        return {"success": False, "error": str(e)}
+
+
 # ── Status / Monitoring API ─────────────────────────────────────────────────
+
 
 @app.get("/api/status")
 async def get_status():
@@ -195,6 +215,7 @@ async def health():
 
 
 # ── SSE (Server-Sent Events) ────────────────────────────────────────────────
+
 
 async def _broadcast_sse(data: dict[str, Any]) -> None:
     """Broadcast an event to all connected SSE clients."""
@@ -259,23 +280,59 @@ async def sse_stream(request: Request):
 
 # ── Background status poller for SSE ────────────────────────────────────────
 
+
 async def _status_poller():
-    """Poll the ledger and broadcast changes to SSE clients."""
+    """Poll the ledger and broadcast changes + new log entries to SSE clients."""
     manager = get_loop_manager()
-    last_hash = ""
+    last_log_count = 0
+    last_status_hash = ""
+    idle_ticks = 0
     while True:
         await asyncio.sleep(2)
         if not _sse_clients:
+            idle_ticks = 0
             continue
         try:
             status = manager.get_status()
-            current_hash = str(status.get("ledger", {}).get("total_iterations", 0))
-            if current_hash != last_hash:
-                last_hash = current_hash
-                await _broadcast_sse({
-                    "type": "status_update",
-                    "data": status,
-                })
+            live = status.get("live_iteration", {})
+
+            # Build a richer hash covering iteration number, worker statuses,
+            # error_counts, mitigations, log count, and terminal lines.
+            iter_n = live.get("n", 0)
+            worker_statuses = "|".join(
+                f"{w.get('id','')}:{w.get('status','')}"
+                for w in live.get("workers", [])
+            )
+            err_counts = str(status.get("error_counts", {}))
+            mitigations = str(status.get("mitigations", {}))
+            term_total = sum(len(v) for v in status.get("worker_term", {}).values())
+            log_count = len(status.get("recent_logs", []))
+
+            status_hash = "|".join(
+                [
+                    str(iter_n),
+                    worker_statuses,
+                    err_counts,
+                    mitigations,
+                    str(term_total),
+                    str(log_count),
+                ]
+            )
+
+            if status_hash != last_status_hash:
+                last_status_hash = status_hash
+                idle_ticks = 0
+                await _broadcast_sse({"type": "status_update", "data": status})
+            elif idle_ticks >= 5:  # every ~10s, push a keepalive status
+                idle_ticks = 0
+                await _broadcast_sse({"type": "status_update", "data": status})
+            else:
+                idle_ticks += 1
+            # Push new log entries individually
+            logs = status.get("recent_logs", [])
+            for i in range(last_log_count, len(logs)):
+                await _broadcast_sse({"type": "log_entry", "entry": logs[i]})
+            last_log_count = len(logs)
         except Exception:
             pass
 
@@ -287,6 +344,7 @@ async def startup():
 
 
 # ── Entry point ─────────────────────────────────────────────────────────────
+
 
 def main():
     """Entry point for the web app."""
@@ -301,8 +359,10 @@ def main():
         "--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)"
     )
     parser.add_argument(
-        "--port", type=int, default=default_port,
-        help=f"Port to bind to (default: {default_port})"
+        "--port",
+        type=int,
+        default=default_port,
+        help=f"Port to bind to (default: {default_port})",
     )
     parser.add_argument(
         "--env",

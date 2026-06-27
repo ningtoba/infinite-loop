@@ -276,7 +276,7 @@ update-completions:
 lint:
 	@echo "Checking Python syntax..."
 	@ERRORS=0; \
-	for f in hermes_loop/*.py session-self-loop.py launch-loop.py; do \
+	for f in hermes_loop/*.py web_app/*.py session-self-loop.py launch-loop.py; do \
 		if $(PYTHON) -m py_compile "$$f" 2>/dev/null; then \
 			echo "  [OK] $$f"; \
 		else \

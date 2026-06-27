@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import re
 import signal
 import sys
 import time
@@ -28,6 +29,17 @@ class LoopManager:
         self._max_logs = 500
         self._log_file = "/tmp/infinite-loop-web.log"
         self._log_fp = None
+        # Live iteration state parsed from daemon stdout
+        self._live_iteration: dict[str, Any] = {}
+        self._worker_states: dict[str, dict[str, Any]] = {}
+        self._worker_logs: dict[str, list[dict[str, Any]]] = {}  # wid -> log entries
+        self._worker_term: dict[str, list[str]] = (
+            {}
+        )  # wid -> raw terminal lines (ANSI intact)
+
+    @property
+    def live_iteration(self) -> dict[str, Any]:
+        return self._live_iteration
 
     @property
     def status(self) -> str:
@@ -49,7 +61,7 @@ class LoopManager:
         }
         self._logs.append(entry)
         if len(self._logs) > self._max_logs:
-            self._logs = self._logs[-self._max_logs:]
+            self._logs = self._logs[-self._max_logs :]
 
         # Also write to log file
         try:
@@ -70,8 +82,34 @@ class LoopManager:
         # Read current config from JSON
         config = get_raw_config()
 
+        # When running inside Docker, the workdir is always mounted at /workdir.
+        # On the host, use the user's actual path from config (or cwd if empty).
+        in_docker = os.path.exists("/.dockerenv") or os.environ.get(
+            "DOCKER_CONTAINER", ""
+        )
+        if in_docker:
+            config["INFINITE_LOOP_WORKDIR"] = "/workdir"
+        elif config.get("INFINITE_LOOP_WORKDIR", "") == "/workdir":
+            # Stale Docker path on host — clear it so daemon uses cwd
+            config["INFINITE_LOOP_WORKDIR"] = ""
+
         # Build CLI args
         cli_args = build_cli_args(config)
+
+        # Force --workdir when in Docker (build_cli_args skips defaults)
+        if in_docker and "--workdir" not in cli_args:
+            cli_args.extend(["--workdir", "/workdir"])
+
+        # Force --worker-url '' for live stdout streaming (direct subprocess mode).
+        # build_cli_args skips empty values, but the daemon defaults to 'auto'.
+        if "--worker-url" not in cli_args:
+            cli_args.extend(["--worker-url", ""])
+
+        # Only pass --worktree if the workdir is actually a git repo
+        workdir = config.get("INFINITE_LOOP_WORKDIR", "") or os.getcwd()
+        if not os.path.isdir(os.path.join(workdir, ".git")):
+            if "--worktree" in cli_args:
+                cli_args.remove("--worktree")
 
         # Ensure --run flag is present
         if "--run" not in cli_args:
@@ -87,6 +125,10 @@ class LoopManager:
         cmd = [sys.executable, "-m", "hermes_loop"] + cli_args
 
         self._add_log("info", f"Starting daemon: {' '.join(cmd)}")
+
+        # Reset live iteration tracking
+        self._live_iteration = {}
+        self._worker_states = {}
 
         try:
             self._process = await asyncio.create_subprocess_exec(
@@ -114,39 +156,42 @@ class LoopManager:
             return {"success": False, "error": str(e)}
 
     async def stop(self) -> dict[str, Any]:
-        """Stop the loop daemon via sentinel file."""
+        """Stop the loop daemon — writes sentinel + immediately kills the
+        process group (including any running hermes chat session)."""
         if not self.is_running and self._status != "paused":
             return {"success": False, "error": "Loop is not running"}
 
-        self._add_log("info", "Sending stop signal...")
+        self._add_log("info", "Stopping daemon...")
 
+        # Write sentinel so the daemon knows it was a controlled stop
         try:
             with open(SENTINEL_PATH, "w") as f:
                 f.write("stop")
-        except OSError as e:
-            return {"success": False, "error": f"Failed to write sentinel: {e}"}
+        except OSError:
+            pass
 
-        # Wait for process to exit gracefully
+        # Immediately kill the process group — the daemon only checks the
+        # sentinel between iterations, so we need SIGTERM to stop a running
+        # hermes chat session mid-iteration.
         if self._process:
             try:
-                await asyncio.wait_for(self._process.wait(), timeout=30)
+                pgid = os.getpgid(self._process.pid)
+                os.killpg(pgid, signal.SIGTERM)
+                await asyncio.wait_for(self._process.wait(), timeout=5)
             except asyncio.TimeoutError:
-                self._add_log("warn", "Daemon did not stop gracefully, sending SIGTERM")
+                self._add_log("warn", "Force killing...")
                 try:
-                    os.killpg(os.getpgid(self._process.pid), signal.SIGTERM)
-                    await asyncio.wait_for(self._process.wait(), timeout=10)
-                except asyncio.TimeoutError:
-                    self._add_log("warn", "Force killing daemon...")
-                    try:
-                        os.killpg(os.getpgid(self._process.pid), signal.SIGKILL)
-                    except OSError:
-                        pass
+                    os.killpg(pgid, signal.SIGKILL)
+                    await asyncio.wait_for(self._process.wait(), timeout=5)
+                except (asyncio.TimeoutError, OSError):
+                    pass
+            except (ProcessLookupError, OSError):
+                pass
 
         self._status = "stopped"
         self._process = None
         self._add_log("info", "Daemon stopped")
 
-        # Clean up sentinel
         try:
             if os.path.exists(SENTINEL_PATH):
                 os.remove(SENTINEL_PATH)
@@ -224,11 +269,14 @@ class LoopManager:
             "mitigations": ledger.get("mitigations", {}),
             "eta": ledger.get("eta", {}),
             "latest_iteration": latest,
+            "live_iteration": self._live_iteration,
+            "worker_logs": {w: logs[-100:] for w, logs in self._worker_logs.items()},
+            "worker_term": {w: lines[-500:] for w, lines in self._worker_term.items()},
             "recent_logs": self._logs[-50:],
         }
 
     async def _read_stream(self, stream, name: str) -> None:
-        """Read lines from a subprocess stream and log them."""
+        """Read lines from a subprocess stream, log them, and parse worker events."""
         while self._process and stream:
             try:
                 line = await stream.readline()
@@ -236,9 +284,111 @@ class LoopManager:
                     break
                 text = line.decode("utf-8", errors="replace").rstrip()
                 if text:
-                    self._add_log("info" if name == "stdout" else "warn", text)
+                    level = "info" if name == "stdout" else "warn"
+                    self._add_log(level, text)
+                    self._parse_daemon_line(text)
             except (ValueError, OSError):
                 break
+            except Exception as e:
+                self._add_log("error", f"Stream reader crashed ({name}): {e}")
+                break
+
+    def _parse_daemon_line(self, text: str) -> None:
+        """Parse daemon stdout for live iteration/worker progress and per-worker logs."""
+        ts = datetime.now(timezone.utc).isoformat()
+
+        # Iteration start — only match daemon's actual iteration header line.
+        # Format: "[HH:MM:SS] Iteration N" where the line starts with a
+        # timestamp or is preceded by a separator/blank line context.
+        # The line must consist ONLY of the timestamp + "Iteration N" (nothing else).
+        m = re.search(r"^\[\d{2}:\d{2}:\d{2}\]\s+Iteration\s+#?(\d+)\s*$", text)
+        if m and "still running" not in text.lower():
+            it_num = int(m.group(1))
+            if self._live_iteration.get("n") != it_num:
+                self._live_iteration = {"n": it_num, "workers": [], "started_at": ts}
+                self._worker_states = {}
+                self._worker_logs = {}
+
+        # Detect worker ID — daemon lines use "(worker #N)" format
+        wid = None
+        m = re.search(r"\(worker\s+#(\d+)\)", text)
+        if m:
+            wid = m.group(1)
+        # Also check for [STDOUT (worker #N)], [STDERR (worker #N)], [TERM (worker #N)]
+        for prefix in ("STDOUT", "STDERR", "MODEL", "TERM"):
+            m = re.search(rf"\[{prefix}\s*\(worker\s+#(\d+)\)\]", text)
+            if m:
+                wid = m.group(1)
+                if wid not in self._worker_states:
+                    self._worker_states[wid] = {
+                        "id": wid,
+                        "status": "running",
+                        "started_at": ts,
+                    }
+                if wid not in self._worker_logs:
+                    self._worker_logs[wid] = []
+                # Store raw terminal output for xterm.js rendering
+                if prefix == "TERM":
+                    if wid not in self._worker_term:
+                        self._worker_term[wid] = []
+                    # Extract just the terminal content (strip the [TERM (worker #N)] prefix)
+                    term_content = re.sub(
+                        rf"\[TERM\s*\(worker\s+#{re.escape(wid)}\)\]\s*",
+                        "",
+                        text,
+                        count=1,
+                    )
+                    self._worker_term[wid].append(term_content)
+                    if len(self._worker_term[wid]) > 1000:
+                        self._worker_term[wid] = self._worker_term[wid][-1000:]
+
+        # Worker spawned
+        m = re.search(r"\[SPAWN\s+\(worker\s+#(\d+)\)\]", text)
+        if m:
+            wid = m.group(1)
+            self._worker_states[wid] = {
+                "id": wid,
+                "status": "running",
+                "started_at": ts,
+            }
+            if wid not in self._worker_logs:
+                self._worker_logs[wid] = []
+
+        # Worker completed
+        m = re.search(
+            r"\[WORKER\s+\(worker\s+#(\d+)\)\]\s+Response\s+in\s+([\d.]+)s\s+\(status=(\w+)\)",
+            text,
+        )
+        if m:
+            wid = m.group(1)
+            self._worker_states[wid] = {
+                "id": wid,
+                "status": m.group(3),
+                "duration_seconds": float(m.group(2)),
+                "completed_at": ts,
+            }
+
+        # Heartbeat
+        m = re.search(
+            r"\[BEAT\]\s+Iteration\s+#?(\d+)\s+still\s+running\s+\((\d+)s", text
+        )
+        if m:
+            self._live_iteration["elapsed_seconds"] = int(m.group(2))
+
+        # Error type
+        m = re.search(r"\[ERROR-TYPE\]\s+(\w+)", text)
+        if m:
+            self._live_iteration["error_type"] = m.group(1)
+
+        # Store per-worker log line
+        if wid and wid in self._worker_logs:
+            entry = {"timestamp": ts, "message": text}
+            self._worker_logs[wid].append(entry)
+            if len(self._worker_logs[wid]) > 200:
+                self._worker_logs[wid] = self._worker_logs[wid][-200:]
+
+        # Keep worker list in sync
+        self._live_iteration["workers"] = list(self._worker_states.values())
 
     async def _monitor_process(self) -> None:
         """Monitor the process and handle unexpected exits."""

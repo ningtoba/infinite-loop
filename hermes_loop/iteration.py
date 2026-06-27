@@ -274,6 +274,7 @@ def _execute_iteration(
                 continue_session=continue_session,
                 heartbeat_timeout=heartbeat_timeout,
                 iteration_count=iteration_count,
+                worker_id=0,
             )
             if not result.get("error") or attempt >= max_retries:
                 break
@@ -298,11 +299,72 @@ def _merge_worker_results(
     consecutive_errors: int,
     state: dict,
 ) -> dict:
-    """Merge results from one or more workers into a single summary."""
-    errors = [r.get("error") for r in all_results if r.get("error")]
+    """Merge results from one or more workers into a single summary.
+
+    In multi-worker mode, a single worker's non-fatal error (e.g. "exit code 1"
+    with useful output) should NOT mark the entire iteration as failed.  Only
+    treat the iteration as errored when all workers failed, or when a serious
+    error type (timeout/network/schema) dominates and the majority failed.
+    """
+    num_workers = len(all_results)
     durations = [r.get("duration_seconds", 0) for r in all_results]
     total_duration = max(durations) if len(durations) > 1 else durations[0]
-    combined_error = "; ".join(errors) if errors else None
+
+    # --- Soft-error detection: distinguish subprocess exit-code noise from real failures ---
+    # A worker's error is "soft" if it looks like an exit-code artifact rather than
+    # a genuine hermes failure.  Specifically: error says "exit code N" but the
+    # worker produced meaningful output (non-empty summary, non-trivial output).
+    def _is_soft_error(r: dict) -> bool:
+        err = r.get("error", "")
+        if not err:
+            return False
+        # "exit code N" without any other error content is a soft error
+        err_lower = err.lower().strip()
+        if err_lower.startswith("exit code") or err_lower.startswith("hermes exit"):
+            # Check if the worker actually produced usable output
+            summary = r.get("summary", "").strip()
+            # A summary that doesn't start with FAILED means work was done
+            if summary and not summary.startswith("FAILED"):
+                return True
+            output_len = len(r.get("output", "") or "")
+            if output_len > 500:
+                return True
+        return False
+
+    # Separate hard errors (genuine failures) from soft errors (exit-code noise)
+    hard_errors = []
+    soft_errors = []
+    for r in all_results:
+        if r.get("error"):
+            if _is_soft_error(r):
+                soft_errors.append(r.get("error"))
+            else:
+                hard_errors.append(r.get("error"))
+
+    # Determine the final combined_error based on worker count and error severity
+    combined_error = None
+    if num_workers <= 1:
+        # Single-worker: use ALL errors (both hard and soft)
+        if hard_errors or soft_errors:
+            combined_error = "; ".join(hard_errors + soft_errors)
+    else:
+        # Multi-worker: only treat as error if ALL workers have hard errors,
+        # OR if the majority failed with a serious error type
+        num_hard = len(hard_errors)
+        num_with_any_error = num_hard + len(soft_errors)
+
+        if num_hard == num_workers:
+            # All workers have hard errors — genuine failure
+            combined_error = "; ".join(hard_errors)
+        elif num_with_any_error == num_workers and num_hard > 0:
+            # All workers have some error, but some are soft — check error types
+            serious_types = {"timeout", "network", "schema"}
+            serious_count = sum(
+                1 for r in all_results if r.get("error_type") in serious_types
+            )
+            if serious_count >= num_workers / 2:
+                combined_error = "; ".join(hard_errors)
+        # else: some workers succeeded or only had soft errors — not a failure
 
     primary_error_type = None
     consecutive_successes = 0
@@ -348,7 +410,7 @@ def _merge_worker_results(
             next_context = "\n\n".join(parts)
 
     summaries = [
-        r.get("summary", f"Worker #{r.get('worker_id', 0)} completed")
+        str(r.get("summary", f"Worker #{r.get('worker_id', 0)} completed"))
         for r in all_results
     ]
     combined_summary = " | ".join(summaries) if len(summaries) > 1 else summaries[0]

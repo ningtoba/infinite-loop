@@ -51,6 +51,7 @@ from .iteration import (
     _handle_callbacks,
     _sleep_with_shutdown_check,
 )
+from .worktree_merger import _merge_worktree_branches
 from .stats import _recalc_stats
 from .color_utils import colorizer as _shutdown_colorizer
 
@@ -576,6 +577,14 @@ def run_loop(
         next_context = merged["next_context"]
         combined_summary = merged["combined_summary"]
         combined_output = merged["combined_output"]
+
+        # Merge worker worktree branches back to main (best-effort)
+        if worktree:
+            _merge_worktree_branches(
+                workdir=workdir,
+                iteration_count=iteration_count,
+                worker_count=workers,
+            )
 
         git_after = (
             _capture_git_state(workdir, store_diff=store_git_diff) if git else {}

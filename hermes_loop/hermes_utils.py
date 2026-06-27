@@ -23,23 +23,20 @@ from .heartbeat import (
 )
 from .signal_handlers import _shutdown_requested
 
-# Regex for token/progress lines on Hermes stderr
-_TOKEN_RE = re.compile(
-    r"(?:tokens?|tok/s|generat|complete|response|model)"
-    r"|(?:\[DONE\]|\[MODEL\]|\[REQUEST\]|\[RESPONSE\]|\[TOKEN\])",
-    re.IGNORECASE,
-)
+# Regex for stripping ANSI escape codes, TUI control chars, and carriage returns
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\].*?\x07|\x1b\[[0-9]*[KJhlsu]|\r")
 
 
 def _read_stderr_real_time(
     proc: subprocess.Popen,
     worker_tag: str,
 ) -> None:
-    """Daemon thread: read stderr line-by-line and log token/progress info.
+    """Daemon thread: read stderr line-by-line and log ALL output.
 
-    Hermes prints progress (token counts, model status, timing) to stderr.
-    This thread captures those lines in real-time and logs them with a
-    ``[MODEL{worker_tag}]`` prefix so the user sees live token flow.
+    Hermes prints tool calls, thinking, model responses, and token info
+    to stderr during ``chat -q`` sessions. This thread captures every line
+    in real-time with a ``[STDERR{worker_tag}]`` prefix so the web UI
+    can show per-worker hermes output live.
     """
     try:
         for raw_line in iter(proc.stderr.readline, ""):
@@ -48,13 +45,101 @@ def _read_stderr_real_time(
             line = raw_line.rstrip("\n\r")
             if not line:
                 continue
-            # Only log lines that look like progress / token info
-            if _TOKEN_RE.search(line):
-                # Shorten noisy lines but keep the useful part
-                display = line[:300]
-                _log(f"[MODEL{worker_tag}] {display}")
+            # Log every line — tool calls, thinking, progress, everything
+            _log(f"[STDERR{worker_tag}] {line[:500]}")
     except (ValueError, OSError, AttributeError):
         pass  # pipe closed or process gone
+
+
+def _run_hermes_with_pty(
+    cmd: list[str],
+    worker_tag: str,
+    timeout_seconds: int,
+    workdir: str,
+) -> tuple[str, int]:
+    """Spawn hermes with a PTY for true line-buffered output.
+
+    Regular pipes cause programs to block-buffer (4KB+). A pseudo-terminal
+    forces line-buffered output so we see every tool call and model response
+    in real time.
+
+    Returns (accumulated_stdout, exit_code).
+    Raises ``subprocess.TimeoutExpired`` if the process exceeds the timeout.
+    """
+    import pty
+    import select
+
+    lines: list[str] = []
+    start = time.time()
+
+    master_fd, slave_fd = pty.openpty()
+
+    proc = subprocess.Popen(
+        cmd,
+        stdout=slave_fd,
+        stderr=slave_fd,  # merge stderr into stdout via PTY
+        cwd=workdir or os.getcwd(),
+        text=True,
+        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        start_new_session=True,
+    )
+    os.close(slave_fd)
+    os.set_blocking(master_fd, False)
+
+    buffer = ""
+    while True:
+        elapsed = time.time() - start
+        if timeout_seconds > 0 and elapsed > timeout_seconds:
+            os.close(master_fd)
+            proc.kill()
+            proc.wait()
+            raise subprocess.TimeoutExpired(cmd, timeout_seconds)
+
+        try:
+            r, _, _ = select.select([master_fd], [], [], 1.0)
+        except (ValueError, OSError):
+            break
+
+        if master_fd in r:
+            try:
+                chunk = os.read(master_fd, 4096).decode("utf-8", errors="replace")
+                if not chunk:
+                    break
+                buffer += chunk
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    line = line.rstrip("\r")
+                    # Strip ANSI and normalize TUI artifacts
+                    clean = _ANSI_RE.sub("", line)
+                    # Collapse TUI spinners/indicators
+                    clean = clean.replace("┊", "|").replace("✓", "✓").replace("✗", "✗")
+                    clean = clean.strip()
+                    # Skip pure ANSI/TUI noise lines
+                    if (
+                        clean
+                        and not clean.startswith("@@")
+                        and clean not in ("", "│", "╰", "╭")
+                    ):
+                        lines.append(line)
+                        _log(f"[STDOUT{worker_tag}] {clean[:500]}")
+                    # Also log raw line (ANSI intact) for terminal rendering in web UI
+                    if line.strip():
+                        _log(f"[TERM{worker_tag}] {line[:1000]}")
+            except (OSError, UnicodeDecodeError):
+                break
+
+        if proc.poll() is not None and not buffer:
+            break
+
+    if buffer.strip():
+        clean = _ANSI_RE.sub("", buffer).strip()
+        if clean and not clean.startswith("@@"):
+            lines.append(buffer)
+            _log(f"[STDOUT{worker_tag}] {clean[:500]}")
+
+    os.close(master_fd)
+    exit_code = proc.wait()
+    return "\n".join(lines), exit_code
 
 
 def find_hermes() -> str:
@@ -730,31 +815,49 @@ def spawn_delegation_session(
                 raw = resp.read().decode()
             elapsed = time.time() - start
             result_data = json.loads(raw)
+            # Ensure result_data is a dict (worker might return a list/string on error)
+            if not isinstance(result_data, dict):
+                result_data = {"response": str(result_data), "status": "ok"}
+
+            # Extract response safely — it might be a nested dict
+            response_val = result_data.get("response", raw)
+            if not isinstance(response_val, str):
+                response_val = (
+                    json.dumps(response_val)
+                    if isinstance(response_val, (dict, list))
+                    else str(response_val)
+                )
+
             stdout = (
-                result_data.get("response", raw)[:max_output_chars]
+                response_val[:max_output_chars]
                 if max_output_chars > 0
-                else result_data.get("response", raw)
+                else response_val
             )
-            stderr = (
-                result_data.get("stderr", "")[:1000]
-                if result_data.get("stderr")
-                else ""
-            )
+            stderr_val = result_data.get("stderr", "")
+            stderr = str(stderr_val)[:1000] if stderr_val else ""
             error = result_data.get("error")
             exit_code = 0 if error is None else 1
             _log(
-                f"[WORKER{worker_tag}] Response in {elapsed:.1f}s (status={result_data.get('status')})"
+                f"[WORKER{worker_tag}] Response in {elapsed:.1f}s (status={result_data.get('status', '?')})"
             )
             cap = (
                 max_output_chars
                 if max_output_chars > 0
-                else (len(stdout) if "\n" in stdout else len(raw))
+                else (
+                    len(stdout)
+                    if isinstance(stdout, str) and "\n" in stdout
+                    else len(raw)
+                )
             )
             return {
-                "summary": stdout[:cap],
+                "summary": str(stdout)[:cap],
                 "duration_seconds": round(elapsed, 1),
-                "error": error,
-                "output": stdout[:max_output_chars] if max_output_chars > 0 else stdout,
+                "error": str(error) if error else None,
+                "output": (
+                    stdout[:max_output_chars]
+                    if max_output_chars > 0 and isinstance(stdout, str)
+                    else str(stdout)
+                ),
                 "stderr": stderr,
                 "exit_code": exit_code,
                 "total_output_bytes": len(raw),
@@ -777,12 +880,15 @@ def spawn_delegation_session(
     proc: subprocess.Popen | None = None
     try:
         if heartbeat_timeout > 0:
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=workdir or os.getcwd(),
                 text=True,
+                env=env,
             )
             session_start = time.time()
             pid = proc.pid
@@ -810,12 +916,12 @@ def spawn_delegation_session(
             stderr_reader.start()
 
             try:
-                stdout_b, stderr_b = proc.communicate(timeout=timeout_seconds)
+                stdout, subprocess_exit_code = _read_stdout_live(
+                    proc, worker_tag, timeout_seconds
+                )
                 stderr_reader.join(timeout=2)
                 elapsed = time.time() - start
-                stdout = (stdout_b or "").strip()
-                stderr = (stderr_b or "").strip()
-                subprocess_exit_code = proc.returncode
+                stderr = ""  # already streamed by stderr_reader
             except subprocess.TimeoutExpired:
                 elapsed = time.time() - start
                 _kill_session(proc, str(pid))
@@ -830,31 +936,23 @@ def spawn_delegation_session(
                     "spawned_session_id": "",
                 }
         else:
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=workdir or os.getcwd(),
-                text=True,
-            )
-            # Real-time stderr reader (token/progress feedback)
-            stderr_reader = threading.Thread(
-                target=_read_stderr_real_time,
-                args=(proc, worker_tag),
-                daemon=True,
-            )
-            stderr_reader.start()
             try:
-                stdout_b, stderr_b = proc.communicate(timeout=timeout_seconds)
-                stderr_reader.join(timeout=2)
+                stdout, subprocess_exit_code = _run_hermes_with_pty(
+                    cmd, worker_tag, timeout_seconds, workdir or os.getcwd()
+                )
             except subprocess.TimeoutExpired:
-                proc.kill()
-                stdout_b, stderr_b = proc.communicate(timeout=5)
-                stderr_reader.join(timeout=2)
+                elapsed = time.time() - start
+                return {
+                    "summary": f"TIMEOUT after {timeout_seconds}s",
+                    "duration_seconds": round(elapsed, 1),
+                    "error": f"timed out after {timeout_seconds}s",
+                    "error_type": "timeout",
+                    "output": "",
+                    "exit_code": -1,
+                    "spawned_session_id": "",
+                }
             elapsed = time.time() - start
-            stdout = (stdout_b or "").strip()
-            stderr = (stderr_b or "").strip()
-            subprocess_exit_code = proc.returncode
+            stderr = ""
 
         extracted_session_id = ""
         for line in (stdout or "").split("\n"):
@@ -881,18 +979,37 @@ def spawn_delegation_session(
                 if not schema_valid:
                     _log(f"[SCHEMA] Output schema validation failed: {schema_error}")
 
+            # Coerce summary to string — hermes might return nested dicts
+            raw_summary = parsed_json.get("summary", stdout[:output_cap])
+            safe_summary = (
+                json.dumps(raw_summary)
+                if isinstance(raw_summary, (dict, list))
+                else (
+                    str(raw_summary) if raw_summary is not None else stdout[:output_cap]
+                )
+            )
+            # Determine error from JSON content only — not from subprocess exit code.
+            # Hermes often exits non-zero even on successful runs (e.g. stderr
+            # warnings), so exit code alone should NOT produce a false error.
+            json_error = parsed_json.get("error")
+            if json_error is not None and str(json_error).strip():
+                effective_error = str(json_error)
+            elif not schema_valid:
+                effective_error = schema_error
+            else:
+                effective_error = None
             result_obj = {
-                "summary": parsed_json.get("summary", stdout[:output_cap]),
+                "summary": safe_summary,
                 "duration_seconds": parsed_json.get(
                     "duration_seconds", round(elapsed, 1)
                 ),
-                "error": (
-                    parsed_json.get("error") or schema_error
-                    if not schema_valid
-                    else parsed_json.get("error")
+                "error": effective_error,
+                "next_goal": (
+                    str(parsed_json.get("next_goal"))
+                    if parsed_json.get("next_goal")
+                    else None
                 ),
-                "next_goal": parsed_json.get("next_goal"),
-                "context": parsed_json.get("context", ""),
+                "context": str(parsed_json.get("context", "")),
                 "output": stdout[:output_cap],
                 "stderr": stderr[:stderr_cap],
                 "exit_code": subprocess_exit_code,
@@ -911,16 +1028,16 @@ def spawn_delegation_session(
             result_obj["spawned_session_id"] = spawned_session_id
             return result_obj
 
-        summary = stdout[:output_cap] if stdout else "(no output)"
+        summary = str(stdout[:output_cap]) if stdout else "(no output)"
         if subprocess_exit_code != 0:
-            summary = f"FAILED (exit {subprocess_exit_code}): {stderr[:300]}"
+            summary = f"FAILED (exit {subprocess_exit_code}): {str(stderr[:300])}"
             return {
                 "summary": summary,
                 "duration_seconds": round(elapsed, 1),
                 "error": f"hermes exit {subprocess_exit_code}",
                 "error_type": "unknown",
-                "output": (stdout + "\n" + stderr)[:output_cap],
-                "stderr": stderr[:stderr_cap],
+                "output": str(stdout + "\n" + stderr)[:output_cap],
+                "stderr": str(stderr[:stderr_cap]),
                 "exit_code": subprocess_exit_code,
                 "total_output_bytes": actual_output_len,
                 "truncated": was_truncated,

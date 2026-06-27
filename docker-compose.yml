@@ -1,35 +1,24 @@
 services:
   hermes-loop:
-    build:
-      context: .
-      args:
-        UID: ${UID:-1000}
-        GID: ${GID:-1000}
+    build: .
     container_name: hermes-loop
-    # Use host networking to avoid bridge pool exhaustion.
-    # The web UI will be accessible at http://localhost:8080 directly.
+    # Host network + PID namespace — the container uses nsenter to run
+    # hermes directly on the host, so it has full access to the host's
+    # PATH, home directory, config files, API keys, and env vars.
     network_mode: host
+    pid: host
+    privileged: true
     environment:
       - WEB_PORT=8090
       - INFINITE_LOOP_WORKDIR=/workdir
-      - HOME=/home/hermes
-      - USER=hermes
-      - PYTHONUNBUFFERED=1
     volumes:
-      # Mount the host's hermes binary — no need to bundle another instance
-      - ${HOME:-~}/.local/bin/hermes:/usr/local/bin/hermes:ro
-      # Mount the host's hermes config directory (profiles, settings, etc.)
-      - ${HOME:-~}/.hermes:/home/hermes/.hermes
       # Mount the work directory (your target project)
       - ${INFINITE_LOOP_WORKDIR:-/tmp}:/workdir
-      # Persist ledger data AND JSON config across container restarts
+      # Persist ledger data + config JSON across container restarts
       - hermes-loop-data:/tmp
-      # Mount Claude config if using Claude Code as the hermes provider
-      - ${HOME:-~}/.claude:/home/hermes/.claude:ro
     restart: unless-stopped
-    # Config is managed entirely through the web UI (persisted as JSON in /tmp).
-    # No .env file is needed or mounted.
-    # Enable TTY for proper terminal handling in spawned sessions
+    # Config is managed entirely through the web UI (JSON in /tmp).
+    # Hermes runs on the host via nsenter — no binary mount needed.
     tty: true
     stdin_open: true
 

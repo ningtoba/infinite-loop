@@ -6,6 +6,9 @@
 <title>Hermes Loop — Web UI</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%99%BE%EF%B8%8F%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 </head>
 <body>
 <div id="app">
@@ -27,6 +30,9 @@
       </button>
       <button class="nav-btn" data-tab="logs">
         <span class="nav-icon">&#x2261;</span> Logs
+      </button>
+      <button class="nav-btn" data-tab="workers">
+        <span class="nav-icon">&#x2691;</span> Workers
       </button>
     </div>
     <div class="sidebar-footer">
@@ -55,6 +61,9 @@
           </button>
           <button id="btn-stop" class="ctrl-btn stop" onclick="controlLoop('stop')" title="Stop the loop" disabled>
             &#x25A0; Stop
+          </button>
+          <button id="btn-reset" class="ctrl-btn secondary" onclick="resetLedger()" title="Clear iteration history">
+            &#x21BA; Reset Ledger
           </button>
         </div>
       </div>
@@ -126,6 +135,12 @@
         <div id="mitigation-list"></div>
       </div>
 
+      <!-- Live Iteration (real-time worker progress) -->
+      <div class="section" id="live-section" style="display:none">
+        <h3>Live Iteration <span id="live-iter-num"></span> <span id="live-elapsed"></span></h3>
+        <div class="worker-grid" id="worker-grid"></div>
+      </div>
+
       <!-- Latest Iteration -->
       <div class="section">
         <h3>Latest Iteration</h3>
@@ -193,11 +208,32 @@
     <!-- Logs Tab -->
     <section id="tab-logs" class="tab-content">
       <div class="top-bar">
-        <h2>Logs</h2>
-        <button class="ctrl-btn secondary" onclick="clearLogs()">Clear</button>
+        <h2>Logs <span id="log-filter-badge" class="tag tag-info" style="display:none;margin-left:8px;"></span></h2>
+        <button class="ctrl-btn secondary" onclick="filterWorkerLogs(null);document.getElementById('log-container').querySelectorAll('.log-entry').forEach(e=>e.style.display='');">Show All</button>
       </div>
       <div class="log-container" id="log-container">
         <div class="log-empty">No logs yet. Start the loop to see output.</div>
+      </div>
+    </section>
+
+    <!-- Workers Tab -->
+    <section id="tab-workers" class="tab-content">
+      <div id="workers-cards-view">
+        <div class="top-bar">
+          <h2>Workers</h2>
+          <span class="subtitle" id="workers-subtitle"></span>
+        </div>
+        <div class="worker-cards-grid" id="worker-cards">
+          <div class="log-empty">No workers active. Start the loop to see per-worker output.</div>
+        </div>
+      </div>
+      <div id="workers-log-view" style="display:none">
+        <div class="top-bar">
+          <button class="ctrl-btn secondary" onclick="showWorkerCards()">← Back</button>
+          <h2 id="worker-log-title">Worker #—</h2>
+          <span class="subtitle" id="worker-log-meta"></span>
+        </div>
+        <div id="worker-terminal-container" style="height:calc(100vh - 160px);padding:4px;background:#0d1117;border-radius:8px;"></div>
       </div>
     </section>
   </main>

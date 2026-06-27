@@ -69,7 +69,13 @@ def _classify_progress(
         return "completed"
 
     # --- Rule: regression (error + no git changes = things got worse) ---
-    if error and not has_git_changes:
+    # NOTE: Only classify as regression for hard errors.  Soft errors (exit-code
+    # noise from subprocess) with meaningful output should not trigger regression.
+    _is_exit_code_noise = error and (
+        error.lower().strip().startswith("exit code")
+        or error.lower().strip().startswith("hermes exit")
+    )
+    if error and not has_git_changes and not _is_exit_code_noise:
         return "regression"
 
     # --- Rule: stuck (no changes + short summary or repetitive failure language) ---

@@ -704,6 +704,7 @@ def run_loop(
                 "skipped": worktree_merge_result.get("skipped", 0),
                 "per_worker": worktree_merge_result.get("per_worker", {}),
                 "conflicts": (worktree_merge_result.get("total_conflicts", 0)),
+                "source_branches": worktree_merge_result.get("source_branches", []),
             }
 
         state["iterations"].append(record)

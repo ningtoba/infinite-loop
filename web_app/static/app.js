@@ -25,15 +25,23 @@ function _wtTooltip(wt) {
   let parts = [`merged:${wt.merged} failed:${wt.failed}`];
   if (wt.skipped != null && wt.skipped > 0) parts.push(`skipped:${wt.skipped}`);
   if (wt.conflicts != null && wt.conflicts > 0) parts.push(`conflicts:${wt.conflicts}`);
+  // Source branches (branch names detected)
+  const sb = wt.source_branches;
+  if (sb && sb.length > 0) {
+    parts.push(`branches:[${sb.join(', ')}]`);
+  }
   // Per-worker details
   const pw = wt.per_worker;
   if (pw) {
     const workerLines = [];
     for (const k of Object.keys(pw).sort()) {
       const ws = pw[k];
-      workerLines.push(`W${k}:${ws.status}`);
+      let line = `W${k}:${ws.status}`;
+      if (ws.branch) line += '/' + ws.branch;
+      if (ws.reason) line += ` (${ws.reason})`;
+      workerLines.push(line);
     }
-    if (workerLines.length) parts.push('[' + workerLines.join(' ') + ']');
+    if (workerLines.length) parts.push('[' + workerLines.join(' | ') + ']');
   }
   return parts.join(' ');
 }
@@ -199,7 +207,7 @@ function updateLatestIteration(latest) {
     const errText = latest.error ? `<div class="lit-error">Error: ${escapeHtml(String(latest.error))}</div>` : '';
     const wt = latest.worktree_merge;
     const wtText = (wt && (wt.merged > 0 || wt.failed > 0))
-      ? `<div class="lit-wt-merge"><span class="tag tag-wt">wt:${wt.merged}✓ ${wt.failed}✗${wt.skipped ? ' ' + wt.skipped + '–' : ''}</span></div>`
+      ? `<div class="lit-wt-merge"><span class="tag tag-wt">wt:${wt.merged}✓ ${wt.failed}✗${wt.skipped ? ' ' + wt.skipped + '–' : ''}${wt.conflicts > 0 ? ' ' + wt.conflicts + '⚡' : ''}</span></div>`
       : '';
     div.innerHTML = `<div class="lit-header">
       <strong>#${latest.n}</strong> <span class="tag ${tagCls}">${escapeHtml(latest.classification || latest.task_type || 'unknown')}</span>
@@ -249,9 +257,12 @@ function updateRecentIterations(data) {
       const tagCls = latest.error ? 'tag-err' : 'tag-ok';
       const wt = latest.worktree_merge;
       const wtTitle = wt ? _wtTooltip(wt) : '';
-      const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
-        ? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
-        : '';
+      let wtHtml = '';
+      if (wt && (wt.merged > 0 || wt.failed > 0)) {
+        let wtLabel = `wt:${wt.merged}✓ ${wt.failed}✗`;
+        if (wt.conflicts > 0) wtLabel += ` ${wt.conflicts}⚡`;
+        wtHtml = `<span class="tag tag-wt" title="${wtTitle}">${wtLabel}</span>`;
+      }
       const rowHtml = `<tr class="${cls}">
         <td>${latest.n}</td><td><span class="tag tag-info">${escapeHtml(latest.task_type || '')}</span></td>
         <td>${latest.duration_seconds || 0}s</td>
@@ -266,7 +277,7 @@ function updateRecentIterations(data) {
     }
   } else {
     // Fallback: fetch full list if latest_iteration isn't available
-    fetch(API.iterations + '?limit=10').then(r => r.json()).then(result => {
+    fetch(API.iterations + '?limit=50').then(r => r.json()).then(result => {
       const iters = result.iterations || [];
       const seenNs = new Set();
       tbody.querySelectorAll('tr').forEach(row => {
@@ -287,7 +298,7 @@ function updateRecentIterations(data) {
 
 // ── Helper: fetch and append missing iterations from the API ────────────
 function _fetchAndAppendMissingIterations(tbody, seenNs) {
-  fetch(API.iterations + '?limit=10').then(r => r.json()).then(result => {
+  fetch(API.iterations + '?limit=50').then(r => r.json()).then(result => {
     const iters = result.iterations || [];
     _appendIterationRows(tbody, iters, seenNs);
     if (result.total != null) {
@@ -307,9 +318,12 @@ function _appendIterationRows(tbody, iters, seenNs) {
     const tagCls = it.error ? 'tag-err' : 'tag-ok';
     const wt = it.worktree_merge;
     const wtTitle = wt ? _wtTooltip(wt) : '';
-    const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
-      ? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
-      : '';
+    let wtHtml = '';
+    if (wt && (wt.merged > 0 || wt.failed > 0)) {
+      let wtLabel = `wt:${wt.merged}✓ ${wt.failed}✗`;
+      if (wt.conflicts > 0) wtLabel += ` ${wt.conflicts}⚡`;
+      wtHtml = `<span class="tag tag-wt" title="${wtTitle}">${wtLabel}</span>`;
+    }
     const temp = document.createElement('tbody');
     temp.innerHTML = `<tr class="${cls}">
       <td>${it.n}</td><td><span class="tag tag-info">${escapeHtml(it.task_type || '')}</span></td>
@@ -530,7 +544,7 @@ async function loadIterations(page = 0) {
       const wt = it.worktree_merge;
       const wtTitle = wt ? _wtTooltip(wt) : '';
       const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
-        ? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
+        ? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗${wt.conflicts > 0 ? ' ' + wt.conflicts + '⚡' : ''}</span>`
         : '';
       return `<tr class="${cls}"><td>${it.n}</td><td style="white-space:nowrap;font-size:0.78rem;color:var(--fg-muted)">${formatTs(it.started_at)}</td><td>${it.duration_seconds||0}s</td><td><span class="tag tag-info">${escapeHtml(it.task_type||'')}</span></td><td><span class="tag ${tagCls}">${it.error?'ERR':(it.classification||'OK')}</span></td><td class="summary-col" title="${escapeHtml(it.summary||'')}">${escapeHtml((it.summary||'').substring(0,100))}</td><td style="color:var(--danger);font-size:0.78rem">${it.error?escapeHtml(String(it.error).substring(0,60)):''}</td><td style="font-size:0.78rem">${wtHtml}</td></tr>`;
     }).join('');

@@ -399,7 +399,8 @@ def _merge_worktree_branches(
 
     Returns:
         A dict with merge results:
-        ``{"merged": int, "failed": int, "skipped": int, "details": list[dict]}``
+        ``{"merged": int, "failed": int, "skipped": int, "details": list[dict],
+            "per_worker": dict, "total_conflicts": int, "source_branches": list[str]}``
     """
     cwd = workdir or os.getcwd()
     result: dict = {
@@ -409,6 +410,7 @@ def _merge_worktree_branches(
         "details": [],
         "per_worker": {},
         "total_conflicts": 0,
+        "source_branches": [],
     }
 
     if not os.path.isdir(os.path.join(cwd, ".git")):
@@ -431,6 +433,30 @@ def _merge_worktree_branches(
         f"[WORKTREE-MERGE] Found {len(branches)} worktree branch(es): "
         f"{', '.join(b['name'] for b in branches)}"
     )
+
+    # Record source branches for the merge result (used by WebUI for display)
+    result["source_branches"] = [b["name"] for b in branches]
+
+    # Update per_worker: mark workers whose branches were found
+    for branch_info in branches:
+        branch = branch_info["name"]
+        extracted_wid = _extract_worker_from_branch(branch)
+        if extracted_wid is not None:
+            wid_str = str(extracted_wid)
+            if wid_str in result["per_worker"]:
+                result["per_worker"][wid_str] = {
+                    "status": "found",
+                    "branch": branch,
+                }
+
+    # For workers still not_found after scanning all detected branches,
+    # add a descriptive reason mentioning the branch pattern mismatch
+    for wid_str, pws in result["per_worker"].items():
+        if pws["status"] == "not_found":
+            pws["reason"] = (
+                "no worktree branch matched this worker — "
+                "branch naming differs from expected pattern"
+            )
 
     # 2. Remember current branch
     original_branch = _get_current_branch(cwd)

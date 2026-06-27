@@ -385,7 +385,12 @@ function createTag(text, cls) {
 function addIterationRow(iter) {
     if (!iter || !iter.n) return;
     var tbody = document.getElementById('iterations-body');
-    // Dedup: skip if a row with this iteration N already exists
+    // Reset detection: if total_iterations dropped (loop was reset),
+    // clear all existing rows to prevent stale data
+    if (window._sseMaxIterN && iter.n < window._sseMaxIterN) {
+        tbody.innerHTML = '';
+        window._sseMaxIterN = 0;
+    }
     var existing = tbody.querySelector('tr[data-iter-n="' + iter.n + '"]');
     if (existing) return;
     var tr = document.createElement('tr');
@@ -429,16 +434,30 @@ function addIterationRow(iter) {
         var wtParts = [];
         if (wt.merged > 0) wtParts.push('m' + wt.merged);
         if (wt.failed > 0) wtParts.push('f' + wt.failed);
+        if (wt.conflicts > 0) wtParts.push('c' + wt.conflicts);
         tdWt.textContent = wtParts.length ? 'wt:' + wtParts.join('/') : '';
-        // Per-worker tooltip
+        // Tooltip: source branches + per-worker details
+        var tooltipParts = [];
+        var sb = wt.source_branches;
+        if (sb && sb.length > 0) {
+            tooltipParts.push('branches: [' + sb.join(', ') + ']');
+        }
         var pw = wt.per_worker;
         if (pw) {
-            var lines = [];
+            var wlines = [];
             for (var k in pw) {
-                lines.push('W' + k + ': ' + pw[k].status);
+                var ws = pw[k];
+                var wline = 'W' + k + ': ' + ws.status;
+                if (ws.branch) wline += '/' + ws.branch;
+                if (ws.reason) wline += ' (' + ws.reason + ')';
+                wlines.push(wline);
             }
-            if (lines.length) tdWt.title = lines.join(' | ');
+            if (wlines.length) tooltipParts.push(wlines.join(' | '));
         }
+        if (wt.merged > 0) tooltipParts.push('merged: ' + wt.merged);
+        if (wt.failed > 0) tooltipParts.push('failed: ' + wt.failed);
+        if (wt.conflicts > 0) tooltipParts.push('conflicts: ' + wt.conflicts);
+        tdWt.title = tooltipParts.join(' | ');
     }
     tr.appendChild(tdWt);
     tbody.insertBefore(tr, tbody.firstChild);
@@ -457,6 +476,10 @@ function renderDashboard(data) {
     updateGoalsPanel(data);
     if (data.iteration && data.iteration.n) {
         addIterationRow(data.iteration);
+        // Track max N seen for reset detection
+        if (data.iteration.n > (window._sseMaxIterN || 0)) {
+            window._sseMaxIterN = data.iteration.n;
+        }
     }
     // If data contains a full iterations array (initial fetch), render all rows
     if (data._iterations && data._iterations.length > 0) {
@@ -489,6 +512,17 @@ fetch('/api/status')
             mitigations: fullState.mitigations || {}
         };
         renderDashboard(renderData);
+        // Also fetch recent iterations for initial table render
+        fetch('/api/iterations?limit=20')
+            .then(function (r) { return r.json(); })
+            .then(function (itData) {
+                var iters = itData.iterations || [];
+                if (iters.length > 0) {
+                    renderData._iterations = iters;
+                    renderDashboard(renderData);
+                }
+            })
+            .catch(function () {});
     })
     .catch(function (err) {
         console.error('Initial fetch failed:', err);
@@ -748,6 +782,7 @@ def _build_sse_payload(state: dict) -> dict:
         iters_per_goal = max(1, total_iters // max(len(goals_list), 1))
     return {
         "iteration": latest,
+        "_iterations": iterations[-20:],  # last 20 for SSE dashboard init
         "status": state.get("status", "unknown"),
         "total_iterations": total_iters,
         "max_iterations": state.get("max_iterations", 0),

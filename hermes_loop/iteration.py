@@ -320,7 +320,11 @@ def _merge_worker_results(
             return False
         # "exit code N" without any other error content is a soft error
         err_lower = err.lower().strip()
-        if err_lower.startswith("exit code") or err_lower.startswith("hermes exit"):
+        if (
+            err_lower.startswith("exit code")
+            or err_lower.startswith("hermes exit")
+            or "exit code" in err_lower
+        ):
             # Check if the worker actually produced usable output
             summary = r.get("summary", "").strip()
             # A summary that doesn't start with FAILED means work was done

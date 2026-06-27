@@ -324,10 +324,29 @@ def _remove_worktree_directory(
         return False
 
 
+def _extract_worker_from_branch(branch_name: str) -> int | None:
+    """Extract worker ID from a branch name like ``hermes/iter-7-w-0``.
+
+    Returns the worker ID integer, or None if the branch doesn't follow
+    the expected pattern.
+    """
+    import re
+
+    m = re.search(r"[_-]w[_-](\d+)$", branch_name)
+    if m:
+        return int(m.group(1))
+    # Also try patterns like hermes-iter7-w0
+    m = re.search(r"w(\d+)$", branch_name)
+    if m:
+        return int(m.group(1))
+    return None
+
+
 def _merge_worktree_branches(
     workdir: str | None,
     iteration_count: int,
     worker_count: int,
+    worker_ids: list[int] | None = None,
 ) -> dict:
     """Detect and merge all worker worktree branches back to the main branch.
 
@@ -358,11 +377,17 @@ def _merge_worktree_branches(
         "failed": 0,
         "skipped": 0,
         "details": [],
+        "per_worker": {},
     }
 
     if not os.path.isdir(os.path.join(cwd, ".git")):
         _log("[WORKTREE-MERGE] Not a git repository — skipping")
         return result
+
+    # Pre-populate per_worker tracking
+    worker_set = set(worker_ids) if worker_ids else set(range(worker_count))
+    for wid in worker_set:
+        result["per_worker"][str(wid)] = {"status": "not_found", "branch": None}
 
     # 1. Detect worktree branches
     branches = _detect_worktree_branches(cwd)
@@ -379,6 +404,12 @@ def _merge_worktree_branches(
     # 2. Remember current branch
     original_branch = _get_current_branch(cwd)
     main_branch = _get_main_branch(cwd)
+
+    # Abort any stale merge state left from a previous interrupted run
+    _abort_merge(cwd)
+
+    # Stash any local changes on main before merging (protects uncommitted work)
+    _log(f"[WORKTREE-MERGE] Switching to '{main_branch}' for merges...")
 
     # 3. Switch to main branch to perform merges
     try:
@@ -412,8 +443,19 @@ def _merge_worktree_branches(
     # 4. Merge each worktree branch
     for idx, branch_info in enumerate(branches):
         branch = branch_info["name"]
-        worker_id = idx  # approximate; real worker_id may differ
+        # Extract worker ID from branch name for accurate tracking
+        extracted_wid = _extract_worker_from_branch(branch)
+        worker_id = (
+            extracted_wid
+            if extracted_wid is not None
+            else (idx if worker_ids is None or idx < len(worker_ids) else 0)
+        )
         _log(f"[WORKTREE-MERGE] Merging '{branch}' (worker #{worker_id})...")
+
+        # Mark per_worker status
+        wid_str = str(worker_id)
+        if wid_str in result["per_worker"]:
+            result["per_worker"][wid_str] = {"status": "merging", "branch": branch}
 
         # Check if the branch still exists locally (may have been already
         # merged and deleted by another process)
@@ -430,6 +472,12 @@ def _merge_worktree_branches(
                 }
             )
             result["skipped"] += 1
+            # Per-worker tracking
+            result["per_worker"][wid_str] = {
+                "status": "skipped",
+                "branch": branch,
+                "reason": "no longer exists",
+            }
             continue
 
         # Try fast-forward first
@@ -455,6 +503,11 @@ def _merge_worktree_branches(
                         "reason": "both ff and recursive merge failed",
                     }
                 )
+                result["per_worker"][wid_str] = {
+                    "status": "failed",
+                    "branch": branch,
+                    "reason": "both ff and recursive merge failed",
+                }
                 continue
 
         # Successful merge — delete branch and remove worktree
@@ -467,6 +520,7 @@ def _merge_worktree_branches(
                 "status": "merged",
             }
         )
+        result["per_worker"][wid_str] = {"status": "merged", "branch": branch}
         _log(f"[WORKTREE-MERGE] ✓ '{branch}' merged and cleaned up")
 
     # 5. Push merged changes to remote if we merged anything

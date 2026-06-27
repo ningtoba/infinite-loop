@@ -19,6 +19,39 @@ let lastLogIdx = -1;         // append-only log tracking
 let workerLogFilter = null;  // filter logs by worker ID
 let _lastSeenIterationCount = 0;  // only refetch iterations when count changes
 
+// ── Worktree merge tooltip helper ────────────────────────────────────────
+function _wtTooltip(wt) {
+  if (!wt) return '';
+  let parts = [`merged:${wt.merged} failed:${wt.failed}`];
+  if (wt.skipped != null && wt.skipped > 0) parts.push(`skipped:${wt.skipped}`);
+  // Per-worker details
+  const pw = wt.per_worker;
+  if (pw) {
+    const workerLines = [];
+    for (const k of Object.keys(pw).sort()) {
+      const ws = pw[k];
+      workerLines.push(`W${k}:${ws.status}`);
+    }
+    if (workerLines.length) parts.push('[' + workerLines.join(' ') + ']');
+  }
+  return parts.join(' ');
+}
+
+// ── Smart refresh for full iterations table ───────────────────────────────
+let _lastFullIterationsRefresh = 0;
+function refreshIterationsOnSSE(data) {
+  const led = data.ledger || {};
+  const count = led.total_iterations || 0;
+  if (count > _lastSeenIterationCount) {
+    const now = Date.now();
+    // Throttle: max once every 3 seconds on the iterations tab
+    if (now - _lastFullIterationsRefresh > 3000) {
+      _lastFullIterationsRefresh = now;
+      loadIterations(iterationsPage);
+    }
+  }
+}
+
 // ── Initialization ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -138,6 +171,8 @@ function updateDashboard(data) {
   updateLatestIteration(data.latest_iteration);
   updateRecentIterations(data);
   setText('iterations-count', `${led.total_iterations || 0} total`);
+  // Auto-refresh full iterations table if user is on the iterations tab
+  if (currentTab === 'iterations') refreshIterationsOnSSE(data);
 
   // Workers tab
   if (currentTab === 'workers') renderWorkers(data);
@@ -204,8 +239,9 @@ function updateRecentIterations(data) {
       const cls = latest.error ? 'error-row' : '';
       const tagCls = latest.error ? 'tag-err' : 'tag-ok';
       const wt = latest.worktree_merge;
+      const wtTitle = wt ? _wtTooltip(wt) : '';
       const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
-        ? `<span class="tag tag-wt" title="merged:${wt.merged} failed:${wt.failed}${wt.skipped != null ? ' skipped:'+wt.skipped : ''}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
+        ? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
         : '';
       const rowHtml = `<tr class="${cls}">
         <td>${latest.n}</td><td><span class="tag tag-info">${escapeHtml(latest.task_type || '')}</span></td>
@@ -238,8 +274,9 @@ function updateRecentIterations(data) {
         const cls = it.error ? 'error-row' : '';
         const tagCls = it.error ? 'tag-err' : 'tag-ok';
         const wt = it.worktree_merge;
+        const wtTitle = wt ? _wtTooltip(wt) : '';
         const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
-          ? `<span class="tag tag-wt" title="merged:${wt.merged} failed:${wt.failed}${wt.skipped != null ? ' skipped:'+wt.skipped : ''}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
+          ? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
           : '';
         const temp = document.createElement('tbody');
         temp.innerHTML = `<tr class="${cls}">
@@ -464,8 +501,9 @@ async function loadIterations(page = 0) {
       const cls = it.error ? 'error-row' : '';
       const tagCls = it.error ? 'tag-err' : 'tag-ok';
       const wt = it.worktree_merge;
+      const wtTitle = wt ? _wtTooltip(wt) : '';
       const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
-        ? `<span class="tag tag-wt" title="merged:${wt.merged} failed:${wt.failed}${wt.skipped != null ? ' skipped:'+wt.skipped : ''}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
+        ? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
         : '';
       return `<tr class="${cls}"><td>${it.n}</td><td style="white-space:nowrap;font-size:0.78rem;color:var(--fg-muted)">${formatTs(it.started_at)}</td><td>${it.duration_seconds||0}s</td><td><span class="tag tag-info">${escapeHtml(it.task_type||'')}</span></td><td><span class="tag ${tagCls}">${it.error?'ERR':(it.classification||'OK')}</span></td><td class="summary-col" title="${escapeHtml(it.summary||'')}">${escapeHtml((it.summary||'').substring(0,100))}</td><td style="color:var(--danger);font-size:0.78rem">${it.error?escapeHtml(String(it.error).substring(0,60)):''}</td><td style="font-size:0.78rem">${wtHtml}</td></tr>`;
     }).join('');

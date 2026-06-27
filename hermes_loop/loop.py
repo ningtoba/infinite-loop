@@ -581,10 +581,21 @@ def run_loop(
         # Merge worker worktree branches back to main (best-effort)
         worktree_merge_result = {}
         if worktree:
+            # Collect worker IDs from results for per-worker tracking
+            worker_ids = sorted(
+                set(
+                    r.get("worker_id", -1)
+                    for r in all_results
+                    if r.get("worker_id") is not None
+                )
+            )
+            if not worker_ids:
+                worker_ids = list(range(workers))
             worktree_merge_result = _merge_worktree_branches(
                 workdir=workdir,
                 iteration_count=iteration_count,
                 worker_count=workers,
+                worker_ids=worker_ids,
             )
 
         git_after = (
@@ -691,6 +702,7 @@ def run_loop(
                 "merged": worktree_merge_result.get("merged", 0),
                 "failed": worktree_merge_result.get("failed", 0),
                 "skipped": worktree_merge_result.get("skipped", 0),
+                "per_worker": worktree_merge_result.get("per_worker", {}),
             }
 
         state["iterations"].append(record)

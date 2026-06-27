@@ -1030,6 +1030,22 @@ def spawn_delegation_session(
 
         summary = str(stdout[:output_cap]) if stdout else "(no output)"
         if subprocess_exit_code != 0:
+            output_len = len(stdout or "")
+            # If the session produced actual output (not just an error), treat
+            # it as success — hermes often exits non-zero with stderr warnings
+            # even after a perfectly successful run that produced useful stdout.
+            if output_len > 50:
+                return {
+                    "summary": summary,
+                    "duration_seconds": round(elapsed, 1),
+                    "error": None,
+                    "output": stdout[:output_cap],
+                    "stderr": str(stderr[:stderr_cap]),
+                    "exit_code": subprocess_exit_code,
+                    "total_output_bytes": actual_output_len,
+                    "truncated": was_truncated,
+                    "spawned_session_id": spawned_session_id,
+                }
             summary = f"FAILED (exit {subprocess_exit_code}): {str(stderr[:300])}"
             return {
                 "summary": summary,

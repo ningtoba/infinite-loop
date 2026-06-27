@@ -430,6 +430,15 @@ function addIterationRow(iter) {
         if (wt.merged > 0) wtParts.push('m' + wt.merged);
         if (wt.failed > 0) wtParts.push('f' + wt.failed);
         tdWt.textContent = wtParts.length ? 'wt:' + wtParts.join('/') : '';
+        // Per-worker tooltip
+        var pw = wt.per_worker;
+        if (pw) {
+            var lines = [];
+            for (var k in pw) {
+                lines.push('W' + k + ': ' + pw[k].status);
+            }
+            if (lines.length) tdWt.title = lines.join(' | ');
+        }
     }
     tr.appendChild(tdWt);
     tbody.insertBefore(tr, tbody.firstChild);
@@ -453,23 +462,26 @@ function renderDashboard(data) {
 fetch('/api/status')
     .then(function (r) { return r.json(); })
     .then(function (fullState) {
+        var led = fullState.ledger || {};
         var s = fullState.stats || {};
-        var iters = fullState.iterations || [];
-        var latest = iters.length > 0 ? iters[iters.length - 1] : {};
+        var iters = led.iterations || [];
+        var latest = iters.length > 0 ? iters[iters.length - 1] : (fullState.latest_iteration || {});
         var renderData = {
             iteration: latest,
-            status: fullState.status || 'unknown',
-            total_iterations: fullState.total_iterations || 0,
-            max_iterations: fullState.max_iterations || 0,
-            goal: (fullState.initial_command || '') || '-',
-            evolved_goal: fullState.evolved_goal || '',
-            started_at: fullState.started_at || '',
-            last_updated: fullState.last_updated || '',
+            status: fullState.loop_status || 'unknown',
+            total_iterations: led.total_iterations || 0,
+            max_iterations: led.max_iterations || 0,
+            goal: (led.goal || '') || '-',
+            evolved_goal: led.evolved_goal || '',
+            started_at: led.started_at || '',
+            last_updated: led.last_updated || '',
             stats: { success_count: s.success_count, error_count: s.error_count, total_duration_seconds: s.total_duration_seconds, avg_duration_seconds: s.avg_duration_seconds },
             consecutive_errors: s.consecutive_errors || 0,
             consecutive_successes: fullState.consecutive_successes || 0,
-            cooldown: fullState.cooldown || 0,
-            eta: fullState.eta || {}
+            cooldown: led.cooldown || 0,
+            eta: fullState.eta || {},
+            error_counts: fullState.error_counts || {},
+            mitigations: fullState.mitigations || {}
         };
         renderDashboard(renderData);
         iters.forEach(function(it) {

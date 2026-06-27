@@ -111,7 +111,7 @@ def _adapt_to_error(
 
     if count >= thresholds.get("stop", 999):
         target_level = 3
-    elif count >= thresholds.get("moderate", 999):
+    elif count >= (thresholds.get("moderate") or 999):
         target_level = 2
     elif count >= thresholds.get("mild", 999):
         target_level = 1

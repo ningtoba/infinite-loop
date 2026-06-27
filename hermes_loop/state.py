@@ -101,6 +101,7 @@ def load_or_create_ledger(
             "success_count": 0,
             "error_count": 0,
             "consecutive_errors": 0,
+            "consecutive_successes": 0,
         },
         "error_type_counts": {
             "timeout": 0,

@@ -28,6 +28,7 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 # SSE client tracking
 _sse_clients: list[asyncio.Queue] = []
+_sse_clients_lock = asyncio.Lock()
 
 app = FastAPI(
     title="Hermes Loop Web UI",
@@ -214,24 +215,26 @@ async def health():
 async def _broadcast_sse(data: dict[str, Any]) -> None:
     """Broadcast an event to all connected SSE clients."""
     payload = json.dumps(data, default=str)
-    stale = []
-    for q in _sse_clients:
-        try:
-            q.put_nowait(payload)
-        except asyncio.QueueFull:
-            stale.append(q)
-    for q in stale:
-        try:
-            _sse_clients.remove(q)
-        except ValueError:
-            pass
+    async with _sse_clients_lock:
+        stale = []
+        for q in _sse_clients:
+            try:
+                q.put_nowait(payload)
+            except asyncio.QueueFull:
+                stale.append(q)
+        for q in stale:
+            try:
+                _sse_clients.remove(q)
+            except ValueError:
+                pass
 
 
 @app.get("/live")
 async def sse_stream(request: Request):
     """SSE endpoint for live updates."""
     q: asyncio.Queue = asyncio.Queue(maxsize=32)
-    _sse_clients.append(q)
+    async with _sse_clients_lock:
+        _sse_clients.append(q)
 
     async def event_generator():
         try:
@@ -255,10 +258,11 @@ async def sse_stream(request: Request):
         except asyncio.CancelledError:
             pass
         finally:
-            try:
-                _sse_clients.remove(q)
-            except ValueError:
-                pass
+            async with _sse_clients_lock:
+                try:
+                    _sse_clients.remove(q)
+                except ValueError:
+                    pass
 
     return StreamingResponse(
         event_generator(),

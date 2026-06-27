@@ -579,8 +579,9 @@ def run_loop(
         combined_output = merged["combined_output"]
 
         # Merge worker worktree branches back to main (best-effort)
+        worktree_merge_result = {}
         if worktree:
-            _merge_worktree_branches(
+            worktree_merge_result = _merge_worktree_branches(
                 workdir=workdir,
                 iteration_count=iteration_count,
                 worker_count=workers,
@@ -596,6 +597,18 @@ def run_loop(
             )
             if git_commit_hash:
                 _log(f"[GIT] Committed as {git_commit_hash}")
+                # Also push committed changes to remote (best-effort)
+                try:
+                    import subprocess as _sp
+
+                    _sp.run(
+                        ["git", "push", "origin", "HEAD"],
+                        capture_output=True,
+                        cwd=workdir or os.getcwd(),
+                        timeout=30,
+                    )
+                except Exception:
+                    pass
 
         if git:
             before_ds = git_before.get("diff_stat", "")
@@ -671,6 +684,14 @@ def run_loop(
             state=state,
             sys_before=sys_before,
         )
+
+        # Store worktree merge results in the record
+        if worktree and worktree_merge_result:
+            record["worktree_merge"] = {
+                "merged": worktree_merge_result.get("merged", 0),
+                "failed": worktree_merge_result.get("failed", 0),
+                "skipped": worktree_merge_result.get("skipped", 0),
+            }
 
         state["iterations"].append(record)
         state["total_iterations"] = iteration_count
@@ -762,6 +783,18 @@ def run_loop(
             ok_count = sum(1 for r in all_results if not r.get("error"))
             fail_count = len(all_results) - ok_count
             summary_parts.append(f"workers={ok_count}/{len(all_results)}")
+
+        # Worktree merge results
+        if worktree and worktree_merge_result:
+            wt_merged = worktree_merge_result.get("merged", 0)
+            wt_failed = worktree_merge_result.get("failed", 0)
+            if wt_merged > 0 or wt_failed > 0:
+                wt_parts = []
+                if wt_merged > 0:
+                    wt_parts.append(f"{wt_merged} merged")
+                if wt_failed > 0:
+                    wt_parts.append(f"{wt_failed} failed")
+                summary_parts.append(f"wtree={'/'.join(wt_parts)}")
 
         # Task type
         if task_type:

@@ -310,7 +310,7 @@ def _merge_worktree_branches(
     branches = _detect_worktree_branches(cwd)
     if not branches:
         _log("[WORKTREE-MERGE] No worktree branches found — nothing to merge")
-        result["skipped"] = 0
+        result["skipped"] = 0  # no-op when nothing was attempted
         return result
 
     _log(
@@ -394,7 +394,26 @@ def _merge_worktree_branches(
         )
         _log(f"[WORKTREE-MERGE] ✓ '{branch}' merged and cleaned up")
 
-    # 5. Return to original branch if it still exists
+    # 5. Push merged changes to remote if we merged anything
+    if result["merged"] > 0:
+        try:
+            r = subprocess.run(
+                ["git", "push", "origin", main_branch],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=30,
+            )
+            if r.returncode == 0:
+                _log("[WORKTREE-MERGE] ✓ Pushed merged changes to origin")
+            else:
+                _log(
+                    f"[WORKTREE-MERGE] Push skipped (non-fatal): {r.stderr.strip()[:120]}"
+                )
+        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+            _log(f"[WORKTREE-MERGE] Push skipped: {e}")
+
+    # 6. Return to original branch if it still exists
     if original_branch and original_branch != main_branch:
         try:
             subprocess.run(

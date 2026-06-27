@@ -274,16 +274,25 @@ update-completions:
 
 .PHONY: lint
 lint:
-	@echo "Checking Python syntax..."
+	@echo "Checking Python source with ruff..."
 	@ERRORS=0; \
-	for f in hermes_loop/*.py web_app/*.py session-self-loop.py launch-loop.py; do \
-		if $(PYTHON) -m py_compile "$$f" 2>/dev/null; then \
-			echo "  [OK] $$f"; \
-		else \
-			echo "  [FAIL] $$f - syntax error"; \
-			ERRORS=$$((ERRORS + 1)); \
+	if command -v ruff >/dev/null 2>&1; then \
+		ruff check hermes_loop/ web_app/ session-self-loop.py launch-loop.py; \
+		RUFF_EXIT=$$?; \
+		if [ "$$RUFF_EXIT" -ne 0 ]; then \
+			ERRORS=$$((ERRORS + RUFF_EXIT)); \
 		fi; \
-	done; \
+	else \
+		echo "  [INFO] ruff not found, falling back to py_compile syntax check"; \
+		for f in hermes_loop/*.py web_app/*.py session-self-loop.py launch-loop.py; do \
+			if $(PYTHON) -m py_compile "$$f" 2>/dev/null; then \
+				echo "  [OK] $$f"; \
+			else \
+				echo "  [FAIL] $$f - syntax error"; \
+				ERRORS=$$((ERRORS + 1)); \
+			fi; \
+		done; \
+	fi; \
 	if [ "$$ERRORS" -eq 0 ]; then \
 		echo "Python syntax OK - all files pass"; \
 	else \

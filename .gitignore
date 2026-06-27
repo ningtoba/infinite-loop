@@ -28,3 +28,4 @@ Thumbs.db
 /tmp/infinite-loop-state.json
 /tmp/infinite-loop-stop
 /tmp/infinite-loop-*.log
+.worktrees/

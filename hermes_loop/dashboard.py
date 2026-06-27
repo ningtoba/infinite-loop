@@ -231,7 +231,7 @@ _SSE_DASHBOARD_HTML_TPL = """<!DOCTYPE html>
 <h2>Latest Iteration <span class="compact-toggle" id="compact-toggle" onclick="toggleCompact()">[compact]</span></h2>
 <div id="summary-only"></div>
 <table id="iterations-table">
-<thead><tr><th>#</th><th>Type</th><th>Duration</th><th>Summary</th><th>Classification</th><th>Error</th></tr></thead>
+<thead><tr><th>#</th><th>Type</th><th>Duration</th><th>Summary</th><th>Classification</th><th>Error</th><th>WT</th></tr></thead>
 <tbody id="iterations-body"></tbody>
 </table>
 

@@ -297,7 +297,8 @@ async def _status_poller():
             live = status.get("live_iteration", {})
 
             # Build a richer hash covering iteration number, worker statuses,
-            # error_counts, mitigations, log count, and terminal lines.
+            # error_counts, mitigations, log count, terminal lines, and
+            # latest iteration details (worktree merge, summary changes).
             iter_n = live.get("n", 0)
             worker_statuses = "|".join(
                 f"{w.get('id','')}:{w.get('status','')}"
@@ -307,6 +308,18 @@ async def _status_poller():
             mitigations = str(status.get("mitigations", {}))
             term_total = sum(len(v) for v in status.get("worker_term", {}).values())
             log_count = len(status.get("recent_logs", []))
+            # Include latest iteration's key fields so WT changes (worktree_merge,
+            # summary, error, classification) trigger SSE pushes.
+            latest = status.get("latest_iteration", {}) or {}
+            latest_sig = "|".join(
+                [
+                    str(latest.get("n", 0)),
+                    str(latest.get("worktree_merge", {})),
+                    str(latest.get("error", "")),
+                    str(latest.get("classification", "")),
+                    str(latest.get("summary", "")[:60]),
+                ]
+            )
 
             status_hash = "|".join(
                 [
@@ -316,6 +329,7 @@ async def _status_poller():
                     mitigations,
                     str(term_total),
                     str(log_count),
+                    latest_sig,
                 ]
             )
 

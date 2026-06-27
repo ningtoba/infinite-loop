@@ -25,6 +25,7 @@ def _detect_worktree_branches(workdir: str | None) -> list[dict]:
     branches: list[dict] = []
 
     # 1. Find branches matching worktree patterns
+    main_branch = _get_main_branch(cwd)
     try:
         r = subprocess.run(
             ["git", "branch", "--list", "hermes/*"],
@@ -36,7 +37,7 @@ def _detect_worktree_branches(workdir: str | None) -> list[dict]:
         if r.returncode == 0:
             for line in r.stdout.strip().splitlines():
                 name = line.strip().lstrip("* ")
-                if name:
+                if name and name != main_branch:
                     branches.append({"ref": name, "name": name})
 
         r = subprocess.run(
@@ -49,7 +50,11 @@ def _detect_worktree_branches(workdir: str | None) -> list[dict]:
         if r.returncode == 0:
             for line in r.stdout.strip().splitlines():
                 name = line.strip().lstrip("* ")
-                if name and not any(b["ref"] == name for b in branches):
+                if (
+                    name
+                    and name != main_branch
+                    and not any(b["ref"] == name for b in branches)
+                ):
                     branches.append({"ref": name, "name": name})
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return []
@@ -126,7 +131,9 @@ def _get_main_branch(workdir: str | None) -> str:
 def _try_fast_forward_merge(workdir: str | None, branch: str, main_branch: str) -> bool:
     """Attempt a fast-forward merge of *branch* into the current checkout.
 
-    Returns True if the merge was applied.
+    Returns True if the merge was applied OR if the branch is already
+    up-to-date with main (changes were already committed by another
+    process, e.g. git_commit mode).
     """
     try:
         r = subprocess.run(
@@ -136,7 +143,16 @@ def _try_fast_forward_merge(workdir: str | None, branch: str, main_branch: str) 
             cwd=workdir,
             timeout=30,
         )
-        return r.returncode == 0
+        if r.returncode == 0:
+            return True
+        # "Already up to date" with non-zero exit is still a success
+        # (the branch has no new changes beyond what's already on main)
+        if (
+            "already up to date" in r.stderr.lower()
+            or "already up to date" in r.stdout.lower()
+        ):
+            return True
+        return False
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
 
@@ -348,7 +364,7 @@ def _merge_worktree_branches(
     branches = _detect_worktree_branches(cwd)
     if not branches:
         _log("[WORKTREE-MERGE] No worktree branches found — nothing to merge")
-        result["skipped"] = 0  # no-op when nothing was attempted
+        # skipped = 0 is correct; nothing was attempted
         return result
 
     _log(

@@ -178,9 +178,13 @@ function updateRecentIterations(data) {
   const count = (data.ledger && data.ledger.total_iterations) || 0;
   if (count <= _lastSeenIterationCount) return;
   _lastSeenIterationCount = count;
-  fetch(API.iterations + '?limit=10').then(r => r.json()).then(result => {
+  // Use latest_iteration from SSE data to avoid a separate fetch race
+  const latest = data.latest_iteration;
+  if (latest && latest.n) {
     const tbody = document.getElementById('recent-iterations-body');
-    const iters = result.iterations || [];
+    const iters = [latest]; // prepend latest, keep rest from previous render
+    const existingRows = tbody.querySelectorAll('tr');
+    let merged = false;
     tbody.innerHTML = iters.map(it => {
       const cls = it.error ? 'error-row' : '';
       const tagCls = it.error ? 'tag-err' : 'tag-ok';
@@ -196,7 +200,37 @@ function updateRecentIterations(data) {
         <td style="font-size:0.78rem">${wtHtml}</td>
       </tr>`;
     }).join('');
-  }).catch(() => {});
+    // Append existing rows that aren't the latest (dedup by n)
+    const latestN = latest.n;
+    existingRows.forEach(row => {
+      const td = row.querySelector('td');
+      if (td) {
+        const rowN = parseInt(td.textContent, 10);
+        if (rowN !== latestN) tbody.appendChild(row.cloneNode(true));
+      }
+    });
+  } else {
+    // Fallback: fetch full list if latest_iteration isn't available
+    fetch(API.iterations + '?limit=10').then(r => r.json()).then(result => {
+      const tbody = document.getElementById('recent-iterations-body');
+      const iters = result.iterations || [];
+      tbody.innerHTML = iters.map(it => {
+        const cls = it.error ? 'error-row' : '';
+        const tagCls = it.error ? 'tag-err' : 'tag-ok';
+        const wt = it.worktree_merge;
+        const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
+          ? `<span class="tag tag-wt" title="merged:${wt.merged} failed:${wt.failed}${wt.skipped != null ? ' skipped:'+wt.skipped : ''}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
+          : '';
+        return `<tr class="${cls}">
+          <td>${it.n}</td><td><span class="tag tag-info">${escapeHtml(it.task_type || '')}</span></td>
+          <td>${it.duration_seconds || 0}s</td>
+          <td class="summary-col" title="${escapeHtml(it.summary || '')}">${escapeHtml((it.summary || '').substring(0, 80))}</td>
+          <td><span class="tag ${tagCls}">${it.error ? 'ERR' : (it.classification || 'OK')}</span></td>
+          <td style="font-size:0.78rem">${wtHtml}</td>
+        </tr>`;
+      }).join('');
+    }).catch(() => {});
+  }
 }
 
 function updateLiveIteration(live) {

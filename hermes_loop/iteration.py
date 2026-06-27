@@ -8,23 +8,15 @@ import threading
 import time
 from datetime import datetime, timezone
 
-from .config import DEFAULT_CONVERGENCE_WINDOW, DEFAULT_CONVERGENCE_THRESHOLD
 from .file_utils import _log, write_ledger, write_status_file
-from .error_utils import _classify_progress, classify_error
+from .error_utils import _classify_progress
 from .error_recovery import _pick_primary_error
 from .similarity import check_convergence
 from .system_utils import get_system_usage, get_system_usage_diff
 from .goal_utils import GoalSpec
 from .hermes_utils import _build_delegation_prompt, spawn_delegation_session
 from .library_worker import _run_library_workers_parallel
-from .git_utils import _capture_git_state, _git_auto_commit
-from .stats import _recalc_stats
 from .notifications import _send_per_iteration_notifications
-from .archiving import (
-    _archive_iterations,
-    _cleanup_old_archives,
-    _enforce_archive_max_size,
-)
 
 from .signal_handlers import _shutdown_requested
 
@@ -555,7 +547,6 @@ def _compact_summaries(
             if i >= len(existing_summaries) - keep_full:
                 new_summaries.append(s)
             else:
-                short = s[:80].replace("\n", " ")
                 condensed += 1
         if condensed > 0:
             new_summaries.insert(0, f"[{condensed} earlier iterations condensed]")

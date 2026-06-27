@@ -187,7 +187,9 @@ def _check_env_file() -> list[dict]:
             with open(env_path) as f:
                 content = f.read()
             lines = content.strip().splitlines()
-            total_vars = sum(1 for l in lines if "=" in l and not l.startswith("#"))
+            total_vars = sum(
+                1 for line in lines if "=" in line and not line.startswith("#")
+            )
             checks.append(
                 _check(
                     ".env has content",
@@ -223,7 +225,9 @@ def _check_env_file() -> list[dict]:
                     )
                 )
             # Check if INFINITE_LOOP_GOAL is set
-            has_goal = any(re.match(r"^\s*INFINITE_LOOP_GOAL\s*=", l) for l in lines)
+            has_goal = any(
+                re.match(r"^\s*INFINITE_LOOP_GOAL\s*=", line) for line in lines
+            )
             checks.append(
                 _check(
                     "INFINITE_LOOP_GOAL is set in .env",
@@ -306,7 +310,7 @@ def _check_scripts() -> list[dict]:
                 f"Script: {name} ({desc})",
                 exists,
                 str(path) if exists else f"Missing: {path}",
-                f"File not found — check your checkout" if not exists else "",
+                "File not found — check your checkout" if not exists else "",
             )
         )
     return checks

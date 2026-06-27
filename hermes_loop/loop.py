@@ -10,20 +10,13 @@ from .config import DEFAULT_CONVERGENCE_THRESHOLD, DEFAULT_CONVERGENCE_WINDOW
 from .file_utils import _log, write_ledger, write_status_file
 from .signal_handlers import (
     _shutdown_requested,
-    _shutdown_state_ref,
-    _hermes_worker_ref,
-    _startup_file_snapshots,
     _check_auto_reload,
 )
 from .goal_utils import GoalSpec, _is_goal_completed, _mark_goal_completed
 from .error_recovery import (
     _adapt_to_error,
-    _ORIGINAL_SESSION_TIMEOUT,
-    _ORIGINAL_COOLDOWN,
-    _ORIGINAL_USE_LIBRARY,
-    _ORIGINAL_WORKERS,
 )
-from .error_utils import _classify_progress, classify_error, _suggest_actionable_fix
+from .error_utils import _suggest_actionable_fix
 from .tracker import ETATracker
 from .file_watcher import FileWatcherTrigger
 from .webhook import _start_webhook_server
@@ -127,12 +120,12 @@ def _print_shutdown_summary(
     _slog("")
 
 
-from .archiving import (
+# Import archiving (delayed to avoid circular imports in `loop` module)
+from .archiving import (  # noqa: E402
     _archive_iterations,
     _cleanup_old_archives,
     _enforce_archive_max_size,
 )
-from .heartbeat import _cleanup_stale_heartbeats
 
 
 def run_loop(
@@ -311,16 +304,14 @@ def run_loop(
     eta_tracker = ETATracker()
     state["eta"] = eta_tracker.to_dict()
 
-    webhook_server = None
+    # Start webhook server if port configured
     if webhook_port > 0:
 
         def _webhook_trigger(goal_override=None, context_override=None):
             return {"triggered": True, "iteration": "on_next_loop"}
 
-        webhook_server = _start_webhook_server(
-            webhook_port, _webhook_trigger, sentinel_path
-        )
-        state["webhook_port"] = webhook_port
+        _start_webhook_server(webhook_port, _webhook_trigger, sentinel_path)
+    state["webhook_port"] = webhook_port
 
     file_watcher = None
     if watch_dir:
@@ -453,7 +444,6 @@ def run_loop(
 
         iteration_count += 1
 
-        iterations: list[dict] = state.setdefault("iterations", [])
         iteration_start_time = datetime.now(timezone.utc).isoformat()
 
         if quiet:
@@ -576,7 +566,6 @@ def run_loop(
         next_goal = merged["next_goal"]
         next_context = merged["next_context"]
         combined_summary = merged["combined_summary"]
-        combined_output = merged["combined_output"]
 
         # Merge worker worktree branches back to main (best-effort)
         worktree_merge_result = {}
@@ -795,7 +784,6 @@ def run_loop(
         # Worker breakdown
         if workers > 1 and all_results:
             ok_count = sum(1 for r in all_results if not r.get("error"))
-            fail_count = len(all_results) - ok_count
             summary_parts.append(f"workers={ok_count}/{len(all_results)}")
 
         # Worktree merge results

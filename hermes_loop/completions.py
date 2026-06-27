@@ -293,24 +293,12 @@ def generate_zsh_completion(parser):
             f'          "({choices_str})"\n'
             f"        ;;\n"
         )
-    choice_state_text = "\n".join(choice_state_lines) if choice_state_lines else ""
-
     # File and dir completion for certain flag values
     file_group = [f for f in value_flags if f in _FILE_ARGS]
     dir_group = [f for f in value_flags if f in _DIR_ARGS]
-    choice_group_set = set(choice_flags.keys())
-    plain_value = [
-        f
-        for f in value_flags
-        if f not in _FILE_ARGS and f not in _DIR_ARGS and f not in choice_group_set
-    ]
 
     file_val_flags = " ".join(f for f in file_group)
     dir_val_flags = " ".join(f for f in dir_group)
-
-    # Handle file-arg flags
-    file_val_pattern = "|".join(f.lstrip("-").replace("-", "_") for f in file_group)
-    dir_val_pattern = "|".join(f.lstrip("-").replace("-", "_") for f in dir_group)
 
     return f"""\
 #compdef launch-loop.py run.sh run-loop.sh python3

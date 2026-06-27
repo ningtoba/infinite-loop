@@ -8,8 +8,6 @@ the closest match for misspelled variable names.
 
 import difflib
 import os
-import re
-import sys
 
 # ── Known environment variables — canonical list ──────────────────────────────
 # Sorted set of every INFINITE_LOOP_* variable that the daemon recognises.
@@ -191,7 +189,7 @@ def validate_env_vars(
                 {
                     "type": "warning",
                     "key": key,
-                    "message": f"Non-INFINITE_LOOP_ variable (not consumed by daemon)",
+                    "message": "Non-INFINITE_LOOP_ variable (not consumed by daemon)",
                     "suggestion": None,
                 }
             )
@@ -211,7 +209,7 @@ def validate_env_vars(
                 {
                     "type": "deprecated",
                     "key": key,
-                    "message": f"Deprecated — variable is no longer used",
+                    "message": "Deprecated — variable is no longer used",
                     "suggestion": None,
                 }
             )
@@ -232,7 +230,7 @@ def validate_env_vars(
                     {
                         "type": "unknown",
                         "key": key,
-                        "message": f"Unknown variable — not recognized by the daemon",
+                        "message": "Unknown variable — not recognized by the daemon",
                         "suggestion": None,
                     }
                 )
@@ -245,7 +243,7 @@ def validate_env_vars(
             {
                 "type": "missing",
                 "key": key,
-                "message": f"Not set — required unless --goal is passed as CLI flag",
+                "message": "Not set — required unless --goal is passed as CLI flag",
                 "suggestion": (
                     key.lower().replace("infinite_loop_", "")
                     if key.startswith("INFINITE_LOOP_")
@@ -350,7 +348,7 @@ def check_env_file(env_path: str | None = None) -> int:
 
     if not vars_found and not parse_errors:
         _log(f"[INFO] No INFINITE_LOOP_* variables found in {env_path}")
-        _log(f"[INFO] .env file exists but may be empty or use default values.")
+        _log("[INFO] .env file exists but may be empty or use default values.")
         return 0
 
     results = validate_env_vars(vars_found)

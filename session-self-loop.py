@@ -386,7 +386,7 @@ def main():
     total_dur = sum(it.get("duration_seconds", 0) for it in iters)
     success = sum(1 for it in iters if not it.get("error"))
     errors = len(iters) - success
-    print(f"\n[DONE] Session loop completed")
+    print("\n[DONE] Session loop completed")
     print(f"  Total iterations: {len(iters)}")
     print(f"  Total duration: {total_dur:.0f}s")
     print(f"  Success: {success}, Errors: {errors}")

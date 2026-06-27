@@ -1,7 +1,6 @@
 """Notification utilities — desktop, Pushbullet, and ntfy notifications."""
 
 import json
-import os
 import shutil
 import subprocess
 import urllib.error

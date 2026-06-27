@@ -1,6 +1,5 @@
 """Ledger loading/creation — load_or_create_ledger function."""
 
-import json
 import os
 import time
 from datetime import datetime, timezone

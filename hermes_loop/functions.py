@@ -137,7 +137,7 @@ def _log_startup_banner(
     parts = [f"workers={workers}", f"timeout={session_timeout}s"]
     if max_retries > 0:
         parts.append(f"retries={max_retries}")
-    cooldown_str = f"adaptive" if cooldown_mode == "adaptive" else f"{cooldown}s"
+    cooldown_str = "adaptive" if cooldown_mode == "adaptive" else f"{cooldown}s"
     parts.append(f"cooldown={cooldown_str}")
     if heartbeat_timeout > 0:
         parts.append(f"heartbeat={heartbeat_timeout}s")
@@ -186,7 +186,7 @@ def _log_startup_banner(
     _log(
         f"[DAEMON]   Output:     max-chars={get_max_output_chars()}, schema={'yes' if output_schema else 'no'}"
     )
-    _log(f"[DAEMON] ══════════════════════════════════════════════════")
+    _log("[DAEMON] ══════════════════════════════════════════════════")
     _log(f"[DAEMON] Goal: {goal}")
     _log(f"[DAEMON] Toolsets: {toolsets}")
     _log(f"[DAEMON] Task type: {task_type} ({task_type_desc})")

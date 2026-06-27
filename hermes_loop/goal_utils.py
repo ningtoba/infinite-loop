@@ -2,7 +2,6 @@
 
 import hashlib
 
-from .config import TASK_PATTERNS
 
 
 def _goal_hash(goal_text: str) -> str:

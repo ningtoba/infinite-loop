@@ -13,10 +13,7 @@ from .dashboard import (
     _sse_clients,
     _sse_clients_lock,
     _SSE_DASHBOARD_HTML_TPL,
-    _broadcast_to_sse_clients,
-    _build_sse_payload,
 )
-from .goal_utils import _goal_hash
 from datetime import datetime, timezone
 
 

@@ -8,9 +8,7 @@ import sys
 
 from .config import (
     LEDGER_PATH,
-    LOCK_PATH,
     SENTINEL_PATH_DEFAULT,
-    STATUS_FILE_DEFAULT,
     HERMES_SESSION_TIMEOUT,
     DEFAULT_CONVERGENCE_THRESHOLD,
     DEFAULT_CONVERGENCE_WINDOW,
@@ -19,8 +17,6 @@ from .config import (
 )
 from .file_utils import _log, _init_daemon_log, write_ledger
 from .signal_handlers import (
-    _handle_shutdown,
-    _shutdown_requested,
     _startup_file_snapshots,
     _snapshot_file,
 )
@@ -38,7 +34,6 @@ from .wizard import run_wizard
 from .color_utils import colorizer, configure_color_mode
 from .env_utils import (
     check_env_file,
-    format_validation_results,
     parse_env_vars_from_file,
     validate_env_vars,
 )
@@ -651,11 +646,9 @@ def _run_demo() -> None:
     and summary display. Uses a safe test goal and cleans up after itself.
     """
     c = colorizer
-    import time
 
     DEMO_LEDGER = "/tmp/infinite-loop-demo-state.json"
     DEMO_SENTINEL = "/tmp/infinite-loop-demo-stop"
-    DEMO_SENTINEL_FILE = os.path.expanduser(DEMO_SENTINEL)
     test_goal = "Print the current UTC date and a friendly greeting, then exit."
     test_context = "This is a demonstration run. Just print the date and a greeting."
 
@@ -752,9 +745,9 @@ def _run_demo() -> None:
     print(f"  {c.dim('The daemon spawns a Hermes chat session with:')}")
     print()
     _code(
-        f'hermes chat -q "<prompt>" -t terminal,file,delegation,web,skills,browser,memory'
+        'hermes chat -q "<prompt>" -t terminal,file,delegation,web,skills,browser,memory'
     )
-    _code(f"            -Q --max-turns 500 --session-timeout 7200")
+    _code("            -Q --max-turns 500 --session-timeout 7200")
     print()
     print(
         f"  {c.colorize('Key differences from simple -z oneshot:', 'bold', 'yellow')}"
@@ -817,7 +810,6 @@ def _run_demo() -> None:
                 for i, p in enumerate(cmd)
             )
         )
-        full_cmd = " ".join(f"'{c}'" if " " in str(c) else str(c) for c in cmd)
         print()
         print(f"  {c.dim('Waiting for the spawned session to respond...')}")
         print()
@@ -848,7 +840,7 @@ def _run_demo() -> None:
                 json_text = "\n".join(json_lines)
                 try:
                     parsed = json.loads(json_text)
-                    _ok(f"✓  Session completed successfully!")
+                    _ok("✓  Session completed successfully!")
                     print(
                         f"    {c.colorize('Summary:', 'bold', 'yellow')} {parsed.get('summary', '')}"
                     )
@@ -926,7 +918,7 @@ def _run_demo() -> None:
     print(f"  {c.dim('compact [SUMMARY] line with iteration stats:')}")
     print()
     _code(
-        f"[SUMMARY] ✔ Iteration 1 | content | (15s) | completed | cpu=2.1s | mem=64MB | [████████░░] 1/1 100% | ETA=done"
+        "[SUMMARY] ✔ Iteration 1 | content | (15s) | completed | cpu=2.1s | mem=64MB | [████████░░] 1/1 100% | ETA=done"
     )
     print()
     print(f"  {c.dim('From left to right: status icon, iteration #,')}")
@@ -1008,12 +1000,11 @@ def _simulate_demo_output(c, goal: str):
     summary = f"{random.choice(words)} current UTC time and greeting"
     print(f"    {c.ok(chr(10003))}  Session completed successfully!")
     print(f"    {c.colorize('Summary:', 'bold', 'yellow')} {summary}")
-    _ok("    " + chr(10003) + "  No errors")
+    print("    " + chr(10003) + "  No errors")
     print()
     print(f"  {c.dim('Simulated JSON output:')}")
     dq = chr(34)  # double quote
     print(f"    {c.dim('{')}")
-    esc = chr(92)  # backslash
     print(
         f'    {c.dim("  " + dq + "summary" + dq + ": " + dq)}{c.value(summary)}{c.dim(dq + ",")}'
     )
@@ -1026,7 +1017,7 @@ def _simulate_demo_output(c, goal: str):
 def _display_status():
     """Read the ledger and print a compact colorized status. Used by --status flag."""
     from .file_utils import read_ledger
-    from datetime import datetime, timezone
+    from datetime import datetime
     import time
 
     ledger = read_ledger()
@@ -2056,7 +2047,7 @@ def main():
                 sentinel_val = sys.argv[i + 2]
             if arg.startswith("--shutdown-sentinel="):
                 sentinel_val = arg.split("=", 1)[1]
-        results = PreflightChecker.run_all(
+        results = PreflightChecker.run_all_checks(
             hermes_required=True,
             workdir=workdir_val,
             sentinel_path=sentinel_val,
@@ -2241,7 +2232,7 @@ def main():
 
     # Preflight health checks
     if args.preflight or args.run:
-        results = PreflightChecker.run_all(
+        results = PreflightChecker.run_all_checks(
             hermes_required=True,
             workdir=args.workdir,
             sentinel_path=args.shutdown_sentinel,
@@ -2307,7 +2298,7 @@ def main():
         if args.context_file:
             _log(f"  Context file:   {args.context_file}")
         else:
-            _log(f"  Context file:   (none, using --context)")
+            _log("  Context file:   (none, using --context)")
         _log(f"  Workdir:        {args.workdir or os.getcwd()}")
         _log(
             f"  Max iterations: {args.max_iterations if args.max_iterations > 0 else 'infinite'}"

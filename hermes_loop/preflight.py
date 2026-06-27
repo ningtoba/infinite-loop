@@ -196,7 +196,7 @@ class PreflightChecker:
             return True, "unable to check"
 
     @staticmethod
-    def run_all(
+    def run_all_checks(
         hermes_required: bool = True,
         workdir: str = "",
         sentinel_path: str = SENTINEL_PATH_DEFAULT,

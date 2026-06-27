@@ -1,6 +1,5 @@
 """File watcher — poll a directory for changes and trigger iterations."""
 
-import os
 import pathlib
 
 

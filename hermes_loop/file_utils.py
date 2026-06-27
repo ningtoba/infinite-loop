@@ -10,7 +10,6 @@ import time
 from datetime import datetime, timezone
 
 from .config import LOCK_PATH, LEDGER_PATH, LOG_FORMAT, LOG_DATE_FORMAT
-from .color_utils import colorizer
 
 # Module-level logger reference
 _daemon_logger: logging.Logger | None = None
@@ -92,7 +91,6 @@ def _colorize_log_tags(msg: str) -> str:
         (r"\[MODE\]", _cu.header),
         (r"\[NOTE\]", _cu.warn),
     ]
-    import re
 
     for pattern, formatter in _tag_color_map:
         if formatter in (_cu.tag_summary, _cu.tag_suggest):
@@ -242,7 +240,6 @@ def extract_json_from_output(stdout: str) -> dict | None:
     brace_depth = 0
     in_json = False
     json_chars = []
-    found_open = False
     for ch in reversed(text):
         if ch == "}":
             brace_depth += 1

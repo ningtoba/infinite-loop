@@ -3,31 +3,25 @@
 import asyncio
 import json
 import os
-import time
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import (
     HTMLResponse,
-    JSONResponse,
     StreamingResponse,
-    FileResponse,
 )
 from fastapi.staticfiles import StaticFiles
 
 from .config_manager import (
-    CONFIG_DEFAULTS,
     CONFIG_GROUPS,
     CONFIG_PATH,
     get_config_with_defaults,
     get_raw_config,
-    read_json_config,
     write_json_config,
     build_cli_args,
 )
-from .loop_manager import LoopManager, get_loop_manager
+from .loop_manager import get_loop_manager
 
 # Determine static directory
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -392,10 +386,10 @@ def main():
     if args.env:
         os.environ["HERMES_LOOP_ENV_PATH"] = args.env
 
-    print(f"╔══════════════════════════════════════════════╗")
-    print(f"║  Hermes Loop Web UI                           ║")
+    print("╔══════════════════════════════════════════════╗")
+    print("║  Hermes Loop Web UI                           ║")
     print(f"║  Starting server on {args.host}:{args.port}                        ║")
-    print(f"╚══════════════════════════════════════════════╝")
+    print("╚══════════════════════════════════════════════╝")
 
     uvicorn.run(
         "web_app.server:app",

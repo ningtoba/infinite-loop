@@ -3,15 +3,12 @@
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
-import sys
 import threading
 import time
-from datetime import datetime, timezone
 
-from .config import TASK_PATTERNS, BASE_TOOLSETS
+from .config import TASK_PATTERNS
 from .file_utils import _log, extract_json_from_output
 from .error_utils import classify_error
 from .validation import validate_json_output
@@ -21,7 +18,6 @@ from .heartbeat import (
     _kill_session,
     _cleanup_heartbeat_file,
 )
-from .signal_handlers import _shutdown_requested
 
 # Regex for stripping ANSI escape codes, TUI control chars, and carriage returns
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\].*?\x07|\x1b\[[0-9]*[KJhlsu]|\r")
@@ -49,6 +45,40 @@ def _read_stderr_real_time(
             _log(f"[STDERR{worker_tag}] {line[:500]}")
     except (ValueError, OSError, AttributeError):
         pass  # pipe closed or process gone
+
+
+def _read_stdout_live(
+    proc: subprocess.Popen,
+    worker_tag: str,
+    timeout_seconds: int,
+) -> tuple[str, int]:
+    """Read stdout line-by-line with timeout, return (stdout, exit_code).
+
+    Reads all available stdout lines from a subprocess that also has a
+    stderr reader thread running concurrently. Raises
+    ``subprocess.TimeoutExpired`` if the process exceeds the timeout.
+    """
+    stdout_lines: list[str] = []
+    start = time.time()
+    try:
+        for raw_line in iter(proc.stdout.readline, ""):
+            elapsed = time.time() - start
+            if timeout_seconds > 0 and elapsed > timeout_seconds:
+                raise subprocess.TimeoutExpired(
+                    cmd=proc.args,
+                    timeout=timeout_seconds,
+                    output="\n".join(stdout_lines),
+                )
+            if not raw_line:
+                break
+            line = raw_line.rstrip("\n\r")
+            if line:
+                stdout_lines.append(line)
+                _log(f"[TERM (worker {worker_tag})] {line[:500]}")
+    except (ValueError, OSError, AttributeError):
+        pass  # pipe closed or process gone
+    proc.wait()
+    return "\n".join(stdout_lines), proc.returncode
 
 
 def _run_hermes_with_pty(
@@ -245,7 +275,7 @@ def _build_delegation_prompt(
             )
             instructions.append(f"The skill documentation is at: {skill_dir}/SKILL.md")
             instructions.append(
-                f"The Hermes Worker is at: ~/.hermes/plugins/hermes-mcp-worker/main.py"
+                "The Hermes Worker is at: ~/.hermes/plugins/hermes-mcp-worker/main.py"
             )
             instructions.append("")
             instructions.append(

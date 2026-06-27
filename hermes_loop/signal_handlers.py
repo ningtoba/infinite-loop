@@ -50,7 +50,6 @@ def _handle_shutdown(signum, frame):
         except Exception:
             pass
 
-    import json  # noqa: F811 — local import for signal handler safety
 
     try:
         _subprocess.run(

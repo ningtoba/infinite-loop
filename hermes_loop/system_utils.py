@@ -61,7 +61,6 @@ def get_system_usage() -> dict:
             if len(fields) >= 20:
                 utime = int(fields[11])
                 stime = int(fields[12])
-                starttime = int(fields[19])
                 try:
                     clk_tck = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", 2))
                 except (AttributeError, KeyError, ValueError, OSError):

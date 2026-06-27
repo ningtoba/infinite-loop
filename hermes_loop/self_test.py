@@ -385,7 +385,7 @@ def _run_self_test() -> dict:
             (
                 "basic",
                 lambda: _basic(),
-                lambda r: (r is True, f"basic GoalSpec assertion failed"),
+                lambda r: (r is True, "basic GoalSpec assertion failed"),
             )
         )
 
@@ -397,7 +397,7 @@ def _run_self_test() -> dict:
             (
                 "with-profile",
                 lambda: _with_profile(),
-                lambda r: (r is True, f"with-profile GoalSpec assertion failed"),
+                lambda r: (r is True, "with-profile GoalSpec assertion failed"),
             )
         )
 
@@ -414,7 +414,7 @@ def _run_self_test() -> dict:
             (
                 "full-spec",
                 lambda: _full(),
-                lambda r: (r is True, f"full-spec GoalSpec assertion failed"),
+                lambda r: (r is True, "full-spec GoalSpec assertion failed"),
             )
         )
         return cases

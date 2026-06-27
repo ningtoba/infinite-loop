@@ -1,6 +1,5 @@
 """Error classification and progress classification utilities."""
 
-from .file_utils import _log
 
 
 def classify_error(error_str: str | None) -> str | None:

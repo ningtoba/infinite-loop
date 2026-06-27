@@ -2,7 +2,7 @@
 
 import json
 import os
-from datetime import datetime, timezone
+import threading
 
 from .config import LAUNCH_LOOP_VERSION
 from .file_utils import _log
@@ -10,10 +10,6 @@ from .goal_utils import _goal_hash
 
 # SSE (Server-Sent Events) client tracking for live dashboard
 _sse_clients: list = []
-_sse_clients_lock = None  # Initialized below
-
-import threading
-
 _sse_clients_lock = threading.Lock()
 
 
@@ -691,8 +687,6 @@ def _generate_status_html(state: dict, compact: bool = False) -> str:
             f'<td class="summary" title="{summary.replace(chr(34), "&quot;")}">{summary}</td>'
             f"<td>{it_eta}</td></tr>"
         )
-
-    compact_class = ' class="compact-mode"' if compact else ""
 
     html = (
         _STATUS_HTML_TPL.replace("{STATUS_CLASS}", status_cls)

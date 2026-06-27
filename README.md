@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.32.0
+# Infinite Loop Daemon — v14.33.0
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for
@@ -294,7 +294,7 @@ The `context` field is critical for iterative work — it tells the NEXT spawned
 |--------|------|---------|
 | **hermes_loop** | `hermes_loop` (console command) | Installed via `make install`. Invokes `hermes_loop.cli:main`. Primary way to run the daemon (the old `python3 launch-loop.py` is now a thin backward-compatible shim). |
 | **launch-loop.py** | `launch-loop.py` (root) | Thin backward-compatible shim (18 lines). Imports `main()` from the `hermes_loop/` package. All real code lives in the package. |
-| **hermes_loop/** | `hermes_loop/` (directory) | **Main daemon package** (36 modules). Contains all daemon logic: CLI, loop, functions, iteration, webhook, dashboard, preflight, notifications, and more. See [project structure](#files--structure) for the full module list. |
+| **hermes_loop/** | `hermes_loop/` (directory) | **Main daemon package** (38 modules). Contains all daemon logic: CLI, loop, functions, iteration, webhook, dashboard, preflight, notifications, and more. See [project structure](#files--structure) for the full module list. |
 | **session-self-loop.py** | `session-self-loop.py` (root) | Lightweight in-session loop tracker for self-enhancement from within your current Hermes session. |
 | **Makefile** | `Makefile` (root) | Convenience targets: `make run`, `make dry-run`, `make self-test`, `make status`, `make stop`, `make clean`. ★ |
 | **run.sh** | `run.sh` (root) | **One-command entrypoint** — sources `.env`, forwards all settings as CLI flags. Just `bash run.sh`. ★ |
@@ -583,6 +583,18 @@ echo '{"summary": "added feature X", "next_goal": "add feature Y"}' > /tmp/sessi
 echo '{"done": true}' > /tmp/session-loop-state.json
 kill $LOOP_PID
 ```
+
+---
+
+## v14.33.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
+| Real-time stderr token/progress reader | Enhancement | `hermes_utils.py`, `loop.py`, `cli.py` | New `_read_stderr_real_time()` thread pipes Hermes's stderr progress lines in real-time with `[MODEL{worker_tag}]` prefix. |
+| Context-aware regression suggestions | Enhancement | `error_utils.py` | `_suggest_actionable_fix()` skips suggestions for flags the user already has enabled. |
+| `force_reset` parameter | Enhancement | `loop.py`, `cli.py` | Added to `run_loop()` and passed through from CLI. |
+| Worktree stale-cleanup | Enhancement | `worktree_merger.py`, `loop.py` | `cleanup_stale_worktrees()` prunes leftover worktree branches before spawning. |
+| Version/doc sync | Fix | Multiple | README v14.32.0→v14.33.0, CONTRIBUTING modules 36→38, stale banner fixes, preflight.py docstring sync. |
 
 ---
 
@@ -1317,7 +1329,7 @@ infinite-loop/
 ├── launch-loop.py               ← Thin backward-compatible shim (18 lines) ★
 ├── session-self-loop.py         ← In-session loop tracker ★
 │
-├── hermes_loop/                 ← Main daemon package (36 modules) ★
+├── hermes_loop/                 ← Main daemon package (38 modules) ★
 │   ├── __init__.py
 │   ├── __main__.py              ← `hermes_loop` console script entry point
 │   ├── cli.py                   ← Argparse + main() entry point
@@ -1348,6 +1360,12 @@ infinite-loop/
 │   ├── file_watcher.py          ← Directory/file change watcher
 │   ├── archiving.py             ← Ledger archival
 │   ├── self_test.py             ← In-process unit tests
+│   ├── color_utils.py           ← ANSI colorization helpers
+│   ├── completions.py           ← Shell completion generation
+│   ├── diagnosis.py             ← --doctor self-diagnosis
+│   ├── env_utils.py             ← .env file validation
+│   ├── wizard.py                ← --init interactive setup wizard
+│   ├── worktree_merger.py       ← Smart git worktree branch merging
 │   ├── tracker.py               ← Context window tracker
 │   └── legacy.py                ← Backward compatibility
 │

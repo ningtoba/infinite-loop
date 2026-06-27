@@ -31,7 +31,7 @@ is met.
 
 **Key architecture points:**
 
-- **`hermes_loop/`** — Main package (36 modules). Contains all daemon logic:
+- **`hermes_loop/`** — Main package (38 modules). Contains all daemon logic:
   `cli.py` (argparse + entry point), `loop.py` (iteration loop),
   `functions.py` (helper functions), `iteration.py` (spawned session execution),
   `error_utils.py` (error classification + actionable suggestions),
@@ -52,7 +52,7 @@ is met.
 - **`scripts/archive-state.sh`** — Archive old iterations to JSONL or Markdown.
 - **`scripts/replay-ledger.sh`** — Re-run archived iterations from JSONL files.
 
-**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.28.0"`
+**Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.33.0"`
 in `hermes_loop/config.py`. The project follows
 [Semantic Versioning](https://semver.org/).
 
@@ -251,7 +251,7 @@ git checkout -b feature/describe-your-change
 
 Make your changes. A few guidelines:
 
-- **`hermes_loop/` is a package (36 modules)** — find the right module before
+- **`hermes_loop/` is a package (38 modules)** — find the right module before
   adding code. The `cli.py` module has the argparse setup and `main()` entry
   point. `loop.py` has `run_loop()`. `functions.py` has helper functions like
   `_execute_iteration()`, `_build_iteration_record()`,
@@ -521,7 +521,7 @@ hermes-loop/
 ├── .env                        # Your local configuration (git-ignored)
 ├── .env.example                # Documented config template
 ├── .gitignore
-├── hermes_loop/                # Main package (36 modules) ★
+├── hermes_loop/                # Main package (38 modules) ★
 │   ├── __init__.py
 │   ├── __main__.py
 │   ├── cli.py                  # Argparse + main() entry point
@@ -552,6 +552,12 @@ hermes-loop/
 │   ├── file_watcher.py         # Directory/file change watcher
 │   ├── archiving.py            # Ledger archival
 │   ├── self_test.py            # In-process unit tests
+│   ├── color_utils.py          # ANSI colorization helpers
+│   ├── completions.py          # Shell completion generation
+│   ├── diagnosis.py            # --doctor self-diagnosis
+│   ├── env_utils.py            # .env file validation
+│   ├── wizard.py               # --init interactive setup wizard
+│   ├── worktree_merger.py      # Smart git worktree branch merging
 │   ├── tracker.py              # Context window tracker
 │   └── legacy.py               # Backward compatibility
 ├── scripts/

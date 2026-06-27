@@ -116,7 +116,7 @@ def check_convergence(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="In-session infinite loop (v2.10.0) — "
+        description="In-session infinite loop (v2.12.0) — "
         "tracks iteration state in a JSON file with convergence detection, "
         "context compaction, and progress tracking."
     )

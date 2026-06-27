@@ -222,7 +222,7 @@ fi
 
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop - v14.6.0                       ║"
+  echo "║  Infinite Loop - v14.33.0                       ║"
   echo "║  Makefile, CONTRIBUTING.md,                       ║"
   echo "║  Improved --help, SSE fix, Dashboard v3 SSE,     ║"
   echo "║  Error Panel, Performance Metrics,               ║"

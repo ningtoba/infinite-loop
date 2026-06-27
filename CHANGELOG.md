@@ -4,6 +4,34 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.33.0] — 2026-06-28
+
+### Added
+- **Real-time stderr token/progress reader**: New `_read_stderr_real_time()` thread
+  pipes Hermes's stderr progress lines (tokens, tok/s, [DONE], [MODEL], [REQUEST],
+  etc.) through the daemon log in real-time with a `[MODEL{worker_tag}]` prefix.
+- **Context-aware regression suggestions**: `_suggest_actionable_fix()` now accepts
+  `git`, `git_commit`, `force_reset` params and skips suggestions for flags the
+  user already has enabled.
+- **`force_reset` parameter**: Added to `run_loop()` and passed through from CLI.
+- **3 new self-test cases** for regression context-awareness (13 total).
+- **Stale worktree branch cleanup**: New `cleanup_stale_worktrees()` function that
+  prunes leftover worktree branches before spawning new sessions.
+- **Documentation sync**: README, CONTRIBUTING, CHANGELOG, stale banner/version fixes.
+
+### Changed
+- `hermes_loop/hermes_utils.py` — Added `_read_stderr_real_time()` thread function.
+- `hermes_loop/loop.py` — Plumbing for `force_reset` parameter and worktree cleanup.
+- `hermes_loop/worktree_merger.py` — Added `cleanup_stale_worktrees()` function.
+- `hermes_loop/cli.py` — Forwards `--force-reset` to `run_loop()`.
+- `hermes_loop/config.py` — Bumped `LAUNCH_LOOP_VERSION` from 14.32.0 to 14.33.0.
+- `hermes_loop/self_test.py` — 3 new `_test_suggest_actionable_fix` cases.
+- `hermes_loop/preflight.py` — Updated stale v11.8.0 docstring.
+- `session-self-loop.py` — Updated stale v2.10.0 docstring reference.
+- `scripts/run-loop.sh` — Updated stale v14.6.0 banner to v14.33.0.
+- README, CONTRIBUTING — Module count 36→38, version sync, file trees updated.
+- `CHANGELOG.md` — Added this entry.
+
 ## [14.32.0] — 2026-06-26
 
 ### Added

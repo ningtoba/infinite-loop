@@ -1,6 +1,5 @@
 """Constants, paths, and defaults for the hermes_loop package."""
 
-
 # Paths
 LEDGER_PATH = "/tmp/infinite-loop-state.json"
 LOCK_PATH = "/tmp/infinite-loop-state.lock"
@@ -31,7 +30,7 @@ _ERROR_SEVERITY = {
 _ERROR_THRESHOLDS = {
     "timeout": {"mild": 3, "moderate": 5, "stop": 8},
     "network": {"mild": 2, "moderate": 4, "stop": 6},
-    "schema": {"mild": 3, "moderate": None, "stop": 5},
+    "schema": {"mild": 3, "moderate": None, "stop": 5},  # None = skip moderate level
     "unknown": {"mild": 3, "moderate": 5, "stop": 7},
     "heartbeat": {"mild": 3, "moderate": 5, "stop": 7},
 }

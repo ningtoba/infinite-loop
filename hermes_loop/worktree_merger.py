@@ -223,9 +223,39 @@ def _abort_merge(workdir: str | None) -> None:
         pass
 
 
-def _delete_worktree_branch(workdir: str | None, branch: str) -> bool:
-    """Delete a worktree branch (local) after successful merge."""
+def _branch_exists(workdir: str | None, branch: str) -> bool:
+    """Check if a local git branch exists."""
     try:
+        r = subprocess.run(
+            ["git", "branch", "--list", branch],
+            capture_output=True,
+            text=True,
+            cwd=workdir,
+            timeout=5,
+        )
+        return r.returncode == 0 and bool(r.stdout.strip())
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
+def _delete_worktree_branch(workdir: str | None, branch: str) -> bool:
+    """Delete a worktree branch (local) after successful merge.
+
+    Returns True if the branch was deleted or didn't exist.
+    """
+    try:
+        # Check if branch exists first
+        check = subprocess.run(
+            ["git", "branch", "--list", branch],
+            capture_output=True,
+            text=True,
+            cwd=workdir,
+            timeout=5,
+        )
+        if check.returncode == 0 and not check.stdout.strip():
+            # Branch already deleted — nothing to do
+            return True
+
         r = subprocess.run(
             ["git", "branch", "-d", branch],
             capture_output=True,
@@ -245,15 +275,23 @@ def _remove_worktree_directory(
 
     If *worktree_path* is known, uses ``git worktree remove``.
     Otherwise tries to prune stale worktrees.
+    Gracefully handles already-removed worktrees.
     """
     try:
         if worktree_path:
-            subprocess.run(
-                ["git", "worktree", "remove", worktree_path],
-                capture_output=True,
-                cwd=workdir,
-                timeout=15,
-            )
+            # Check if the worktree path still exists before trying to remove
+            if not os.path.isdir(worktree_path):
+                _log(
+                    f"[WORKTREE-MERGE] Worktree path '{worktree_path}' "
+                    f"for '{branch}' already removed — skipping"
+                )
+            else:
+                subprocess.run(
+                    ["git", "worktree", "remove", worktree_path],
+                    capture_output=True,
+                    cwd=workdir,
+                    timeout=15,
+                )
         # Prune any stale worktree metadata
         subprocess.run(
             ["git", "worktree", "prune"],
@@ -357,6 +395,23 @@ def _merge_worktree_branches(
         worker_id = idx  # approximate; real worker_id may differ
         _log(f"[WORKTREE-MERGE] Merging '{branch}' (worker #{worker_id})...")
 
+        # Check if the branch still exists locally (may have been already
+        # merged and deleted by another process)
+        if not _branch_exists(cwd, branch):
+            _log(
+                f"[WORKTREE-MERGE] Branch '{branch}' no longer exists "
+                "locally — skipping"
+            )
+            result["details"].append(
+                {
+                    "branch": branch,
+                    "status": "skipped",
+                    "reason": "branch no longer exists locally",
+                }
+            )
+            result["skipped"] += 1
+            continue
+
         # Try fast-forward first
         merged = _try_fast_forward_merge(cwd, branch, main_branch)
         if not merged:
@@ -415,15 +470,21 @@ def _merge_worktree_branches(
 
     # 6. Return to original branch if it still exists
     if original_branch and original_branch != main_branch:
-        try:
-            subprocess.run(
-                ["git", "checkout", original_branch],
-                capture_output=True,
-                cwd=cwd,
-                timeout=15,
+        if not _branch_exists(cwd, original_branch):
+            _log(
+                f"[WORKTREE-MERGE] Original branch '{original_branch}' no longer "
+                "exists — staying on main"
             )
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
+        else:
+            try:
+                subprocess.run(
+                    ["git", "checkout", original_branch],
+                    capture_output=True,
+                    cwd=cwd,
+                    timeout=15,
+                )
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
 
     _log(
         f"[WORKTREE-MERGE] Done — {result['merged']} merged, "

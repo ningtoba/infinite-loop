@@ -218,6 +218,7 @@ body {
 .tag-err { background: var(--danger-bg); color: var(--danger); }
 .tag-warn { background: var(--warning-bg); color: var(--warning); }
 .tag-info { background: var(--info-bg); color: var(--info); }
+.tag-wt { background: #2a2a4a; color: #9a9aff; font-size: 0.72rem; }
 
 /* ── Progress ───────────────────────────────────────────────────────────── */
 .progress-section { margin-bottom: 20px; }

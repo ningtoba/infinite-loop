@@ -327,11 +327,17 @@ def _merge_worker_results(
             if summary and not summary.startswith("FAILED"):
                 return True
             output_len = len(r.get("output", "") or "")
-            if output_len > 200:
+            # Lower threshold: 50 chars of meaningful output suffices
+            if output_len > 50:
                 return True
             # A non-trivial next_goal with context suggests partial work done
             next_goal = r.get("next_goal", "") or ""
             if len(next_goal) > 50 and not next_goal.startswith("FAILED"):
+                return True
+            # If error_type is not a serious category (timeout/network/schema),
+            # the exit-code error is more likely a soft artifact than a real failure
+            et = r.get("error_type")
+            if et and et not in ("timeout", "network", "schema"):
                 return True
         return False
 

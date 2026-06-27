@@ -161,10 +161,14 @@ function updateLatestIteration(latest) {
     const tagCls = latest.error ? 'tag-err' : 'tag-ok';
     const summary = (latest.summary || '').substring(0, 200);
     const errText = latest.error ? `<div class="lit-error">Error: ${escapeHtml(String(latest.error))}</div>` : '';
+    const wt = latest.worktree_merge;
+    const wtText = (wt && (wt.merged > 0 || wt.failed > 0))
+      ? `<div class="lit-wt-merge"><span class="tag tag-wt">wt:${wt.merged}✓ ${wt.failed}✗${wt.skipped ? ' ' + wt.skipped + '–' : ''}</span></div>`
+      : '';
     div.innerHTML = `<div class="lit-header">
       <strong>#${latest.n}</strong> <span class="tag ${tagCls}">${escapeHtml(latest.classification || latest.task_type || 'unknown')}</span>
       <span style="color:var(--fg-muted)">${latest.duration_seconds || 0}s</span>
-    </div><div class="lit-summary">${escapeHtml(summary)}</div>${errText}`;
+    </div><div class="lit-summary">${escapeHtml(summary)}</div>${errText}${wtText}`;
   } else {
     div.innerHTML = '<span style="color:var(--fg-muted)">No iterations yet</span>';
   }
@@ -180,11 +184,16 @@ function updateRecentIterations(data) {
     tbody.innerHTML = iters.map(it => {
       const cls = it.error ? 'error-row' : '';
       const tagCls = it.error ? 'tag-err' : 'tag-ok';
+      const wt = it.worktree_merge;
+      const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
+        ? `<span class="tag tag-wt" title="merged:${wt.merged} failed:${wt.failed}${wt.skipped != null ? ' skipped:'+wt.skipped : ''}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
+        : '';
       return `<tr class="${cls}">
         <td>${it.n}</td><td><span class="tag tag-info">${escapeHtml(it.task_type || '')}</span></td>
         <td>${it.duration_seconds || 0}s</td>
         <td class="summary-col" title="${escapeHtml(it.summary || '')}">${escapeHtml((it.summary || '').substring(0, 80))}</td>
         <td><span class="tag ${tagCls}">${it.error ? 'ERR' : (it.classification || 'OK')}</span></td>
+        <td style="font-size:0.78rem">${wtHtml}</td>
       </tr>`;
     }).join('');
   }).catch(() => {});
@@ -389,11 +398,15 @@ async function loadIterations(page = 0) {
     const data = await res.json();
     const tbody = document.getElementById('iterations-body');
     const iters = data.iterations || [];
-    if (!iters.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--fg-muted);padding:40px;">No iterations yet</td></tr>'; return; }
+    if (!iters.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--fg-muted);padding:40px;">No iterations yet</td></tr>'; return; }
     tbody.innerHTML = iters.map(it => {
       const cls = it.error ? 'error-row' : '';
       const tagCls = it.error ? 'tag-err' : 'tag-ok';
-      return `<tr class="${cls}"><td>${it.n}</td><td style="white-space:nowrap;font-size:0.78rem;color:var(--fg-muted)">${formatTs(it.started_at)}</td><td>${it.duration_seconds||0}s</td><td><span class="tag tag-info">${escapeHtml(it.task_type||'')}</span></td><td><span class="tag ${tagCls}">${it.error?'ERR':(it.classification||'OK')}</span></td><td class="summary-col" title="${escapeHtml(it.summary||'')}">${escapeHtml((it.summary||'').substring(0,100))}</td><td style="color:var(--danger);font-size:0.78rem">${it.error?escapeHtml(String(it.error).substring(0,60)):''}</td></tr>`;
+      const wt = it.worktree_merge;
+      const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
+        ? `<span class="tag tag-wt" title="merged:${wt.merged} failed:${wt.failed}${wt.skipped != null ? ' skipped:'+wt.skipped : ''}">wt:${wt.merged}✓ ${wt.failed}✗</span>`
+        : '';
+      return `<tr class="${cls}"><td>${it.n}</td><td style="white-space:nowrap;font-size:0.78rem;color:var(--fg-muted)">${formatTs(it.started_at)}</td><td>${it.duration_seconds||0}s</td><td><span class="tag tag-info">${escapeHtml(it.task_type||'')}</span></td><td><span class="tag ${tagCls}">${it.error?'ERR':(it.classification||'OK')}</span></td><td class="summary-col" title="${escapeHtml(it.summary||'')}">${escapeHtml((it.summary||'').substring(0,100))}</td><td style="color:var(--danger);font-size:0.78rem">${it.error?escapeHtml(String(it.error).substring(0,60)):''}</td><td style="font-size:0.78rem">${wtHtml}</td></tr>`;
     }).join('');
     const tp = Math.ceil((data.total||0)/ITERATIONS_PER_PAGE);
     const pc = document.getElementById('iterations-pagination');

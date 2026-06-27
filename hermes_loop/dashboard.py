@@ -52,6 +52,7 @@ _STATUS_HTML_TPL = """<!DOCTYPE html>
   .tag-ok { background: #1a3a1a; color: #3fb950; }
   .tag-err { background: #3a1a1a; color: #f85149; }
   .tag-evolve { background: #1a1a3a; color: #58a6ff; }
+  .tag-wtree { background: #1a3a2a; color: #3fb950; }
   .progress { height: 8px; background: var(--border); border-radius: 4px; margin: 8px 0; }
   .progress-fill { height: 8px; background: #1f6feb; border-radius: 4px; transition: width 0.3s; }
   .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 1rem; }
@@ -150,6 +151,7 @@ _SSE_DASHBOARD_HTML_TPL = """<!DOCTYPE html>
   .tag-ok { background: #1a3a1a; color: #3fb950; }
   .tag-err { background: #3a1a1a; color: #f85149; }
   .tag-evolve { background: #1a1a3a; color: #58a6ff; }
+  .tag-wtree { background: #1a3a2a; color: #3fb950; }
   .progress { height: 8px; background: var(--border); border-radius: 4px; margin: 8px 0; }
   .progress-fill { height: 8px; background: #1f6feb; border-radius: 4px; transition: width 0.3s; }
   .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 1rem; }
@@ -414,6 +416,18 @@ function addIterationRow(iter) {
     var tdErr = document.createElement('td');
     tdErr.textContent = iter.error && iter.error !== 'none' ? iter.error.substring(0, 60) + '...' : '';
     tr.appendChild(tdErr);
+    // Worktree merge indicator
+    if (iter.worktree_merge) {
+        var wt = iter.worktree_merge;
+        var tdWt = document.createElement('td');
+        tdWt.style.fontSize = '0.75rem';
+        tdWt.style.color = 'var(--muted)';
+        var wtParts = [];
+        if (wt.merged > 0) wtParts.push('m' + wt.merged);
+        if (wt.failed > 0) wtParts.push('f' + wt.failed);
+        tdWt.textContent = wtParts.length ? 'wt:' + wtParts.join('/') : '';
+        tr.appendChild(tdWt);
+    }
     tbody.insertBefore(tr, tbody.firstChild);
     while (tbody.children.length > 100) {
         tbody.removeChild(tbody.lastChild);
@@ -596,11 +610,20 @@ def _generate_status_html(state: dict, compact: bool = False) -> str:
         has_err = bool(err)
         err_cls = ' class="error-row"' if has_err else ""
         has_evolve = bool(it.get("next_goal"))
+        wt = it.get("worktree_merge") or {}
+        has_wtree = bool(wt.get("merged", 0) > 0 or wt.get("failed", 0) > 0)
         tags = ""
         if has_err:
             tags += '<span class="tag tag-err">ERR</span> '
         if has_evolve:
             tags += '<span class="tag tag-evolve">EVOLVE</span> '
+        if has_wtree:
+            wt_parts = []
+            if wt.get("merged", 0) > 0:
+                wt_parts.append(f"WT:{wt['merged']}")
+            if wt.get("failed", 0) > 0:
+                wt_parts.append(f"WT-FAIL:{wt['failed']}")
+            tags += f'<span class="tag tag-wtree">{" ".join(wt_parts)}</span> '
 
         it_eta = "N/A"
         if avg_dur > 0:

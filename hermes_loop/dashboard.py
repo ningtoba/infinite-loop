@@ -464,10 +464,46 @@ fetch('/api/status')
         document.getElementById('connection-status').className = 'disconnected';
     });
 var evtSource = new EventSource('/live');
-evtSource.addEventListener('iteration', function (event) {
+evtSource.addEventListener('init', function (event) {
     try {
         var data = JSON.parse(event.data);
-        renderDashboard(data);
+        if (data && data.data) renderDashboard(data.data);
+    } catch (e) {
+        console.error('SSE parse error:', e);
+    }
+});
+evtSource.addEventListener('update', function (event) {
+    try {
+        var d = JSON.parse(event.data);
+        if (d.type === 'status_update' && d.data) {
+            var s = d.data.stats || {};
+            var led = d.data.ledger || {};
+            var iters = (d.data.ledger || {}).iterations || [];
+            var latest = iters.length > 0 ? iters[iters.length - 1] : {};
+            var et = d.data.error_counts || {};
+            renderDashboard({
+                iteration: latest,
+                status: (d.data.ledger || {}).status || 'unknown',
+                total_iterations: (d.data.ledger || {}).total_iterations || 0,
+                max_iterations: (d.data.ledger || {}).max_iterations || 0,
+                goal: (d.data.ledger || {}).goal || '-',
+                evolved_goal: (d.data.ledger || {}).evolved_goal || '',
+                started_at: (d.data.ledger || {}).started_at || '',
+                last_updated: (d.data.ledger || {}).last_updated || '',
+                stats: { success_count: s.success_count, error_count: s.error_count, total_duration_seconds: s.total_duration_seconds, avg_duration_seconds: s.avg_duration_seconds },
+                consecutive_errors: s.consecutive_errors || 0,
+                consecutive_successes: (d.data.ledger || {}).consecutive_successes || 0,
+                cooldown: (d.data.ledger || {}).cooldown || 0,
+                eta: (d.data.ledger || {}).eta || {},
+                error_counts: et,
+                mitigations: d.data.mitigations || {},
+                avg_turns_per_iter: (d.data.stats || {}).avg_turns_per_iter,
+                avg_tokens_per_iter: (d.data.stats || {}).avg_tokens_per_iter,
+                est_cost: (d.data.ledger || {}).est_cost,
+                iters_per_goal: (d.data.ledger || {}).iters_per_goal,
+                goals: (d.data.ledger || {}).goals || [],
+            });
+        }
     } catch (e) {
         console.error('SSE parse error:', e);
     }

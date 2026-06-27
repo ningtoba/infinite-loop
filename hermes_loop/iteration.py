@@ -327,7 +327,11 @@ def _merge_worker_results(
             if summary and not summary.startswith("FAILED"):
                 return True
             output_len = len(r.get("output", "") or "")
-            if output_len > 500:
+            if output_len > 200:
+                return True
+            # A non-trivial next_goal with context suggests partial work done
+            next_goal = r.get("next_goal", "") or ""
+            if len(next_goal) > 50 and not next_goal.startswith("FAILED"):
                 return True
         return False
 
@@ -344,9 +348,14 @@ def _merge_worker_results(
     # Determine the final combined_error based on worker count and error severity
     combined_error = None
     if num_workers <= 1:
-        # Single-worker: use ALL errors (both hard and soft)
-        if hard_errors or soft_errors:
-            combined_error = "; ".join(hard_errors + soft_errors)
+        # Single-worker: treat as error only if there are HARD errors.
+        # Soft errors (exit-code noise with useful output) should not mark
+        # the iteration as failed.
+        if hard_errors:
+            combined_error = "; ".join(hard_errors)
+        elif soft_errors:
+            # Single soft error — not a real failure; log it for awareness
+            _log(f"[SOFT-ERROR] Single worker had soft error: {soft_errors[0][:100]}")
     else:
         # Multi-worker: only treat as error if ALL workers have hard errors,
         # OR if the majority failed with a serious error type

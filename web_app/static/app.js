@@ -299,7 +299,7 @@ async function resetLedger() {
   try {
     const res = await fetch('/api/loop/reset', { method: 'POST' });
     const data = await res.json();
-    if (data.success) { lastLogIdx = -1; _lastWorkerLogCounts = {}; fetchStatus(); }
+    if (data.success) { lastLogIdx = -1; _lastWorkerLogCounts = {}; _lastSeenIterationCount = 0; fetchStatus(); }
     else alert('Reset failed: ' + (data.error || 'unknown'));
   } catch (err) { alert('Reset failed: ' + err.message); }
 }
@@ -313,7 +313,7 @@ async function controlLoop(action) {
     const res = await fetch(url, { method: 'POST' });
     const data = await res.json();
     if (!data.success) alert(`Error: ${data.error || 'Unknown error'}`);
-    if (action === 'start') { lastLogIdx = -1; _lastWorkerLogCounts = {}; document.getElementById('log-container').innerHTML = ''; }
+    if (action === 'start') { lastLogIdx = -1; _lastWorkerLogCounts = {}; _lastSeenIterationCount = 0; document.getElementById('log-container').innerHTML = ''; }
     setTimeout(fetchStatus, 500);
     setTimeout(fetchStatus, 2000);
   } catch (err) { alert(`Failed: ${err.message}`); }

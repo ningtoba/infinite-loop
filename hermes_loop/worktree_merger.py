@@ -372,6 +372,124 @@ def _extract_worker_from_branch(branch_name: str) -> int | None:
     return None
 
 
+def cleanup_stale_worktrees(workdir: str | None) -> dict:
+    """Clean up stale worktree branches and directories before spawning.
+
+    Hermes worktree creation fails if a branch name already exists. This
+    function prunes leftover branches/worktrees from previous runs that
+    weren't cleaned up (e.g. due to crashes or interrupted runs).
+
+    Returns a dict with cleanup stats: ``{"pruned": int, "errors": int}``.
+    """
+    cwd = workdir or os.getcwd()
+    result: dict = {"pruned": 0, "errors": 0, "details": []}
+
+    if not os.path.isdir(os.path.join(cwd, ".git")):
+        return result
+
+    # 1. Prune stale worktree metadata first
+    try:
+        subprocess.run(
+            ["git", "worktree", "prune"],
+            capture_output=True,
+            cwd=cwd,
+            timeout=10,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    # 2. Detect stale branches
+    branches = _detect_worktree_branches(cwd)
+    if not branches:
+        return result
+
+    _log(
+        f"[WORKTREE-CLEANUP] Found {len(branches)} stale worktree branch(es) "
+        f"from previous runs — cleaning up"
+    )
+
+    # 3. Switch to main branch
+    main_branch = _get_main_branch(cwd)
+    original_branch = _get_current_branch(cwd)
+    _abort_merge(cwd)
+
+    try:
+        subprocess.run(
+            ["git", "checkout", main_branch],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=15,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    # 4. Try to merge and delete each stale branch
+    for branch_info in branches:
+        branch = branch_info["name"]
+        if not _branch_exists(cwd, branch):
+            continue
+
+        _log(f"[WORKTREE-CLEANUP] Cleaning up '{branch}'...")
+
+        # Try to merge changes back (best effort — don't fail if conflicts)
+        if _try_fast_forward_merge(cwd, branch, main_branch):
+            _log(f"[WORKTREE-CLEANUP]   Merged '{branch}' into {main_branch}")
+        else:
+            # Try recursive merge, abort if conflicts
+            merge_result = _merge_with_conflict_tracking(cwd, branch, 0, 0)
+            if not merge_result.get("success"):
+                _abort_merge(cwd)
+                _log(f"[WORKTREE-CLEANUP]   Could not merge '{branch}' — discarding")
+                # Force-delete the branch since we can't merge it
+                try:
+                    subprocess.run(
+                        ["git", "branch", "-D", branch],
+                        capture_output=True,
+                        cwd=cwd,
+                        timeout=10,
+                    )
+                except (subprocess.TimeoutExpired, FileNotFoundError):
+                    pass
+
+        # Delete branch (if still exists) and remove worktree
+        _delete_worktree_branch(cwd, branch)
+        _remove_worktree_directory(cwd, branch, branch_info.get("worktree_path"))
+        result["pruned"] += 1
+
+    # Push any merged changes
+    if result["pruned"] > 0:
+        try:
+            subprocess.run(
+                ["git", "push", "origin", main_branch],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=30,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+    # 5. Return to original branch
+    if (
+        original_branch
+        and original_branch != main_branch
+        and _branch_exists(cwd, original_branch)
+    ):
+        try:
+            subprocess.run(
+                ["git", "checkout", original_branch],
+                capture_output=True,
+                cwd=cwd,
+                timeout=15,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+    _log(f"[WORKTREE-CLEANUP] Done — {result['pruned']} branch(es) cleaned up")
+    return result
+
+
 def _merge_worktree_branches(
     workdir: str | None,
     iteration_count: int,

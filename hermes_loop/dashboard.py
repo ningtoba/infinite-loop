@@ -751,8 +751,11 @@ def _build_sse_payload(state: dict) -> dict:
     iterations = state.get("iterations", [])
     latest = iterations[-1] if iterations else {}
     et = state.get("error_type_counts", {})
-    mitigations = state.get("mitigations", {})
-    mitigations["consecutive_errors"] = stats.get("consecutive_errors", 0)
+    base_mitigations = state.get("mitigations", {})
+    mitigations = {
+        **base_mitigations,
+        "consecutive_errors": stats.get("consecutive_errors", 0),
+    }
     goals_completed = state.get("goals_completed", {})
     goals_specs = state.get("goals_specs", [])
     goals_list = []

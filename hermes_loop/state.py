@@ -87,7 +87,7 @@ def load_or_create_ledger(
 
     return {
         "version": 11,
-        "version_detail": f"v{LAUNCH_LOOP_VERSION} -- Dashboard XSS Fix, Error Panel, Performance Metrics, Goals Visualization, Function Decomposition Phase 2, Phase 3, Self-Test Mode, Output Progress Classification, Idempotent Goal Execution.",
+        "version_detail": f"v{LAUNCH_LOOP_VERSION} -- Worktree cleanup, stale branch pruning, SSE dashboard fixes, bug fixes, self-test mode.",
         "initial_command": goal,
         "initial_context": context,
         "started_at": datetime.now(timezone.utc).isoformat(),

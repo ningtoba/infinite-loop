@@ -62,12 +62,16 @@ def get_system_usage() -> dict:
                 utime = int(fields[11])
                 stime = int(fields[12])
                 try:
-                    clk_tck = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", 2))
+                    clk_tck = os.sysconf_names.get("SC_CLK_TCK", 2)
                 except (AttributeError, KeyError, ValueError, OSError):
-                    clk_tck = 100
+                    clk_tck = 2
+                try:
+                    ticks_per_sec = os.sysconf(clk_tck)
+                except (AttributeError, ValueError, OSError):
+                    ticks_per_sec = 100
                 total_ticks = utime + stime
                 result["cpu_ticks_used"] = total_ticks
-                result["cpu_seconds"] = total_ticks / clk_tck
+                result["cpu_seconds"] = total_ticks / ticks_per_sec
     except (FileNotFoundError, IOError, ValueError, AttributeError):
         pass
 

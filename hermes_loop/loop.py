@@ -44,7 +44,7 @@ from .iteration import (
     _handle_callbacks,
     _sleep_with_shutdown_check,
 )
-from .worktree_merger import _merge_worktree_branches
+from .worktree_merger import _merge_worktree_branches, cleanup_stale_worktrees
 from .stats import _recalc_stats
 from .color_utils import colorizer as _shutdown_colorizer
 
@@ -332,6 +332,10 @@ def run_loop(
     if startup_delay > 0 and iteration_count == 0:
         _log(f"[DAEMON] Startup delay: {startup_delay}s before first iteration")
         _sleep_with_shutdown_check(startup_delay)
+
+    # Clean up stale worktree branches from previous runs before spawning
+    if worktree and workdir:
+        cleanup_stale_worktrees(workdir)
 
     while True:
         if _shutdown_requested:

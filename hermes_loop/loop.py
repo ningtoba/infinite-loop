@@ -509,6 +509,14 @@ def run_loop(
             # Also update goals_list[0] since spawn_goal uses it directly
             if goals_list:
                 goals_list[0].goal = goal
+            # Clean up polluted state so the ledger/UI shows a valid goal
+            # instead of the stale control signal.
+            if state.get("current_goal") and (
+                "need_reload" in state["current_goal"].lower()
+                or state["current_goal"].strip().startswith("NEXT_ITERATION")
+            ):
+                state["current_goal"] = goal
+            state.pop("evolved_goal", None)
 
         if len(goals_list) > 1:
             idx = goals_index % len(goals_list)

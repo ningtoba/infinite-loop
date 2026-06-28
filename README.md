@@ -7,6 +7,7 @@ JSON ledger, and can batch-process hundreds of goals in sequence.
 
 > **Changelog**: See [CHANGELOG.md](./CHANGELOG.md) for the complete version history.
 > **Contributing**: See [CONTRIBUTING.md](./CONTRIBUTING.md) for onboarding and development guide.
+> **Hacking**: See [HACKING.md](./HACKING.md) for the deep-dive protocol reference (spawned-session contract, ledger schema, error taxonomy, module map).
 > **Quick reference**: Use `make help` for convenience targets (run, dry-run, self-test, check, pre-commit, status, demo, stop, clean).
 
 ## Origin

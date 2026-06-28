@@ -40,7 +40,6 @@ def _request_shutdown() -> None:
 def _execute_task(
     goal: str,
     context: str,
-    toolsets: list[str],
     workdir: str | None,
     session_timeout: int,
     max_output_chars: int = 2000,
@@ -109,7 +108,9 @@ def _execute_task(
 
             if proc.returncode == 0:
                 return {
-                    "output": stdout_text[:max_output_chars] if max_output_chars else stdout_text,
+                    "output": stdout_text[:max_output_chars]
+                    if max_output_chars
+                    else stdout_text,
                     "error": None,
                     "duration_seconds": round(duration, 1),
                     "returncode": 0,
@@ -211,7 +212,6 @@ def _print_shutdown_summary(
 def run_loop(
     goal: str,
     context: str,
-    toolsets: list[str],
     workdir: str | None,
     sentinel_path: str,
     max_iterations: int,
@@ -315,7 +315,7 @@ def run_loop(
         max_turns=max_turns,
         tag=tag,
         goal=goal,
-        toolsets=toolsets,
+        toolsets=[],
         evolve=evolve,
         git=git,
         git_commit=git_commit,
@@ -493,7 +493,6 @@ def run_loop(
         result = _execute_task(
             goal=goal_text,
             context=progressive_context,
-            toolsets=toolsets,
             workdir=workdir,
             session_timeout=session_timeout,
             max_output_chars=max_output_chars,

@@ -4,18 +4,20 @@ Simplified task execution loop that spawns subprocess workers and tracks
 progress in a JSON ledger.
 """
 
+from contextlib import suppress
+from datetime import datetime, timezone
 import json
 import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
 
 from .config import VERSION, DEFAULT_CONVERGENCE_THRESHOLD, DEFAULT_CONVERGENCE_WINDOW
 from .file_utils import _log, write_ledger, write_status_file
 from .error_recovery import _adapt_to_error, _set_originals
 from .error_utils import _suggest_actionable_fix
 from .functions import (
+    _cycle_goal,
     _load_goals_file,
     _log_startup_banner,
     _build_progressive_context,
@@ -47,17 +49,19 @@ def _execute_task(
     max_retries: int = 0,
     retry_delay: int = 5,
 ) -> dict:
-    """Execute a single task via pi subprocess.
+    """Execute a single task via pi subprocess with --mode json.
 
-    Streams pi output line-by-line with [TERM (worker #1)] prefix so the
-    web UI's existing xterm.js terminal shows real-time output.
-    Returns a result dict with 'output', 'error', 'duration_seconds', etc.
+    Streams NDJSON events (thinking, tool calls, responses) line-by-line
+    with [TERM (worker #1)] prefix so the web UI's xterm.js terminal
+    shows a rich real-time view of the entire pi session.
+    Returns a result dict with 'output' (final assistant text), 'error',
+    'duration_seconds', etc.
     """
-    cmd = ["pi", "-a", "-p", goal]
+    cmd = ["pi", "-a", "--mode", "json", goal]
     if context:
         cmd.extend(["--append-system-prompt", context])
 
-    print(f"[SPAWN (worker #1)] pi -p {goal[:60]}")
+    print(f"[SPAWN (worker #1)] pi --mode json -- {goal[:60]}")
     sys.stdout.flush()
 
     start_time = time.time()
@@ -65,9 +69,10 @@ def _execute_task(
     max_attempts = max(1, max_retries + 1)
     last_error = None
     all_output = []
+    final_text_parts: list[str] = []
+    proc = None
 
-    def _prefix(line: str) -> None:
-        """Write a TERM-prefixed line to daemon stdout for web UI consumption."""
+    def _term(line: str) -> None:
         sys.stdout.write(f"[TERM (worker #1)] {line}\n")
         sys.stdout.flush()
 
@@ -82,21 +87,71 @@ def _execute_task(
                 text=True,
                 cwd=workdir or os.getcwd(),
             )
-            stdout_lines = []
+            raw_lines: list[str] = []
 
-            # Stream stdout line-by-line
             if proc.stdout is None:
                 raise RuntimeError("pi subprocess has no stdout pipe")
+
             for raw_line in proc.stdout:
                 line = raw_line.rstrip("\n").rstrip("\r")
-                stdout_lines.append(line)
-                _prefix(line)
+                raw_lines.append(line)
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    _term(line)
+                    continue
+
+                etype = event.get("type", "")
+
+                if etype == "message_update":
+                    msg = event.get("message", {})
+                    content = msg.get("content", [])
+                    # Concatenate text deltas into readable output
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict):
+                            bt = block.get("type", "")
+                            if bt == "text":
+                                text_parts.append(block.get("text", ""))
+                            elif bt == "tool_use":
+                                name = block.get("name", "tool")
+                                inp = block.get("input", {})
+                                inp_str = json.dumps(inp, default=str)[:120]
+                                text_parts.append(f"[Tool: {name}({inp_str})]")
+                            elif bt == "thinking":
+                                text_parts.append(
+                                    f"[Thinking: {block.get('thinking', '')[:60]}...]"
+                                )
+                            elif bt == "tool_result":
+                                content_block = block.get("content", "")
+                                if isinstance(content_block, list):
+                                    for cb in content_block:
+                                        if (
+                                            isinstance(cb, dict)
+                                            and cb.get("type") == "text"
+                                        ):
+                                            text_parts.append(
+                                                f"[Result: {cb.get('text', '')[:120]}]"
+                                            )
+                                elif isinstance(content_block, str):
+                                    text_parts.append(
+                                        f"[Result: {content_block[:120]}]"
+                                    )
+                    if text_parts:
+                        _term(" ".join(text_parts))
+
+                elif etype == "message_end":
+                    msg = event.get("message", {})
+                    for block in msg.get("content", []):
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            final_text_parts.append(block.get("text", ""))
 
             proc.wait(timeout=session_timeout)
             duration = time.time() - attempt_start
-            stdout_text = "\n".join(stdout_lines)
+            stdout_text = "\n".join(raw_lines)
 
-            # Read any remaining stderr
             stderr_text = ""
             if proc.stderr:
                 stderr_text = proc.stderr.read()
@@ -107,10 +162,13 @@ def _execute_task(
             sys.stdout.flush()
 
             if proc.returncode == 0:
+                final_output = (
+                    "\n".join(final_text_parts) if final_text_parts else stdout_text
+                )
                 return {
-                    "output": stdout_text[:max_output_chars]
+                    "output": final_output[:max_output_chars]
                     if max_output_chars
-                    else stdout_text,
+                    else final_output,
                     "error": None,
                     "duration_seconds": round(duration, 1),
                     "returncode": 0,
@@ -128,6 +186,11 @@ def _execute_task(
         except subprocess.TimeoutExpired:
             duration = time.time() - attempt_start
             last_error = f"timeout after {session_timeout}s"
+            # Kill the orphaned process to prevent zombie accumulation
+            if proc is not None:
+                with suppress(Exception):
+                    proc.kill()
+                    proc.wait(timeout=5)
             if attempts < max_attempts:
                 _log(
                     f"[RETRY] Attempt {attempts}/{max_attempts} timed out ({session_timeout}s)"
@@ -144,6 +207,11 @@ def _execute_task(
         except Exception as e:
             duration = time.time() - attempt_start
             last_error = str(e)
+            # Kill any orphaned subprocess on unexpected errors
+            if proc is not None:
+                with suppress(Exception):
+                    proc.kill()
+                    proc.wait(timeout=5)
             if attempts < max_attempts:
                 time.sleep(retry_delay)
 
@@ -459,7 +527,7 @@ def run_loop(
         # Cycle goals
         if len(goals_list) > 1:
             goals_index += 1
-            goal_text, exhausted = _cycle_goal_simple(
+            goal_text, exhausted = _cycle_goal(
                 goals_list, goals_index - 1, stop_at_goals_end
             )
             if exhausted:
@@ -614,7 +682,7 @@ def run_loop(
 
         # Notifications
         if notify_desktop:
-            try:
+            with suppress(Exception):
                 subprocess.run(
                     [
                         "notify-send",
@@ -623,19 +691,15 @@ def run_loop(
                     ],
                     timeout=5,
                 )
-            except Exception:
-                pass
 
         if html_dashboard:
-            try:
+            with suppress(Exception):
                 html = _build_dashboard_html(state)
                 with open(html_dashboard, "w") as f:
                     f.write(html)
-            except Exception:
-                pass
 
         if http_callback:
-            try:
+            with suppress(Exception):
                 import urllib.request
 
                 data = json.dumps(record).encode()
@@ -647,15 +711,11 @@ def run_loop(
                 if http_callback_secret:
                     req.add_header("Authorization", http_callback_secret)
                 urllib.request.urlopen(req, timeout=10)
-            except Exception:
-                pass
 
         # On-error command
         if combined_error and on_error_cmd:
-            try:
+            with suppress(Exception):
                 subprocess.run(on_error_cmd, shell=True, timeout=30)
-            except Exception:
-                pass
 
         # Cooldown
         _handle_cooldown(cooldown, cooldown_mode, None, "generic")
@@ -764,17 +824,3 @@ tr:nth-child(even) {{ background: #fafafa; }}
 | Total: {state.get("stats", {}).get("total_duration_seconds", 0):.0f}s</p>
 <table><thead><tr><th>#</th><th>Status</th><th>Duration</th><th>Summary</th></tr></thead>
 <tbody>{rows}</tbody></table></body></html>"""
-
-
-def _cycle_goal_simple(
-    goals_list: list, index: int, stop_at_end: bool
-) -> tuple[str, bool]:
-    """Cycle goals helper."""
-    if len(goals_list) <= 1:
-        return ("", False)
-    idx = index % len(goals_list)
-    spec = goals_list[idx]
-    goal_text = spec[0] if isinstance(spec, tuple) else str(spec)
-    if stop_at_end and index >= len(goals_list):
-        return ("", True)
-    return (goal_text, False)

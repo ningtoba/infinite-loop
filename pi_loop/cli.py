@@ -796,6 +796,13 @@ _pi_loop_completions() {{
 complete -F _pi_loop_completions pi-loop
 """)
     elif shell == "zsh":
+        # Compute separator outside the f-string to avoid SyntaxError
+        # on Python <3.12 (backslash \ in f-string expression parts).
+        _zsh_sep = chr(92) + chr(10) + "        "
+        _zsh_flags = _zsh_sep.join(
+            f"--{f}" for f in sorted(flag_names)
+            if not f.startswith("--") and f != "--help"
+        )
         print(f"""#compdef pi-loop
 compdef _pi_loop pi-loop
 function _pi_loop() {{
@@ -805,7 +812,7 @@ function _pi_loop() {{
         {{'--run'}}[Run the loop] \\
         {{'--version'}}[Show version] \\
         {{'--status'}}[Show status] \\
-        {" \\\n        ".join(f"--{f}" for f in sorted(flag_names) if not f.startswith("--") and f != "--help")}
+        {_zsh_flags}
 }}
 """)
     else:

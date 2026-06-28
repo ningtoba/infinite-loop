@@ -17,3 +17,9 @@ pi-loop-web = "web_app.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["pi_loop*", "web_app*"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "pytest-asyncio>=0.21.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

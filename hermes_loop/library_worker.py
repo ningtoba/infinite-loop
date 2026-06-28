@@ -2,6 +2,7 @@
 
 import sys
 import time
+import concurrent.futures as _cf
 
 from .config import LOG_FORMAT, LOG_DATE_FORMAT
 from .file_utils import _log, extract_json_from_output
@@ -102,8 +103,6 @@ def _library_worker(config: dict, prompt: str, worker_id: int) -> dict:
             pass_session_id=config.get("pass_session_id", False),
             session_id=config.get("session_id", None),
         )
-        import concurrent.futures as _cf
-
         try:
             with _cf.ThreadPoolExecutor(max_workers=1) as pool:
                 future = pool.submit(agent.run_conversation, user_message=prompt)

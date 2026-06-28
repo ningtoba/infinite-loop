@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import socket as _sock
 import subprocess
 
 from .config import SENTINEL_PATH_DEFAULT
@@ -118,8 +119,6 @@ class PreflightChecker:
         if port <= 0:
             return True, "port not requested"
         try:
-            import socket as _sock
-
             with _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM) as s:
                 s.bind(("", port))
             return True, f"port {port} is available"

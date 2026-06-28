@@ -130,7 +130,12 @@
       <!-- Error Breakdown -->
       <div class="section" id="error-section" style="display:none">
         <h3>Error Breakdown</h3>
-        <div class="error-grid" id="error-grid"></div>
+        <div class="error-grid" id="error-grid">
+          <div class="error-card etimeout" id="err-card-timeout"><span class="ecount">0</span> timeout</div>
+          <div class="error-card enetwork" id="err-card-network"><span class="ecount">0</span> network</div>
+          <div class="error-card eschema" id="err-card-schema"><span class="ecount">0</span> schema</div>
+          <div class="error-card eunknown" id="err-card-unknown"><span class="ecount">0</span> unknown</div>
+        </div>
       </div>
 
       <!-- Mitigations -->

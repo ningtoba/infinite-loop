@@ -461,6 +461,22 @@ function addIterationRow(iter) {
         if (wt.conflicts > 0) tooltipParts.push('conflicts: ' + wt.conflicts);
         tdWt.title = tooltipParts.join(' | ');
     }
+    // Remote cleanup data (pre-iteration stale/remote branch cleanup)
+    if (iter.remote_cleanup) {
+        var rc = iter.remote_cleanup;
+        var rcParts = [];
+        if (rc.remote_deleted > 0) rcParts.push('r' + rc.remote_deleted + 'del');
+        if (rc.remote_merged > 0) rcParts.push('r' + rc.remote_merged + 'mg');
+        if (rc.stale_pruned > 0) rcParts.push('s' + rc.stale_pruned);
+        var rcText = rcParts.length ? 'clean:' + rcParts.join('/') : '';
+        if (tdWt.textContent) {
+            tdWt.textContent += ' ' + rcText;
+            tdWt.title += ' | remote cleanup: ' + (rc.remote_deleted || 0) + ' deleted, ' + (rc.remote_merged || 0) + ' merged, ' + (rc.stale_pruned || 0) + ' stale pruned';
+        } else {
+            tdWt.textContent = rcText;
+            tdWt.title = 'remote cleanup: ' + (rc.remote_deleted || 0) + ' deleted, ' + (rc.remote_merged || 0) + ' merged, ' + (rc.stale_pruned || 0) + ' stale pruned';
+        }
+    }
     tr.appendChild(tdWt);
     tbody.insertBefore(tr, tbody.firstChild);
     while (tbody.children.length > 100) {
@@ -711,6 +727,12 @@ def _generate_status_html(state: dict, compact: bool = False) -> str:
         has_evolve = bool(it.get("next_goal"))
         wt = it.get("worktree_merge") or {}
         has_wtree = bool(wt.get("merged", 0) > 0 or wt.get("failed", 0) > 0)
+        rc = it.get("remote_cleanup") or {}
+        has_rc = bool(
+            rc.get("remote_deleted", 0) > 0
+            or rc.get("stale_pruned", 0) > 0
+            or rc.get("remote_merged", 0) > 0
+        )
         tags = ""
         if has_err:
             tags += '<span class="tag tag-err">ERR</span> '
@@ -723,6 +745,15 @@ def _generate_status_html(state: dict, compact: bool = False) -> str:
             if wt.get("failed", 0) > 0:
                 wt_parts.append(f"WT-FAIL:{wt['failed']}")
             tags += f'<span class="tag tag-wtree">{" ".join(wt_parts)}</span> '
+        if has_rc:
+            rc_parts = []
+            if rc.get("remote_deleted", 0) > 0:
+                rc_parts.append(f"R:{rc['remote_deleted']}del")
+            if rc.get("stale_pruned", 0) > 0:
+                rc_parts.append(f"R:{rc['stale_pruned']}stale")
+            if rc.get("remote_merged", 0) > 0:
+                rc_parts.append(f"R:{rc['remote_merged']}mg")
+            tags += f'<span class="tag tag-wtree">{" ".join(rc_parts)}</span> '
 
         it_eta = "N/A"
         if avg_dur > 0:

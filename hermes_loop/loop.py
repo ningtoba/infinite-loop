@@ -530,13 +530,15 @@ def run_loop(
         sys_before = get_system_usage()
 
         # Clean up stale worktree branches before spawning (from crashes/errors)
+        stale_cleanup_result: dict = {}
         if worktree and workdir:
-            cleanup_stale_worktrees(workdir)
+            stale_cleanup_result = cleanup_stale_worktrees(workdir)
 
         # Also clean stale remote worktree branches before spawning (prevents
         # worker branch pile-up on GitHub from failed/interrupted jobs)
+        remote_cleanup_result: dict = {}
         if worktree and workdir:
-            _cleanup_stale_remote_branches(workdir)
+            remote_cleanup_result = _cleanup_stale_remote_branches(workdir)
 
         all_results, spawn_goal, use_library = _execute_iteration(
             state=state,
@@ -726,6 +728,19 @@ def run_loop(
                 "source_branches": worktree_merge_result.get("source_branches", []),
             }
 
+        # Store pre-iteration remote/branch cleanup stats in the record
+        if worktree:
+            stale_merged = stale_cleanup_result.get("pruned", 0)
+            remote_deleted = remote_cleanup_result.get("deleted", 0)
+            remote_merged = remote_cleanup_result.get("merged", 0)
+            if stale_merged > 0 or remote_deleted > 0 or remote_merged > 0:
+                record["remote_cleanup"] = {
+                    "stale_pruned": stale_merged,
+                    "remote_merged": remote_merged,
+                    "remote_deleted": remote_deleted,
+                    "remote_failed": remote_cleanup_result.get("failed", 0),
+                }
+
         state["iterations"].append(record)
         state["total_iterations"] = iteration_count
         state["last_updated"] = datetime.now(timezone.utc).isoformat()
@@ -843,6 +858,21 @@ def run_loop(
                 if wt_conflicts > 0:
                     wt_parts.append(f"{wt_conflicts} conflicts")
                 summary_parts.append(f"wtree={'/'.join(wt_parts)}")
+
+        # Remote cleanup stats (stale branches and remote hermes/* branches cleaned pre-iteration)
+        if worktree:
+            stale_pruned = stale_cleanup_result.get("pruned", 0)
+            remote_del = remote_cleanup_result.get("deleted", 0)
+            remote_merged = remote_cleanup_result.get("merged", 0)
+            if stale_pruned > 0 or remote_del > 0 or remote_merged > 0:
+                rc_parts = []
+                if remote_merged > 0:
+                    rc_parts.append(f"{remote_merged} merged")
+                if remote_del > 0:
+                    rc_parts.append(f"{remote_del} deleted")
+                if stale_pruned > 0:
+                    rc_parts.append(f"{stale_pruned} stale")
+                summary_parts.append(f"remote={'/'.join(rc_parts)}")
 
         # Task type
         if task_type:

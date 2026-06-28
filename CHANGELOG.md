@@ -4,6 +4,11 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.39.3] — 2026-06-28
+
+### Fixed
+- **`loop.py` — `need_reload` control signal no longer pollutes evolved goal**: When a worker returns `next_goal` containing "need_reload" (a self-modification signal), the evolve logic now skips it instead of setting it as the next iteration's goal. Previously, the evolved goal would become `"NEXT_ITERATION need_reload"`, causing subsequent workers to waste an iteration chasing a meaningless goal. This was especially problematic with `HERMES_LOOP_NO_AUTO_RELOAD=1` (web UI mode), where the daemon cannot execv-reload and the stale goal persisted indefinitely. (Iteration #28)
+
 ## [14.39.2] — 2026-06-28
 
 ### Added

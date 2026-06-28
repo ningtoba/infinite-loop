@@ -1,12 +1,12 @@
 # Improvement Plan
 
-Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T16:17:00+08:00
+Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T17:35:00+08:00
 
 ## 📊 Progress Summary
 
 | Category      | Completed | Remaining |
 |---------------|-----------|-----------|
-| 🐛 Bugs       | 2         | 0         |
+| 🐛 Bugs       | 3         | 0         |
 | 🧪 Tests      | 0         | 0         |
 | 📖 Docs        | 0         | 0         |
 | 🔧 Refactor   | 2         | 0         |
@@ -18,6 +18,8 @@ Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T16:17:00+08:00
 | 🏗️ Infra/CI  | 2         | 0         |
 
 ## Completed
+
+- **[2026-06-28] [🐛 Bugs] `loop.py` — `need_reload` control signal no longer pollutes evolved goal**: `evolve` logic now detects `"need_reload"` in `next_goal` and skips evolution. Fixes the bug where `HERMES_LOOP_NO_AUTO_RELOAD=1` (web UI mode) caused the daemon to keep sending workers on a "NEXT_ITERATION need_reload" wild goose chase. — commit pending
 
 - **[2026-06-28] [🧹 Hygiene] `library_worker.py` — Moved inline `import logging as _logging` to module top level**: No behaviour change. — commit a6c1747
 - **[2026-06-28] [🔒 Security] HMAC-SHA256 webhook signing for `--http-callback`**: Added `--http-callback-secret` CLI flag. — commit 4f8a647

@@ -767,11 +767,21 @@ def run_loop(
             print(json.dumps(json_line, default=str), flush=True)
 
         if evolve and next_goal and len(goals_list) <= 1:
-            state["current_goal"] = next_goal
-            goal = next_goal
-            goals_list[0] = GoalSpec(goal)
-            state["evolved_goal"] = goal
-            _log(f"[EVOLVE] Next goal: {goal[:120]}...")
+            # Guard: "need_reload" is a control signal, NOT a real goal.
+            # Evolving to it would send the next worker on a wild goose chase.
+            # If the reload is blocked (HERMES_LOOP_NO_AUTO_RELOAD) or fails,
+            # the stale evolved goal persists and pollutes all subsequent iterations.
+            if "need_reload" in next_goal:
+                _log(
+                    "[EVOLVE] next_goal contains 'need_reload' — skipping evolution (control signal, not a real goal)"
+                )
+                state.pop("evolved_goal", None)
+            else:
+                state["current_goal"] = next_goal
+                goal = next_goal
+                goals_list[0] = GoalSpec(goal)
+                state["evolved_goal"] = goal
+                _log(f"[EVOLVE] Next goal: {goal[:120]}...")
 
         if next_context:
             progressive_context = f"[Context from previous iteration]: {next_context}"

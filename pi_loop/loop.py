@@ -56,10 +56,9 @@ def _execute_task(
     cmd = ["pi", "-p", goal]
     if context:
         cmd.extend(["--append-system-prompt", context])
-    # Only pass --tools if the user explicitly configured toolsets
-    # (empty = pi uses its full default toolset)
-    if toolsets and any(t not in ("terminal", "file", "delegation") for t in toolsets):
-        cmd.extend(["--tools", ",".join(toolsets)])
+    # Pi comes with its full default toolset (read, bash, edit, write, etc.)
+    # Do NOT pass --tools — the old hermes toolset names (terminal, file, delegation, etc.)
+    # are NOT pi tool names, and passing them restricts pi to a broken subset.
 
     print(f"[SPAWN (worker #1)] pi -p {goal[:60]}")
     sys.stdout.flush()
@@ -85,7 +84,9 @@ def _execute_task(
             stdout = r.stdout or ""
             stderr = r.stderr or ""
 
-            print(f"[WORKER (worker #1)] Response in {duration:.1f}s (status={'ok' if r.returncode == 0 else 'failed'})")
+            print(
+                f"[WORKER (worker #1)] Response in {duration:.1f}s (status={'ok' if r.returncode == 0 else 'failed'})"
+            )
             sys.stdout.flush()
             duration = time.time() - attempt_start
             stdout = r.stdout or ""

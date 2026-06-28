@@ -157,7 +157,9 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
 
-        q: queue.Queue = queue.Queue()
+        q: queue.Queue = queue.Queue(
+            maxsize=128
+        )  # bounded — prevents unbounded memory growth from slow/disconnected clients
         with _sse_clients_lock:
             _sse_clients.append(q)
 

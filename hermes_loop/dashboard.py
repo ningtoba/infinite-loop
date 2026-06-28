@@ -2,6 +2,7 @@
 
 import json
 import os
+import queue
 import threading
 
 from .config import LAUNCH_LOOP_VERSION
@@ -857,7 +858,12 @@ def _wrap_sse_payload(raw: dict) -> dict:
 
 
 def _broadcast_to_sse_clients(state: dict) -> None:
-    """Push the latest iteration state as an SSE event to all connected clients."""
+    """Push the latest iteration state as an SSE event to all connected clients.
+
+    Uses bounded queues (maxsize=128 in webhook.py _handle_sse) so that
+    slow or disconnected clients are detected via queue.Full and dropped,
+    preventing unbounded memory growth.
+    """
     global _sse_clients
     payload = _build_sse_payload(state)
     payload_json = json.dumps(payload, default=str)
@@ -867,8 +873,10 @@ def _broadcast_to_sse_clients(state: dict) -> None:
             try:
                 q.put_nowait(payload_json)
                 alive.append(q)
+            except queue.Full:
+                pass  # consumer too slow — bounded queue hit capacity, drop client
             except Exception:
-                pass  # client queue full or removed — drop client
+                pass  # safeguard for any other queue errors
         _sse_clients = alive
 
 

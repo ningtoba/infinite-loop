@@ -1,6 +1,6 @@
 # Improvement Plan
 
-Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T15:49:00+08:00
+Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T15:52:00+08:00
 
 ## 📊 Progress Summary
 
@@ -9,7 +9,7 @@ Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T15:49:00+08:00
 | 🐛 Bugs       | 2         | 0         |
 | 🧪 Tests      | 0         | 0         |
 | 📖 Docs        | 0         | 0         |
-| 🔧 Refactor   | 0         | 2         |
+| 🔧 Refactor   | 1         | 1         |
 | ⚡ Perf       | 0         | 0         |
 | 🔒 Security   | 0         | 0         |
 | ✨ Features   | 0         | 1         |
@@ -24,6 +24,7 @@ Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T15:49:00+08:00
 - **[2026-06-28] [🐛 Bugs] Fixed `os.sysconf_names` deprecation in `system_utils.py:65-69`**: Replaced two-step `os.sysconf_names.get("SC_CLK_TCK")` → `os.sysconf()` lookup with direct `os.sysconf("SC_CLK_TCK")` call. Simpler, more readable, and avoids any concern about the deprecated `sysconf_names` mapping behavior on Python 3.14+. — commit (unstaged)
 - **[2026-06-28] [🐛 Bugs] Added depth limit + cycle detection to `validation.py:_validate`**: Added `_MAX_VALIDATION_DEPTH=50` depth cap and identity-based cycle detector (`(id(schema_node), id(obj))` pairs) to prevent stack overflow from deeply nested or self-referencing schemas. All 12 self-tests pass with no regressions. — commit (unstaged)
 - **[2026-06-28] [🏗️ Infra/CI] Fixed broken `make test` and `make check` targets**: Removed `pytest tests/` command from Makefile, replaced `make test` to delegate to `make self-test`. Removed `[tool.pytest.ini_options]` from pyproject.toml. Removed `tests/` from ruff lint paths. Updated `make check` step 2 to skip `make test` and just run `make self-test`. — commit (unstaged)
+- **[2026-06-28] [🔧 Refactor] `preflight.py` — `run_all()` delegates to `run_all_checks()`**: The instance method `run_all()` now delegates to the static `run_all_checks()` instead of duplicating the same check list. `_read_heartbeat` optimized to use `json.load(f)` directly. `import glob` moved to module top level in `heartbeat.py`. — commit (unstaged)
 
 ## Backlog (prioritized — highest impact first)
 
@@ -43,8 +44,7 @@ Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T15:49:00+08:00
 
 ### 🔧 Refactoring Candidates
 
-- **`hermes_loop/heartbeat.py` — `_monitor_heartbeat` IO with GIL**: `_write_heartbeat_file` does file I/O inside the hot loop. For a daemon thread, this is fine, but the `_read_heartbeat` call on every poll cycle does JSON parsing and file open — could batch reads.
-- **`hermes_loop/preflight.py` — Duplicated check list between `run_all()` and `run_all_checks()`**: Both instance method and static method duplicate the same list of checks. One should delegate to the other.
+- **`hermes_loop/heartbeat.py` — `_monitor_heartbeat` IO with GIL**: `_write_heartbeat_file` does file I/O inside the hot loop. For a daemon thread, this is fine, but the `_read_heartbeat` call on every poll cycle does JSON parsing and file open — could batch reads. *(Partly addressed: `_read_heartbeat` optimized to use `json.load(f)` directly + `import glob` moved to module level.)*
 
 ### ⚡ Performance Issues
 
@@ -60,9 +60,8 @@ Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T15:49:00+08:00
 
 ### 🧹 Code Hygiene (lint, types, dead code, imports)
 
-- **`hermes_loop/preflight.py:150` — `import socket as _sock`** inside method body: Should be at module top level for consistency with other stdlib imports.
-- **`hermes_loop/heartbeat.py:187` — `import glob` inside function body**: Should be at module top level.
-- **`hermes_loop/library_worker.py:106-108` — `import concurrent.futures as _cf` inside try block inside function**: Should be at module top level.
+- **`hermes_loop/preflight.py:149` — `import socket as _sock`** inside method body: Should be at module top level for consistency with other stdlib imports.
+- **`hermes_loop/library_worker.py:106-108` — `import concurrent.futures as _cf`** inside try block inside function: Should be at module top level.
 
 ### 🌐 Web UI / Frontend (web_app/, dashboard.py)
 

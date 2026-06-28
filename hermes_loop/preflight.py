@@ -28,57 +28,29 @@ class PreflightChecker:
 
     def run_all(self) -> bool:
         """Run all preflight checks from args, log results, return True if all pass."""
-        checks = [
-            ("hermes binary", PreflightChecker.check_hermes_binary()),
-            ("workdir", PreflightChecker.check_workdir(self._args.workdir or "")),
-            (
-                "sentinel writable",
-                PreflightChecker.check_sentinel_writable(self._args.shutdown_sentinel),
-            ),
-            (
-                "port available",
-                PreflightChecker.check_port_available(self._args.webhook_port or 0),
-            ),
-            (
-                "context file",
-                PreflightChecker.check_file_readable(
-                    self._args.context_file or "", "context-file"
-                ),
-            ),
-            (
-                "goals file",
-                PreflightChecker.check_file_readable(
-                    self._args.goals_file or "", "goals-file"
-                ),
-            ),
-            (
-                "schema file",
-                PreflightChecker.check_schema_file(self._args.output_schema_file or ""),
-            ),
-        ]
+        results = PreflightChecker.run_all_checks(
+            hermes_required=True,
+            workdir=self._args.workdir or "",
+            sentinel_path=self._args.shutdown_sentinel,
+            webhook_port=self._args.webhook_port or 0,
+            context_file=self._args.context_file or "",
+            goals_file=self._args.goals_file or "",
+            schema_file=self._args.output_schema_file or "",
+            check_git=getattr(self._args, "git", False),
+            check_disk=getattr(self._args, "log_file", "") or "/tmp",
+            fail_fast=self._fail_fast,
+        )
 
-        if getattr(self._args, "git", False):
-            checks.append(
-                ("git repo", PreflightChecker.check_git_repo(self._args.workdir or ""))
-            )
-
-        log_path = getattr(self._args, "log_file", "") or "/tmp"
-        checks.append(("disk space", PreflightChecker.check_disk_space(log_path)))
-
-        checks.append(("hermes version", PreflightChecker.check_hermes_version()))
-
-        results = []
         all_pass = True
-        for name, (passed, detail) in checks:
-            results.append({"name": name, "passed": passed, "detail": detail})
-            if not passed:
+        for r in results:
+            if not r["passed"]:
                 all_pass = False
-                _log(f"[PREFLIGHT] ✗ {name}: {detail[:120]}")
+                _log(f"[PREFLIGHT] \u2717 {r['name']}: {r['detail'][:120]}")
                 if self._fail_fast:
-                    _log("[PREFLIGHT] FAIL FAST — aborting.")
+                    _log("[PREFLIGHT] FAIL FAST \u2014 aborting.")
                     break
             else:
-                _log(f"[PREFLIGHT] ✓ {name}: {detail[:120]}")
+                _log(f"[PREFLIGHT] \u2713 {r['name']}: {r['detail'][:120]}")
 
         if all_pass:
             _log("[PREFLIGHT] All checks passed.")
@@ -101,7 +73,7 @@ class PreflightChecker:
         """Check the installed Hermes version for compatibility."""
         hermes = shutil.which("hermes")
         if not hermes:
-            return False, "'hermes' not on PATH — can't check version"
+            return False, "'hermes' not on PATH \u2014 can't check version"
         try:
             r = subprocess.run(
                 [hermes, "--version"], capture_output=True, text=True, timeout=10
@@ -130,7 +102,7 @@ class PreflightChecker:
         git_dir = os.path.join(base, ".git")
         if os.path.isdir(git_dir):
             return True, f".git found at {git_dir}"
-        return False, "no .git directory — git features will be no-ops"
+        return False, "no .git directory \u2014 git features will be no-ops"
 
     @staticmethod
     def check_sentinel_writable(sentinel_path: str) -> tuple[bool, str]:
@@ -246,11 +218,11 @@ class PreflightChecker:
 
     @staticmethod
     def format_results(results: list[dict]) -> str:
-        """Format preflight results as a table with ✓/✗ indicators."""
+        """Format preflight results as a table with \u2713/\u2717 indicators."""
         lines = ["", "--- Preflight Health Checks ---"]
         all_pass = True
         for r in results:
-            icon = "✓" if r["passed"] else "✗"
+            icon = "\u2713" if r["passed"] else "\u2717"
             if not r["passed"]:
                 all_pass = False
             detail = r["detail"][:80]

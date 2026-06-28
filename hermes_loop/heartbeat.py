@@ -1,5 +1,6 @@
 """Heartbeat helpers (Session Self-Healing)."""
 
+import glob
 import json
 import os
 import subprocess
@@ -26,7 +27,7 @@ def _read_heartbeat(heartbeat_file: str) -> dict | None:
     """Read and parse a heartbeat file. Returns None on any error."""
     try:
         with open(heartbeat_file) as f:
-            return json.loads(f.read().strip())
+            return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return None
 
@@ -184,8 +185,6 @@ def _kill_session(proc: subprocess.Popen | None, session_id: str) -> None:
 
 def _cleanup_stale_heartbeats() -> None:
     """Remove heartbeat files from previous daemon instances at startup."""
-    import glob
-
     pattern = os.path.join(HEARTBEAT_DIR, f"{HEARTBEAT_PREFIX}*")
     removed = 0
     for f in glob.glob(pattern):

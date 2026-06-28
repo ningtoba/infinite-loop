@@ -2,6 +2,7 @@
 
 import atexit
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -114,9 +115,9 @@ def _print_shutdown_summary(
         f"    {c.dim('Errors:')}          bash scripts/inspect-ledger.sh --errors-only"
     )
     _slog(f"    {c.dim('Re-run:')}          bash scripts/run-loop.sh")
-    _slog(f"    {c.dim('Restart with:')}  python3 -m hermes_loop --goal \"...\" --run")
-    _slog(f"    {c.dim('Help:')}           python3 -m hermes_loop --help")
-    _slog(f"    {c.dim('Examples:')}       python3 -m hermes_loop --examples")
+    _slog(f"    {c.dim('Restart with:')}  hermes_loop --goal \"...\" --run")
+    _slog(f"    {c.dim('Help:')}           hermes_loop --help")
+    _slog(f"    {c.dim('Examples:')}       hermes_loop --examples")
     _slog(f"{c.header('══════════════════════════════════════════════')}")
     _slog("")
 
@@ -502,6 +503,9 @@ def run_loop(
                 _log(
                     f"[TRACK-GOALS] Skipping already-completed goal: {goal_text[:120]}..."
                 )
+                iteration_count -= (
+                    1  # undo the pre-increment since we're not actually iterating
+                )
                 continue
 
         progressive_context = _build_progressive_context(context, existing_summaries)
@@ -605,9 +609,7 @@ def run_loop(
                 _log(f"[GIT] Committed as {git_commit_hash}")
                 # Also push committed changes to remote (best-effort)
                 try:
-                    import subprocess as _sp  # noqa: F401
-
-                    _sp.run(
+                    subprocess.run(
                         ["git", "push", "origin", "HEAD"],
                         capture_output=True,
                         cwd=workdir or os.getcwd(),
@@ -720,6 +722,8 @@ def run_loop(
             _log("[RELOAD] Spawned session signaled need_reload. Restarting daemon...")
             state["status"] = "reloading"
             state["last_updated"] = datetime.now(timezone.utc).isoformat()
+            state["consecutive_successes"] = consecutive_successes
+            state["consecutive_errors"] = consecutive_errors
             write_ledger(state)
             write_status_file(status_file, state, iteration_count, "reloading")
             if worker_manager:
@@ -947,6 +951,7 @@ def run_loop(
         )
 
         state["consecutive_successes"] = consecutive_successes
+        state.setdefault("stats", {})["consecutive_errors"] = consecutive_errors
 
         for action in adapt_actions:
             _log(f"[AUTO-RECOVERY] {action}")
@@ -973,10 +978,9 @@ def run_loop(
 
         if state["mitigations"].get("mitigation_level", 0) >= 3:
             _log("[AUTO-RECOVERY] Persistent failure detected — stopping daemon")
-            stop_reason = (
-                f"stopped: {primary_error_type}-failure-"
-                f"{state.get('error_type_counts', {}).get(primary_error_type, 0)}"
-            )
+            err_type = primary_error_type or "unknown"
+            err_count = state.get("error_type_counts", {}).get(err_type, 0)
+            stop_reason = f"stopped: {err_type}-failure-{err_count}"
             state["status"] = stop_reason
             state["last_updated"] = datetime.now(timezone.utc).isoformat()
             write_ledger(state)

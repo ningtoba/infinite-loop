@@ -172,17 +172,19 @@ class LoopManager:
         # sentinel between iterations, so we need SIGTERM to stop a running
         # hermes chat session mid-iteration.
         if self._process:
+            pgid = None
             try:
                 pgid = os.getpgid(self._process.pid)
                 os.killpg(pgid, signal.SIGTERM)
                 await asyncio.wait_for(self._process.wait(), timeout=5)
             except asyncio.TimeoutError:
-                self._add_log("warn", "Force killing...")
-                try:
-                    os.killpg(pgid, signal.SIGKILL)
-                    await asyncio.wait_for(self._process.wait(), timeout=5)
-                except (asyncio.TimeoutError, OSError):
-                    pass
+                if pgid is not None:
+                    self._add_log("warn", "Force killing...")
+                    try:
+                        os.killpg(pgid, signal.SIGKILL)
+                        await asyncio.wait_for(self._process.wait(), timeout=5)
+                    except (asyncio.TimeoutError, OSError):
+                        pass
             except (ProcessLookupError, OSError):
                 pass
 

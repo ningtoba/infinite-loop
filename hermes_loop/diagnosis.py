@@ -195,7 +195,7 @@ def _check_env_file() -> list[dict]:
                     ".env has content",
                     total_vars > 0,
                     f"{total_vars} variable(s) defined",
-                    "Run 'python3 -m hermes_loop --init' to create a .env",
+                    "Run 'hermes_loop --init' to create a .env",
                 )
             )
             # Check for common typos
@@ -212,7 +212,7 @@ def _check_env_file() -> list[dict]:
                         "No typos in INFINITE_LOOP_* variables",
                         False,
                         f"Suspicious: {', '.join(suspicious)}",
-                        "Run 'python3 -m hermes_loop --check-env' for detailed validation",
+                        "Run 'hermes_loop --check-env' for detailed validation",
                     )
                 )
             else:
@@ -247,7 +247,7 @@ def _check_env_file() -> list[dict]:
                 False,
                 "Not found in cwd or parent dirs",
                 "Copy .env.example to .env: cp .env.example .env\n"
-                "Or run: python3 -m hermes_loop --init",
+                "Or run: hermes_loop --init",
             )
         )
     return checks
@@ -477,4 +477,4 @@ def print_diagnosis_report(checks: list[dict], version: str = ""):
         print("  Quick start:")
         print("    bash run.sh           # Launch with .env config")
         print("    make run              # Same via Makefile")
-        print("    python3 -m hermes_loop --init  # Create .env interactively")
+        print("    hermes_loop --init  # Create .env interactively")

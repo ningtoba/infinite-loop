@@ -126,7 +126,7 @@ print('Config updated successfully.')
   echo "          for these changes to take effect."
   echo ""
   echo "Verify with:"
-  echo "  grep -A 8 '^delegation:' $CONFIG_FILE"
+  echo "  grep -A 8 '^delegation:' \"$CONFIG_FILE\""
   exit 1
 else
   echo "[ALL PASS] Config is ready for infinite-loop."

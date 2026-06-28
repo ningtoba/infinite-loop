@@ -147,7 +147,7 @@ Browser (Web UI)
   ├─ GET  /api/status        → Loop status + ledger stats
   ├─ GET  /api/config        → Full configuration with schema
   ├─ POST /api/config        → Save configuration to .env
-  ├─ POST /api/loop/start    → Spawns python3 -m hermes_loop ... --run
+  ├─ POST /api/loop/start    → Spawns hermes_loop ... --run
   ├─ POST /api/loop/stop     → Writes "stop" to sentinel file
   ├─ POST /api/loop/pause    → Writes "pause" to sentinel file
   ├─ POST /api/loop/resume   → Removes sentinel file
@@ -158,7 +158,7 @@ Browser (Web UI)
 ```
 
 The web server manages the daemon as a subprocess — it reads `.env` for
-configuration, builds the CLI arguments, and spawns `python3 -m hermes_loop`.
+configuration, builds the CLI arguments, and spawns `hermes_loop`.
 Control is handled via the sentinel file (the same mechanism used by the
 standalone daemon).
 

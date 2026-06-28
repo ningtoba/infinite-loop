@@ -94,7 +94,7 @@ async def preview_cli_args():
     """Preview the CLI arguments that would be used to start the daemon."""
     config = get_raw_config()
     cli_args = build_cli_args(config)
-    return {"args": cli_args, "command": "python3 -m hermes_loop " + " ".join(cli_args)}
+    return {"args": cli_args, "command": "hermes_loop " + " ".join(cli_args)}
 
 
 # ── Loop Control API ────────────────────────────────────────────────────────

@@ -12,6 +12,30 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
   `scripts/run-loop.sh` banner which were already at 14.34.0.
 - **CHANGELOG entry**: Added this missing v14.34.0 changelog section.
 
+## [14.35.0] — 2026-06-28
+
+### Fixed
+- **`hermes_loop/signal_handlers.py` — `_handle_shutdown()` removed stale `import os as _os`
+  and `os.kill(0, signal.SIGCONT)` no-op**: Removed unnecessary redundant import and the
+  misleading `os.kill(0, SIGCONT)` call that actually sent SIGCONT to all processes in the
+  process group (not a true no-op). The downstream `pkill -9 -P <pid>` already handles
+  child process cleanup.
+- **`hermes_loop/loop.py` — Missing `consecutive_errors` state persistence**: Added
+  `state.setdefault("stats", {})["consecutive_errors"] = consecutive_errors` at the end
+  of the iteration loop body (line 952). Previously only `consecutive_successes` was saved
+  back to the state dict — `consecutive_errors` was computed from the merge result but
+  never written to `state["stats"]`, causing stale data on ledger reload.
+- **`hermes_loop/loop.py` — Repeated `import subprocess as _sp` inside loop body**: Moved
+  `import subprocess` to the top-level module imports (line 6). Previously it was imported
+  inside the `try` block on every iteration when `--git-commit` was enabled (line 608).
+- **Stale `python3 -m hermes_loop` references**: Updated 10 remaining `python3 -m hermes_loop`
+  references that were missed in v14.30.0's CLI unification. Files updated:
+  `hermes_loop/loop.py` (shutdown summary next-steps), `hermes_loop/diagnosis.py` (5
+  --doctor messages), `hermes_loop/completions.py` (docstring), `hermes_loop/__main__.py`
+  (module docstring), `web_app/server.py` (command preview API), `README.md` (2 references
+  in web app API doc). All now consistently use the installed `hermes_loop` command.
+  The `python3 -m hermes_loop` fallback still works and completion scripts document it.
+
 ## [14.33.0] — 2026-06-28
 
 ### Added

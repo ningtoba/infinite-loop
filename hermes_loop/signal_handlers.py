@@ -54,9 +54,6 @@ def _handle_shutdown(signum, frame):
 
     try:
         # Kill only descendant processes of this daemon, not all hermes instances
-        import os as _os
-
-        _os.kill(0, signal.SIGCONT)  # no-op to ensure process group is valid
         _subprocess.run(
             ["pkill", "-9", "-P", str(os.getpid())], capture_output=True, timeout=3
         )

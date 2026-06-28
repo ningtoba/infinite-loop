@@ -5,9 +5,9 @@ for bash and zsh — eliminating the need to maintain static completion
 files that drift from the actual argparse definitions.
 
 Usage:
-    python3 -m hermes_loop --completion-script bash   # print bash completion
-    python3 -m hermes_loop --completion-script zsh    # print zsh completion
-    python3 -m hermes_loop --completion-script bash | source /dev/stdin
+    hermes_loop --completion-script bash   # print bash completion
+    hermes_loop --completion-script zsh    # print zsh completion
+    hermes_loop --completion-script bash | source /dev/stdin
 """
 
 
@@ -140,7 +140,7 @@ def generate_bash_completion(parser):
 # Provides completions for:
 #   launch-loop.py
 #   python3 launch-loop.py
-#   python3 -m hermes_loop
+#   python3 -m hermes_loop         (still supported as fallback)
 #   run.sh
 #   scripts/run-loop.sh
 

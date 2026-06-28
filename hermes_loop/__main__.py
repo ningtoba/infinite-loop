@@ -1,4 +1,4 @@
-"""python3 -m hermes_loop entry point."""
+"""hermes_loop entry point."""
 
 from .cli import main
 

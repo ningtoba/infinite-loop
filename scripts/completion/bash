@@ -6,7 +6,7 @@
 # Provides completions for:
 #   launch-loop.py
 #   python3 launch-loop.py
-#   python3 -m hermes_loop
+#   python3 -m hermes_loop         (still supported as fallback)
 #   run.sh
 #   scripts/run-loop.sh
 

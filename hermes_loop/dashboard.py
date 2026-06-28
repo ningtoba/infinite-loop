@@ -2,7 +2,6 @@
 
 import json
 import os
-import queue
 import threading
 
 from .config import LAUNCH_LOOP_VERSION
@@ -835,7 +834,7 @@ def _broadcast_to_sse_clients(state: dict) -> None:
             try:
                 q.put_nowait(payload_json)
                 alive.append(q)
-            except (queue.Full, ValueError):
+            except Exception:
                 pass  # client queue full or removed — drop client
         _sse_clients = alive
 

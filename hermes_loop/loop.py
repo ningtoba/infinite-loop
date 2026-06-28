@@ -957,8 +957,9 @@ def run_loop(
 
         state["consecutive_successes"] = consecutive_successes
         state["consecutive_errors"] = consecutive_errors
-        state.setdefault("stats", {})["consecutive_errors"] = consecutive_errors
-        state.setdefault("stats", {})["consecutive_successes"] = consecutive_successes
+        stats_dict = state.setdefault("stats", {})
+        stats_dict["consecutive_errors"] = consecutive_errors
+        stats_dict["consecutive_successes"] = consecutive_successes
 
         for action in adapt_actions:
             _log(f"[AUTO-RECOVERY] {action}")

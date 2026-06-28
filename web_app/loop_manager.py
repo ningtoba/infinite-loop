@@ -379,12 +379,12 @@ class LoopManager:
                 self._worker_states = {}
                 self._worker_logs = {}
 
-        # Detect worker ID — daemon lines use "(worker #N)" format
+        # Detect worker ID — daemon lines use structured prefixes like
+        # [STDOUT (worker #N)], [STDERR (worker #N)], [TERM (worker #N)], etc.
+        # IMPORTANT: Check specific structured prefixes FIRST before falling back
+        # to the generic "(worker #N)" pattern, to avoid matching worker IDs
+        # from free-text log content that casually mentions "(worker #0)".
         wid = None
-        m = re.search(r"\(worker\s+#(\d+)\)", text)
-        if m:
-            wid = m.group(1)
-        # Also check for [STDOUT (worker #N)], [STDERR (worker #N)], [TERM (worker #N)]
         for prefix in ("STDOUT", "STDERR", "MODEL", "TERM"):
             m = re.search(rf"\[{prefix}\s*\(worker\s+#(\d+)\)\]", text)
             if m:
@@ -411,6 +411,12 @@ class LoopManager:
                     self._worker_term[wid].append(term_content)
                     if len(self._worker_term[wid]) > 1000:
                         self._worker_term[wid] = self._worker_term[wid][-1000:]
+                break  # matched a structured prefix — skip the generic fallback
+        else:
+            # No structured prefix matched — only then try the generic "(worker #N)" pattern
+            m = re.search(r"\(worker\s+#(\d+)\)", text)
+            if m:
+                wid = m.group(1)
 
         # Worker spawned
         m = re.search(r"\[SPAWN\s+\(worker\s+#(\d+)\)\]", text)

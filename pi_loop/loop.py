@@ -51,13 +51,11 @@ def _execute_task(
 
     Returns a result dict with 'output', 'error', 'duration_seconds', etc.
     """
-    cmd = ["pi", "-q", goal]
+    cmd = ["pi", "-p", goal]
     if context:
-        cmd.extend(["--context", context])
+        cmd.extend(["--append-system-prompt", context])
     if toolsets:
-        cmd.extend(["--toolsets", ",".join(toolsets)])
-    if max_turns:
-        cmd.extend(["--max-turns", str(max_turns)])
+        cmd.extend(["--tools", ",".join(toolsets)])
 
     start_time = time.time()
     attempts = 0
@@ -423,7 +421,7 @@ def run_loop(
             if max_iterations > 0:
                 pct = min(100.0 * iteration_count / max_iterations, 100.0)
                 bar_width = 25
-                filled = int(pct / 100.0 * bar_width)
+                filled = bar_width * iteration_count // max_iterations
                 bar = "█" * filled + "░" * (bar_width - filled)
                 _log(f"    [{bar}] {iteration_count}/{max_iterations} — {pct:.0f}%")
             _log(f"    Goal: {goal[:100]}{'...' if len(goal) > 100 else ''}")

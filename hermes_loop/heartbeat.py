@@ -62,7 +62,11 @@ def _monitor_heartbeat(
 ) -> dict:
     """Monitor a single heartbeat file in a blocking loop.
 
-    Polls every HEARTBEAT_POLL_INTERVAL seconds. Returns a status dict:
+    Polls every HEARTBEAT_POLL_INTERVAL seconds. Batch-reads the heartbeat
+    file — only opens and parses it when the file's mtime changes, avoiding
+    redundant I/O on every poll cycle.
+
+    Returns a status dict:
       {"status": "alive"|"expired"|"lost"|"completed",
        "age_seconds": ...,
        "last_heartbeat_data": ...|None}
@@ -70,6 +74,8 @@ def _monitor_heartbeat(
     Designed to run in a daemon thread alongside the subprocess.
     """
     grace_period = int(timeout * HEARTBEAT_GRACE_FACTOR) if timeout > 0 else 0
+    _cached_mtime: float | None = None
+    _cached_data: dict | None = None
 
     while not _shutdown_requested:
         if proc is not None and proc.poll() is not None:
@@ -80,7 +86,18 @@ def _monitor_heartbeat(
             }
 
         age = _heartbeat_age(heartbeat_file)
-        hb_data = _read_heartbeat(heartbeat_file) if age is not None else None
+
+        # Batch-read: only open/parse when mtime changes
+        hb_data: dict | None = None
+        if age is not None:
+            try:
+                current_mtime = os.path.getmtime(heartbeat_file)
+            except OSError:
+                current_mtime = 0.0
+            if current_mtime != _cached_mtime:
+                _cached_data = _read_heartbeat(heartbeat_file)
+                _cached_mtime = current_mtime
+            hb_data = _cached_data
 
         if age is None:
             elapsed = time.time() - session_start

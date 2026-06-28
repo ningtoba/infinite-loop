@@ -4,13 +4,34 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
-## [14.34.0] — 2026-06-28
+## [14.37.0] — 2026-06-28
 
 ### Fixed
-- **Version sync**: `pyproject.toml`, `config.py` (`LAUNCH_LOOP_VERSION`), and `run.sh` updated
-  from 14.33.0 to 14.34.0 to match README, CONTRIBUTING, preflight docstring, and
-  `scripts/run-loop.sh` banner which were already at 14.34.0.
-- **CHANGELOG entry**: Added this missing v14.34.0 changelog section.
+- **`hermes_loop/self_test.py` — Unicode escape regression**: Fixed double-escaped
+  `\u2717`/`\u2713` in test assertion strings that were introduced by a parallel
+  subagent which re-escaped the raw Unicode codepoints.
+- **`hermes_loop/cooldown.py` — Smooth linear interpolation**: Replaced stepped
+  cooldown curve (discrete breakpoints at 5s/15s/300s) with smooth linear
+  interpolation across the full duration range, avoiding discontinuities at
+  boundary values.
+- **`hermes_loop/loop.py` — Removed redundant mitigations `setdefault`**: The
+  mitigations dict is guaranteed to exist from state initialization; the
+  per-iteration `setdefault` was dead code.
+- **`hermes_loop/notifications.py` — `capture_output=True`**: Added missing
+  `capture_output=True` to `subprocess.run()` for desktop notifications, fixing
+  a `BrokenPipeError` on some terminal configurations.
+- **`hermes_loop/system_utils.py` — `sysconf_names` KeyError guard**: Added
+  `.get()` fallback for `os.sysconf_names` lookups on Python builds that lack
+  `SC_CLK_TCK`.
+- **`web_app/loop_manager.py` — `maxsize=1` queue**: Fixed queue capacity to
+  prevent SSE event queue overflow under rapid iteration.
+- **`web_app/loop_manager.py` — Cooldown in status**: Exposed current cooldown
+  value in loop manager status for dashboard visibility.
+- **Version sync**: Updated `pyproject.toml`, `README.md`, `CONTRIBUTING.md`,
+  `run.sh`, `scripts/run-loop.sh`, and `preflight.py` docstring from 14.36.0
+  to 14.37.0.
+- **`hermes_loop/__init__.py`**: Added `__version__` attribute for PEP 396
+  compatibility (`import hermes_loop; hermes_loop.__version__`).
 
 ## [14.36.0] — 2026-06-28
 

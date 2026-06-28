@@ -68,6 +68,7 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
             if state:
                 stats = state.get("stats", {})
                 iterations = state.get("iterations", [])
+                total_iters = state.get("total_iterations", 0)
                 latest = iterations[-1] if iterations else {}
                 et = state.get("error_type_counts", {})
                 goals_specs = state.get("goals_specs", [])
@@ -86,6 +87,37 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
                     goals_list.append(
                         {"text": gtext[:100], "done": done, "active": active}
                     )
+                # Compute throughput metrics from available iteration data
+                # (same logic as _build_sse_payload in dashboard.py)
+                avg_chars_per_iter = None
+                avg_throughput = None
+                if iterations:
+                    chars_list = [it.get("output_chars", 0) or 0 for it in iterations]
+                    if chars_list:
+                        avg_chars_per_iter = int(sum(chars_list) // len(chars_list))
+                    cps_list = [
+                        it.get("chars_per_second", 0) or 0
+                        for it in iterations
+                        if it.get("chars_per_second", 0)
+                    ]
+                    if cps_list:
+                        avg_throughput = round(sum(cps_list) / len(cps_list), 1)
+                metrics_summary_parts = []
+                if avg_chars_per_iter:
+                    metrics_summary_parts.append(f"{avg_chars_per_iter} chars/iter")
+                if avg_throughput:
+                    metrics_summary_parts.append(f"{avg_throughput} cps avg")
+                if stats.get("avg_duration_seconds", 0):
+                    metrics_summary_parts.append(
+                        f'{stats["avg_duration_seconds"]:.0f}s avg'
+                    )
+                metrics_summary = (
+                    ", ".join(metrics_summary_parts) if metrics_summary_parts else ""
+                )
+                iters_per_goal = None
+                if goals_list and total_iters > 0:
+                    iters_per_goal = max(1, total_iters // max(len(goals_list), 1))
+
                 self._send_json(
                     200,
                     {
@@ -125,11 +157,11 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
                         "mitigations": state.get("mitigations", {}),
                         "eta": state.get("eta", {}),
                         "goals": goals_list,
-                        "avg_chars_per_iter": None,
-                        "avg_throughput": None,
+                        "avg_chars_per_iter": avg_chars_per_iter,
+                        "avg_throughput": avg_throughput,
                         "est_cost": state.get("est_cost"),
-                        "iters_per_goal": None,
-                        "metrics_summary": "",
+                        "iters_per_goal": iters_per_goal,
+                        "metrics_summary": metrics_summary,
                         "consecutive_errors": stats.get("consecutive_errors", 0),
                         "consecutive_successes": stats.get("consecutive_successes", 0),
                         "cooldown": state.get("cooldown", 0),

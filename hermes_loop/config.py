@@ -1,4 +1,4 @@
-"""Constants, paths, and defaults for the hermes_loop package."""
+"""Constants, paths, and defaults for the hermes_loop package (v14.37.0)."""
 
 # Paths
 LEDGER_PATH = "/tmp/infinite-loop-state.json"

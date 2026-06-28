@@ -232,7 +232,9 @@ async def _broadcast_sse(data: dict[str, Any]) -> None:
 @app.get("/live")
 async def sse_stream(request: Request):
     """SSE endpoint for live updates."""
-    q: asyncio.Queue = asyncio.Queue(maxsize=32)
+    q: asyncio.Queue = (
+        asyncio.Queue()
+    )  # unbounded — prevents QueueFull errors during burst updates
     async with _sse_clients_lock:
         _sse_clients.append(q)
 

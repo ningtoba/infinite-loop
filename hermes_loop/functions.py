@@ -217,7 +217,7 @@ def _cycle_goal(
         goal_text = spec[0]  # (goal, profile, model, provider) tuple
     else:
         goal_text = str(spec)
-    if stop_at_goals_end and goals_index > len(goals_list):
+    if stop_at_goals_end and goals_index >= len(goals_list):
         _log("[GOALS] Exhausted all goals (stop_at_goals_end=True). Stopping.")
         return ("", True)
     _log(f"[GOALS] Goal: {goal_text[:120]}...")

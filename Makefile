@@ -40,6 +40,8 @@ help:
 	@echo "    version      Print daemon version and exit"
 	@echo "    check-env    Validate .env file for typos, unknown variables, common mistakes"
 	@echo "    doctor       Run comprehensive self-diagnosis (hermes, PATH, .env, git)"
+	@echo "    dump-env     Print all env vars with defaults to stdout (non-interactive)"
+	@echo "    diff-env     Compare current .env against the default template"
 	@echo "    examples     Print categorized real-world usage examples"
 	@echo "    explain      Show detailed help on a single flag (pass FLAG=)"
 	@echo "    help-topic   Show flags for a specific argument group (pass TOPIC=)"
@@ -143,6 +145,27 @@ test:
 .PHONY: self-test
 self-test:
 	$(RUN_SH) --self-test
+
+.PHONY: diff-env
+diff-env:
+	@echo "━━━ make diff-env — Compare .env against default template ━━━"
+	@echo ""
+	@TMPFILE=$$(mktemp); \
+	$(LAUNCHER) --dump-env > "$$TMPFILE"; \
+	if [ -f .env ]; then \
+		echo "  Showing diff between .env and defaults..."; \
+		echo ""; \
+		diff --unified=3 .env "$$TMPFILE" || true; \
+		echo ""; \
+		echo "  Tip: pipe through 'diffstat' or 'colordiff' for nicer output."; \
+	else \
+		echo "  No .env file found. Run 'make env' to create one."; \
+	fi; \
+	rm -f "$$TMPFILE"
+
+.PHONY: dump-env
+dump-env:
+	$(LAUNCHER) --dump-env
 
 .PHONY: version
 version:

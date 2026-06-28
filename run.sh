@@ -58,6 +58,7 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "    --examples            Print categorized real-world usage examples (7 categories)"
   echo "    --check-env           Validate .env file for typos and unknown variables"
   echo "    --doctor              Run comprehensive self-diagnosis"
+  echo "    --dump-env            Print all env vars with defaults to stdout"
   echo "    --completion-script {bash|zsh}  Generate shell completion (pipe to source)"
   echo ""
   echo "EXAMPLES:"
@@ -170,6 +171,7 @@ fi
 [ -n "${INFINITE_LOOP_MAX_IDLE_ITERATIONS:-}" ] && DAEMON_ARGS+=("--max-idle-iterations" "$INFINITE_LOOP_MAX_IDLE_ITERATIONS")
 [ -n "${INFINITE_LOOP_SPAWN_SOURCE:-}" ]    && DAEMON_ARGS+=("--spawn-source" "$INFINITE_LOOP_SPAWN_SOURCE")
 [ "${INFINITE_LOOP_JSON_LOGS:-false}" == "true" ]          && DAEMON_ARGS+=("--json-logs")
+[ "${INFINITE_LOOP_DUMP_ENV:-false}" == "true" ]           && DAEMON_ARGS+=("--dump-env")
 
 # Boolean flags (no value arg)
 [ "${INFINITE_LOOP_STOP_AT_GOALS_END:-false}" == "true" ]  && DAEMON_ARGS+=("--stop-at-goals-end")

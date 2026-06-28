@@ -88,7 +88,8 @@ def _list_flags(show_help=True):
         "--init": "Interactive setup wizard — walks you through configuration step by step",
         "--wizard": "Alias for --init (interactive setup wizard)",
         "--doctor": "Run comprehensive self-diagnosis — checks hermes, PATH, .env, git, shell, disk space, gateway, and more",
-        "--demo": "Interactive walkthrough of the daemon's full lifecycle — shows prompt construction, spawning, JSON parsing, ledger write, and summary display using a safe test goal",
+        "--demo": "Interactive walkthrough of the daemon's full lifecycle \u2014 shows prompt construction, spawning, JSON parsing, ledger write, and summary display using a safe test goal",
+        "--dump-env": "Print all known INFINITE_LOOP_* env vars with their current defaults and exit (non-interactive complement to --init/--wizard)",
     }
     total_flags = sum(len(v) for v in group_map.values()) + len(introspection_flags)
     header = f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — CLI Flags Reference"
@@ -278,6 +279,12 @@ def _list_examples():
     _comment("Interactive setup wizard")
     _cmd("hermes_loop --init")
     _cmd("make init")
+    print()
+    _comment("View all env vars with defaults (non-interactive, pipeable)")
+    _cmd("hermes_loop --dump-env")
+    _cmd("hermes_loop --dump-env > /tmp/default-env.txt")
+    _cmd("diff .env /tmp/default-env.txt")
+    _cmd("make diff-env   # shortcut for the above")
     print()
     _comment("Quick one-command entrypoint (reads .env)")
     _cmd("bash run.sh")
@@ -1778,6 +1785,15 @@ def _create_parser(for_introspection=False):
         help="Print what would happen without spawning any sessions",
     )
     group.add_argument(
+        "--dump-env",
+        action="store_true",
+        help="Print all known INFINITE_LOOP_* environment variables with their "
+        "current default values to stdout and exit. "
+        "Non-interactive complement to --init/--wizard \u2014 useful for seeing all "
+        "available settings, piping to a file, or diffing against .env. "
+        "Pre-argparse \u2014 no --goal required.",
+    )
+    group.add_argument(
         "--self-test",
         action="store_true",
         help="Run self-test suite and exit (groups/cases auto-detected at runtime)",
@@ -1891,6 +1907,294 @@ def _create_parser(for_introspection=False):
     )
 
     return parser
+
+
+def _dump_env_vars() -> None:
+    """Print all known INFINITE_LOOP_* env vars with their current defaults."""
+    from .env_utils import KNOWN_ENV_VARS as known_vars
+
+    DEFAULTS: dict[str, str] = {
+        "INFINITE_LOOP_ACCEPT_HOOKS": "false",
+        "INFINITE_LOOP_ARCHIVE_DIR": "$HOME/.hermes/infinite-loop-archives",
+        "INFINITE_LOOP_ARCHIVE_MAX_SIZE": "0",
+        "INFINITE_LOOP_ARCHIVE_RETENTION": "30",
+        "INFINITE_LOOP_CHECKPOINTS": "false",
+        "INFINITE_LOOP_COMPACT_EVERY": "5",
+        "INFINITE_LOOP_CONFIG": "",
+        "INFINITE_LOOP_CONTEXT": "",
+        "INFINITE_LOOP_CONTEXT_FILE": "",
+        "INFINITE_LOOP_CONTINUE": "false",
+        "INFINITE_LOOP_CONVERGENCE_STOP": "false",
+        "INFINITE_LOOP_CONVERGENCE_THRESHOLD": "0.9",
+        "INFINITE_LOOP_CONVERGENCE_WINDOW": "5",
+        "INFINITE_LOOP_COOLDOWN": "0",
+        "INFINITE_LOOP_COOLDOWN_MODE": "fixed",
+        "INFINITE_LOOP_DRY_RUN": "false",
+        "INFINITE_LOOP_EVOLVE": "false",
+        "INFINITE_LOOP_FORCE_RESET": "false",
+        "INFINITE_LOOP_GIT": "false",
+        "INFINITE_LOOP_GIT_COMMIT": "false",
+        "INFINITE_LOOP_GOAL": "",
+        "INFINITE_LOOP_GOALS_FILE": "",
+        "INFINITE_LOOP_HEARTBEAT_TIMEOUT": "0",
+        "INFINITE_LOOP_HTTP_CALLBACK": "",
+        "INFINITE_LOOP_IGNORE_RULES": "false",
+        "INFINITE_LOOP_IGNORE_USER_CONFIG": "false",
+        "INFINITE_LOOP_JSON_LOGS": "false",
+        "INFINITE_LOOP_KEEP_ITERATIONS": "0",
+        "INFINITE_LOOP_LOG_FILE": "",
+        "INFINITE_LOOP_LOG_MAX_MB": "10",
+        "INFINITE_LOOP_MAX_IDLE_ITERATIONS": "0",
+        "INFINITE_LOOP_MAX_ITERATIONS": "0",
+        "INFINITE_LOOP_MAX_OUTPUT_CHARS": "2000",
+        "INFINITE_LOOP_MAX_RETRIES": "0",
+        "INFINITE_LOOP_MAX_TURNS": "500",
+        "INFINITE_LOOP_MODEL": "",
+        "INFINITE_LOOP_NOTIFY_CMD": "",
+        "INFINITE_LOOP_NOTIFY_DESKTOP": "false",
+        "INFINITE_LOOP_NOTIFY_NTFY": "",
+        "INFINITE_LOOP_NOTIFY_NTFY_SERVER": "https://ntfy.sh",
+        "INFINITE_LOOP_NOTIFY_ON_COMPLETION": "false",
+        "INFINITE_LOOP_NOTIFY_PUSHBULLET": "",
+        "INFINITE_LOOP_NO_AUTO_TOOLSETS": "false",
+        "INFINITE_LOOP_NO_FAILURE_LEARNING": "false",
+        "INFINITE_LOOP_ON_ERROR_CMD": "",
+        "INFINITE_LOOP_OUTPUT_SCHEMA": "",
+        "INFINITE_LOOP_OUTPUT_SCHEMA_FILE": "",
+        "INFINITE_LOOP_PASS_SESSION_ID": "false",
+        "INFINITE_LOOP_PREFLIGHT": "false",
+        "INFINITE_LOOP_PREFLIGHT_FAIL_FAST": "false",
+        "INFINITE_LOOP_PROFILE": "",
+        "INFINITE_LOOP_PROMPT_SUFFIX": "",
+        "INFINITE_LOOP_PROVIDER": "",
+        "INFINITE_LOOP_QUIET": "false",
+        "INFINITE_LOOP_RESET_GOALS": "false",
+        "INFINITE_LOOP_RESUME": "false",
+        "INFINITE_LOOP_RETRY_DELAY": "0",
+        "INFINITE_LOOP_RUN": "false",
+        "INFINITE_LOOP_SAFE_MODE": "false",
+        "INFINITE_LOOP_SAVE_CONFIG": "",
+        "INFINITE_LOOP_SELF_TEST": "false",
+        "INFINITE_LOOP_SESSION_TIMEOUT": "7200",
+        "INFINITE_LOOP_SHUTDOWN_SENTINEL": "/tmp/infinite-loop-stop",
+        "INFINITE_LOOP_SKILLS": "",
+        "INFINITE_LOOP_SPAWN_SOURCE": "infinite-loop",
+        "INFINITE_LOOP_STARTUP_DELAY": "0.0",
+        "INFINITE_LOOP_STATUS_FILE": "",
+        "INFINITE_LOOP_STATUS_HTML": "",
+        "INFINITE_LOOP_STOP_AT_GOALS_END": "false",
+        "INFINITE_LOOP_STORE_GIT_DIFF": "false",
+        "INFINITE_LOOP_TAG": "",
+        "INFINITE_LOOP_TASK_TYPE": "auto",
+        "INFINITE_LOOP_TOOLSETS": (
+            "terminal,file,delegation,web,skills,browser,memory,"
+            "session_search,code_execution,todo,vision"
+        ),
+        "INFINITE_LOOP_TRACK_GOALS": "false",
+        "INFINITE_LOOP_USE_LIBRARY": "false",
+        "INFINITE_LOOP_WATCH_DIR": "",
+        "INFINITE_LOOP_WATCH_POLL": "5.0",
+        "INFINITE_LOOP_WEBHOOK_PORT": "0",
+        "INFINITE_LOOP_WORKDIR": "",
+        "INFINITE_LOOP_WORKERS": "1",
+        "INFINITE_LOOP_WORKER_URL": "auto",
+        "INFINITE_LOOP_WORKTREE": "false",
+        "INFINITE_LOOP_YOLO": "false",
+    }
+
+    # Organise env vars by group (mirrors .env.example sections)
+    group_order: list[tuple[str, list[str]]] = [
+        (
+            "Core Task",
+            [
+                "INFINITE_LOOP_GOAL",
+                "INFINITE_LOOP_CONTEXT",
+                "INFINITE_LOOP_CONTEXT_FILE",
+            ],
+        ),
+        ("Working Directory", ["INFINITE_LOOP_WORKDIR"]),
+        (
+            "Toolsets",
+            [
+                "INFINITE_LOOP_TOOLSETS",
+                "INFINITE_LOOP_NO_AUTO_TOOLSETS",
+                "INFINITE_LOOP_NO_FAILURE_LEARNING",
+            ],
+        ),
+        (
+            "Iteration Control",
+            [
+                "INFINITE_LOOP_MAX_ITERATIONS",
+                "INFINITE_LOOP_MAX_TURNS",
+                "INFINITE_LOOP_COMPACT_EVERY",
+                "INFINITE_LOOP_EVOLVE",
+                "INFINITE_LOOP_RUN",
+            ],
+        ),
+        ("Parallelism", ["INFINITE_LOOP_WORKERS"]),
+        (
+            "Timeouts",
+            [
+                "INFINITE_LOOP_SESSION_TIMEOUT",
+                "INFINITE_LOOP_RETRY_DELAY",
+                "INFINITE_LOOP_MAX_RETRIES",
+                "INFINITE_LOOP_HEARTBEAT_TIMEOUT",
+            ],
+        ),
+        (
+            "Git Integration",
+            [
+                "INFINITE_LOOP_GIT",
+                "INFINITE_LOOP_GIT_COMMIT",
+                "INFINITE_LOOP_STORE_GIT_DIFF",
+                "INFINITE_LOOP_MAX_IDLE_ITERATIONS",
+            ],
+        ),
+        (
+            "Goal File",
+            [
+                "INFINITE_LOOP_GOALS_FILE",
+                "INFINITE_LOOP_STOP_AT_GOALS_END",
+                "INFINITE_LOOP_TRACK_GOALS",
+                "INFINITE_LOOP_RESET_GOALS",
+            ],
+        ),
+        ("Rate Limiting", ["INFINITE_LOOP_COOLDOWN", "INFINITE_LOOP_COOLDOWN_MODE"]),
+        (
+            "Convergence",
+            [
+                "INFINITE_LOOP_CONVERGENCE_STOP",
+                "INFINITE_LOOP_CONVERGENCE_THRESHOLD",
+                "INFINITE_LOOP_CONVERGENCE_WINDOW",
+            ],
+        ),
+        (
+            "Structured Output",
+            [
+                "INFINITE_LOOP_OUTPUT_SCHEMA",
+                "INFINITE_LOOP_OUTPUT_SCHEMA_FILE",
+                "INFINITE_LOOP_MAX_OUTPUT_CHARS",
+            ],
+        ),
+        ("Sentinel", ["INFINITE_LOOP_SHUTDOWN_SENTINEL"]),
+        (
+            "Profile",
+            ["INFINITE_LOOP_PROFILE", "INFINITE_LOOP_MODEL", "INFINITE_LOOP_PROVIDER"],
+        ),
+        ("Webhook", ["INFINITE_LOOP_WEBHOOK_PORT", "INFINITE_LOOP_HTTP_CALLBACK"]),
+        (
+            "Notifications",
+            [
+                "INFINITE_LOOP_NOTIFY_CMD",
+                "INFINITE_LOOP_ON_ERROR_CMD",
+                "INFINITE_LOOP_NOTIFY_DESKTOP",
+                "INFINITE_LOOP_NOTIFY_ON_COMPLETION",
+                "INFINITE_LOOP_NOTIFY_PUSHBULLET",
+                "INFINITE_LOOP_NOTIFY_NTFY",
+                "INFINITE_LOOP_NOTIFY_NTFY_SERVER",
+            ],
+        ),
+        (
+            "Logging",
+            [
+                "INFINITE_LOOP_JSON_LOGS",
+                "INFINITE_LOOP_LOG_FILE",
+                "INFINITE_LOOP_LOG_MAX_MB",
+            ],
+        ),
+        (
+            "Status / Dashboard",
+            ["INFINITE_LOOP_STATUS_HTML", "INFINITE_LOOP_STATUS_FILE"],
+        ),
+        (
+            "Ledger Management",
+            [
+                "INFINITE_LOOP_KEEP_ITERATIONS",
+                "INFINITE_LOOP_FORCE_RESET",
+                "INFINITE_LOOP_TAG",
+            ],
+        ),
+        (
+            "Archiving",
+            [
+                "INFINITE_LOOP_ARCHIVE_DIR",
+                "INFINITE_LOOP_ARCHIVE_RETENTION",
+                "INFINITE_LOOP_ARCHIVE_MAX_SIZE",
+            ],
+        ),
+        ("File Watcher", ["INFINITE_LOOP_WATCH_DIR", "INFINITE_LOOP_WATCH_POLL"]),
+        ("Hermes Worker", ["INFINITE_LOOP_WORKER_URL"]),
+        (
+            "Spawned Session Flags",
+            [
+                "INFINITE_LOOP_USE_LIBRARY",
+                "INFINITE_LOOP_PASS_SESSION_ID",
+                "INFINITE_LOOP_CHECKPOINTS",
+                "INFINITE_LOOP_RESUME",
+                "INFINITE_LOOP_SKILLS",
+                "INFINITE_LOOP_IGNORE_RULES",
+                "INFINITE_LOOP_IGNORE_USER_CONFIG",
+                "INFINITE_LOOP_SPAWN_SOURCE",
+                "INFINITE_LOOP_YOLO",
+                "INFINITE_LOOP_SAFE_MODE",
+                "INFINITE_LOOP_ACCEPT_HOOKS",
+                "INFINITE_LOOP_WORKTREE",
+                "INFINITE_LOOP_CONTINUE",
+            ],
+        ),
+        (
+            "Prompt Customization",
+            ["INFINITE_LOOP_PROMPT_SUFFIX", "INFINITE_LOOP_TASK_TYPE"],
+        ),
+        (
+            "Startup",
+            [
+                "INFINITE_LOOP_STARTUP_DELAY",
+                "INFINITE_LOOP_QUIET",
+                "INFINITE_LOOP_PREFLIGHT",
+                "INFINITE_LOOP_PREFLIGHT_FAIL_FAST",
+                "INFINITE_LOOP_DRY_RUN",
+                "INFINITE_LOOP_SELF_TEST",
+                "INFINITE_LOOP_SAVE_CONFIG",
+                "INFINITE_LOOP_CONFIG",
+            ],
+        ),
+        ("Config Reference", ["INFINITE_LOOP_DUMP_ENV"]),
+    ]
+
+    print("# ============================================================")
+    print("# Infinite Loop Daemon - Environment Variables Reference")
+    print("# Generated by: hermes_loop --dump-env")
+    print("# ============================================================")
+    print("# Copy sections of this output to .env and uncomment as needed.")
+    print("# CLI flags override .env values.")
+    print("# ============================================================")
+    print()
+
+    for group_title, var_names in group_order:
+        print(f"# --- {group_title} --------------------------------------------------")
+        print()
+        for var in var_names:
+            if var not in known_vars:
+                continue
+            env_val = os.environ.get(var, "")
+            default_val = DEFAULTS.get(var, "")
+            is_set = bool(env_val)
+            printable_val = env_val if is_set else default_val
+            if is_set:
+                print(
+                    f'{var}="{printable_val}"        # <-- active (from env, {len(env_val)} chars)'
+                )
+            else:
+                if default_val:
+                    print(f'#{var}="{default_val}"')
+                else:
+                    print(f"#{var}=")
+        print()
+
+    print("# ============================================================")
+    print(f"# End of environment variables ({len(known_vars)} total)")
+    print("# ============================================================")
 
 
 def main():
@@ -2009,6 +2313,11 @@ def main():
     if "--demo" in sys.argv:
         configure_color_mode(color_mode)
         _run_demo()
+        sys.exit(0)
+
+    # Check --dump-env before argparse to avoid required --goal conflict
+    if "--dump-env" in sys.argv:
+        _dump_env_vars()
         sys.exit(0)
 
     # Check --save-config before argparse to avoid required --goal conflict
@@ -2144,6 +2453,7 @@ def main():
         "--wizard",
         "--doctor",
         "--demo",
+        "--dump-env",
     }
     arg_set = set(sys.argv[1:])
     has_goal = any(

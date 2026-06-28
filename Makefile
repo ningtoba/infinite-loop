@@ -133,6 +133,11 @@ run:
 dry-run:
 	$(RUN_SH) --dry-run $(ARGS)
 
+.PHONY: test
+test:
+	@echo "━━━ Running pytest test suite ━━━"
+	@$(PYTHON) -m pytest tests/ -v --tb=short
+
 .PHONY: self-test
 self-test:
 	$(RUN_SH) --self-test
@@ -223,7 +228,8 @@ check:
 	@echo "  Step 1/4 — Python + shell syntax check..."
 	@$(MAKE) lint || exit 1
 	@echo ""
-	@echo "  Step 2/4 — Self-tests..."
+	@echo "  Step 2/4 — pytest + self-tests..."
+	@$(MAKE) test 2>&1 || exit 1
 	@$(MAKE) self-test 2>&1 || exit 1
 	@echo ""
 	@echo "  Step 3/4 — .env validation..."
@@ -277,7 +283,7 @@ lint:
 	@echo "Checking Python source with ruff..."
 	@ERRORS=0; \
 	if command -v ruff >/dev/null 2>&1; then \
-		ruff check hermes_loop/ web_app/ session-self-loop.py launch-loop.py; \
+		ruff check hermes_loop/ web_app/ tests/ session-self-loop.py launch-loop.py; \
 		RUFF_EXIT=$$?; \
 		if [ "$$RUFF_EXIT" -ne 0 ]; then \
 			ERRORS=$$((ERRORS + RUFF_EXIT)); \

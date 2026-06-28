@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pytest
+import subprocess
 
 
 from hermes_loop.hermes_utils import (
@@ -10,7 +13,14 @@ from hermes_loop.hermes_utils import (
     find_hermes,
     detect_task_type,
     _build_delegation_prompt,
+    _read_stderr_real_time,
+    _read_stdout_live,
+    _run_hermes_with_pty,
 )
+
+import select
+import os as _os
+import time as _time
 
 # ===================================================================
 # ANSI regex
@@ -558,3 +568,523 @@ class TestBuildDelegationPrompt:
                 evolve=False,
             )
             assert "SELF-MODIFICATION CONTEXT" in prompt
+
+
+# ===================================================================
+# _read_stderr_real_time
+# ===================================================================
+
+
+class TestReadStderrRealTime:
+    """Tests for _read_stderr_real_time — daemon thread reading stderr."""
+
+    def test_reads_lines_and_logs_them(self):
+        """Reads lines from stderr and logs them with [STDERR] prefix."""
+        proc = MagicMock()
+        proc.stderr.readline.side_effect = ["line1\n", "line2\n", ""]
+
+        from hermes_loop.hermes_utils import _read_stderr_real_time
+
+        with patch("hermes_loop.hermes_utils._log") as mock_log:
+            _read_stderr_real_time(proc, worker_tag="")
+
+        assert mock_log.call_count == 2
+        mock_log.assert_any_call("[STDERR] line1")
+        mock_log.assert_any_call("[STDERR] line2")
+
+    def test_reads_with_worker_tag(self):
+        """Logs include worker tag in [STDERR{tag}] prefix."""
+        proc = MagicMock()
+        proc.stderr.readline.side_effect = ["output\n", ""]
+
+        from hermes_loop.hermes_utils import _read_stderr_real_time
+
+        with patch("hermes_loop.hermes_utils._log") as mock_log:
+            _read_stderr_real_time(proc, worker_tag="#1")
+
+        mock_log.assert_called_with("[STDERR#1] output")
+
+    def test_strips_trailing_newlines(self):
+        """Strips \\n and \\r from line ends."""
+        proc = MagicMock()
+        proc.stderr.readline.side_effect = ["hello\r\n", ""]
+
+        from hermes_loop.hermes_utils import _read_stderr_real_time
+
+        with patch("hermes_loop.hermes_utils._log") as mock_log:
+            _read_stderr_real_time(proc, worker_tag="")
+
+        mock_log.assert_called_with("[STDERR] hello")
+
+    def test_skips_empty_lines(self):
+        """Empty lines are skipped without logging."""
+        proc = MagicMock()
+        proc.stderr.readline.side_effect = ["\n", "content\n", ""]
+
+        from hermes_loop.hermes_utils import _read_stderr_real_time
+
+        with patch("hermes_loop.hermes_utils._log") as mock_log:
+            _read_stderr_real_time(proc, worker_tag="")
+
+        assert mock_log.call_count == 1
+        mock_log.assert_called_with("[STDERR] content")
+
+    def test_truncates_long_lines(self):
+        """Lines longer than 500 chars are truncated."""
+        proc = MagicMock()
+        long_line = "x" * 600 + "\n"
+        proc.stderr.readline.side_effect = [long_line, ""]
+
+        from hermes_loop.hermes_utils import _read_stderr_real_time
+
+        with patch("hermes_loop.hermes_utils._log") as mock_log:
+            _read_stderr_real_time(proc, worker_tag="")
+
+        logged = mock_log.call_args[0][0]
+        assert len(logged) <= 515  # "[STDERR] " (8) + 500 = 508
+
+    def test_handles_value_error_gracefully(self):
+        """ValueError from readline is caught silently."""
+        proc = MagicMock()
+        proc.stderr.readline.side_effect = ValueError("I/O operation on closed file")
+
+        from hermes_loop.hermes_utils import _read_stderr_real_time
+
+        with patch("hermes_loop.hermes_utils._log") as mock_log:
+            # Should not raise
+            _read_stderr_real_time(proc, worker_tag="")
+        mock_log.assert_not_called()
+
+    def test_handles_os_error_gracefully(self):
+        """OSError from readline is caught silently."""
+        proc = MagicMock()
+        proc.stderr.readline.side_effect = OSError("pipe closed")
+
+        from hermes_loop.hermes_utils import _read_stderr_real_time
+
+        with patch("hermes_loop.hermes_utils._log") as mock_log:
+            _read_stderr_real_time(proc, worker_tag="")
+        mock_log.assert_not_called()
+
+    def test_handles_attribute_error_gracefully(self):
+        """AttributeError (e.g. NoneType) is caught silently."""
+        proc = MagicMock()
+        proc.stderr.readline.side_effect = AttributeError(
+            "'NoneType' object has no attribute 'readline'"
+        )
+
+        from hermes_loop.hermes_utils import _read_stderr_real_time
+
+        with patch("hermes_loop.hermes_utils._log") as mock_log:
+            # Should not raise
+            _read_stderr_real_time(proc, worker_tag="")
+        mock_log.assert_not_called()
+
+
+# ===================================================================
+# _read_stdout_live
+# ===================================================================
+
+
+class TestReadStdoutLive:
+    """Tests for _read_stdout_live — stdout reader with timeout."""
+
+    def test_reads_lines_and_returns_joined_output(self):
+        """Reads stdout lines and returns joined string + exit code."""
+        proc = MagicMock()
+        proc.stdout.readline.side_effect = ["line1\n", "line2\n", ""]
+        proc.wait.return_value = 0
+        proc.returncode = 0
+        proc.args = ["hermes", "chat", "-q"]
+
+        from hermes_loop.hermes_utils import _read_stdout_live
+
+        with patch("hermes_loop.hermes_utils._log"):
+            stdout, code = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
+
+        assert stdout == "line1\nline2"
+        assert code == 0
+
+    def test_truncates_long_lines_in_log(self):
+        """Lines longer than 500 chars logged with truncation."""
+        proc = MagicMock()
+        long_line = "x" * 600 + "\n"
+        proc.stdout.readline.side_effect = [long_line, ""]
+        proc.wait.return_value = 0
+        proc.returncode = 0
+        proc.args = ["hermes"]
+
+        from hermes_loop.hermes_utils import _read_stdout_live
+
+        with patch("hermes_loop.hermes_utils._log") as mock_log:
+            _read_stdout_live(proc, worker_tag="#1", timeout_seconds=0)
+
+        # Logged line should be truncated to 500 chars
+        logged = mock_log.call_args[0][0]
+        assert len(logged) <= 530  # "[TERM (worker #1)] " + 500
+
+    def test_skips_empty_lines(self):
+        """Empty lines in stdout are skipped."""
+        proc = MagicMock()
+        proc.stdout.readline.side_effect = ["\n", "data\n", ""]
+        proc.wait.return_value = 0
+        proc.returncode = 0
+        proc.args = ["hermes"]
+
+        from hermes_loop.hermes_utils import _read_stdout_live
+
+        with patch("hermes_loop.hermes_utils._log"):
+            stdout, _ = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
+
+        assert stdout == "data"
+
+    def test_raises_timeout_expired(self):
+        """Raises subprocess.TimeoutExpired when timeout exceeded."""
+        proc = MagicMock()
+        # Simulate slow output that keeps returning data so iter() doesn't stop
+        proc.stdout.readline.side_effect = ["line1\n"] + ["data\n"] * 100
+        proc.args = ["hermes", "chat", "-q"]
+
+        from hermes_loop.hermes_utils import _read_stdout_live
+
+        with patch("hermes_loop.hermes_utils._log"):
+            with patch("hermes_loop.hermes_utils.time.time") as mock_time:
+                # Returns start time, elapsed time exceeds timeout
+                mock_time.side_effect = [100.0, 100.0, 130.0]  # 30s elapsed
+                with pytest.raises(subprocess.TimeoutExpired) as exc:
+                    _read_stdout_live(proc, worker_tag="", timeout_seconds=10)
+                assert "line1" in str(exc.value.output)
+
+    def test_timeout_disabled_when_zero(self):
+        """timeout_seconds=0 disables timeout check."""
+        proc = MagicMock()
+        proc.stdout.readline.side_effect = ["data\n", ""]
+        proc.wait.return_value = 0
+        proc.returncode = 0
+        proc.args = ["hermes"]
+
+        from hermes_loop.hermes_utils import _read_stdout_live
+
+        with patch("hermes_loop.hermes_utils._log"):
+            stdout, code = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
+
+        assert stdout == "data"
+        assert code == 0
+
+    def test_handles_value_error_gracefully(self):
+        """ValueError from readline caught, returns partial output."""
+        proc = MagicMock()
+        proc.stdout.readline.side_effect = ["partial\n", ValueError("closed")]
+        proc.wait.return_value = 0
+        proc.returncode = 0
+        proc.args = ["hermes"]
+
+        from hermes_loop.hermes_utils import _read_stdout_live
+
+        with patch("hermes_loop.hermes_utils._log"):
+            stdout, code = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
+
+        assert stdout == "partial"
+        assert code == 0
+
+    def test_handles_os_error_gracefully(self):
+        """OSError from readline caught."""
+        proc = MagicMock()
+        proc.stdout.readline.side_effect = OSError("closed")
+        proc.wait.return_value = 0
+        proc.returncode = 0
+        proc.args = ["hermes"]
+
+        from hermes_loop.hermes_utils import _read_stdout_live
+
+        with patch("hermes_loop.hermes_utils._log"):
+            stdout, code = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
+
+        assert stdout == ""
+        assert code == 0
+
+    def test_handles_attribute_error_gracefully(self):
+        """AttributeError from readline caught."""
+        proc = MagicMock()
+        proc.stdout.readline.side_effect = AttributeError("no attribute")
+        proc.wait.return_value = 0
+        proc.returncode = 0
+        proc.args = ["hermes"]
+
+        from hermes_loop.hermes_utils import _read_stdout_live
+
+        with patch("hermes_loop.hermes_utils._log"):
+            stdout, code = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
+
+        assert stdout == ""
+        assert code == 0
+
+    def test_uses_worker_tag_in_log(self):
+        """Worker tag included in log prefix."""
+        proc = MagicMock()
+        proc.stdout.readline.side_effect = ["output\n", ""]
+        proc.wait.return_value = 0
+        proc.returncode = 0
+        proc.args = ["hermes"]
+
+        from hermes_loop.hermes_utils import _read_stdout_live
+
+        with patch("hermes_loop.hermes_utils._log") as mock_log:
+            _read_stdout_live(proc, worker_tag="#2", timeout_seconds=0)
+
+        mock_log.assert_called_with("[TERM (worker #2)] output")
+
+    def test_calls_proc_wait_before_returning(self):
+        """proc.wait() is called before returning results."""
+        proc = MagicMock()
+        proc.stdout.readline.side_effect = ["done\n", ""]
+        proc.wait.return_value = 0
+        proc.returncode = 0
+        proc.args = ["hermes"]
+
+        from hermes_loop.hermes_utils import _read_stdout_live
+
+        with patch("hermes_loop.hermes_utils._log"):
+            _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
+
+        proc.wait.assert_called_once()
+
+
+# ===================================================================
+class TestRunHermesWithPty:
+    """Tests for _run_hermes_with_pty — PTY subprocess management."""
+
+    def test_raises_timeout_when_exceeded(self):
+        """Raises subprocess.TimeoutExpired when timeout exceeded."""
+        with patch("pty.openpty", return_value=(5, 6)) as mock_pty:
+            with patch("subprocess.Popen") as mock_popen:
+                with patch("select.select", return_value=([], [], [])):
+                    with patch("os.set_blocking"):
+                        with patch("os.close"):
+                            with patch("time.time") as mock_time:
+                                mock_proc = MagicMock()
+                                mock_popen.return_value = mock_proc
+                                mock_proc.poll.return_value = None
+                                mock_time.side_effect = [0.0, 0.0, 0.0, 31.0]
+
+                                with pytest.raises(subprocess.TimeoutExpired):
+                                    _run_hermes_with_pty(
+                                        cmd=["hermes", "chat", "-q"],
+                                        worker_tag="#1",
+                                        timeout_seconds=30,
+                                        workdir="/tmp",
+                                    )
+
+                                mock_proc.kill.assert_called_once()
+                                mock_proc.wait.assert_called()
+
+    def test_zero_timeout_disables_check(self):
+        """timeout_seconds=0 disables timeout (process runs until done)."""
+        with patch("pty.openpty", return_value=(5, 6)):
+            with patch("subprocess.Popen") as mock_popen:
+                with patch("select.select") as mock_select:
+                    with patch("os.set_blocking"):
+                        with patch("os.close"):
+                            mock_proc = MagicMock()
+                            mock_popen.return_value = mock_proc
+                            mock_select.side_effect = [
+                                ([5], [], []),
+                                ([], [], []),
+                            ]
+                            mock_proc.poll.side_effect = [None, 0]
+                            with patch("os.read") as mock_read:
+                                mock_read.side_effect = [b"hello\n", b""]
+
+                                with patch("hermes_loop.hermes_utils._log"):
+                                    stdout, code = _run_hermes_with_pty(
+                                        cmd=["hermes"],
+                                        worker_tag="",
+                                        timeout_seconds=0,
+                                        workdir="/tmp",
+                                    )
+
+        assert "hello" in stdout
+
+    def test_reads_data_and_returns_output(self):
+        """Reads PTY data, processes lines, returns joined output."""
+        with patch("pty.openpty", return_value=(5, 6)):
+            with patch("subprocess.Popen") as mock_popen:
+                with patch("select.select") as mock_select:
+                    with patch("os.set_blocking"):
+                        with patch("os.close"):
+                            mock_proc = MagicMock()
+                            mock_popen.return_value = mock_proc
+                            mock_select.side_effect = [
+                                ([5], [], []),
+                                ([], [], []),
+                            ]
+                            mock_proc.poll.side_effect = [None, 0]
+                            with patch("os.read") as mock_read:
+                                mock_read.side_effect = [
+                                    b"line1\nline2\n",
+                                    b"",
+                                ]
+
+                                with patch("hermes_loop.hermes_utils._log"):
+                                    stdout, code = _run_hermes_with_pty(
+                                        cmd=["hermes"],
+                                        worker_tag="#1",
+                                        timeout_seconds=120,
+                                        workdir="/tmp",
+                                    )
+
+        assert "line1" in stdout
+        assert "line2" in stdout
+
+    def test_strips_ansi_and_processes_lines(self):
+        """ANSI codes are stripped, TUI chars normalized."""
+        with patch("pty.openpty", return_value=(5, 6)):
+            with patch("subprocess.Popen") as mock_popen:
+                with patch("select.select") as mock_select:
+                    with patch("os.set_blocking"):
+                        with patch("os.close"):
+                            mock_proc = MagicMock()
+                            mock_popen.return_value = mock_proc
+                            mock_select.return_value = ([5], [], [])
+                            mock_proc.poll.return_value = 0
+                            with patch("os.read") as mock_read:
+                                mock_read.side_effect = [
+                                    b"\x1b[32mgreen\x1b[0m\n",
+                                    b"",
+                                ]
+
+                                with patch("hermes_loop.hermes_utils._log"):
+                                    stdout, code = _run_hermes_with_pty(
+                                        cmd=["hermes"],
+                                        worker_tag="",
+                                        timeout_seconds=30,
+                                        workdir="/tmp",
+                                    )
+
+        assert "green" in stdout
+
+    def test_value_error_in_select_breaks_loop(self):
+        """ValueError from select.select breaks the loop gracefully."""
+        with patch("pty.openpty", return_value=(5, 6)):
+            with patch("subprocess.Popen") as mock_popen:
+                with patch(
+                    "select.select",
+                    side_effect=ValueError("bad fd"),
+                ):
+                    with patch("os.set_blocking"):
+                        with patch("os.close"):
+                            mock_proc = MagicMock()
+                            mock_popen.return_value = mock_proc
+                            mock_proc.poll.return_value = 0
+                            mock_proc.wait.return_value = 0
+
+                            with patch("hermes_loop.hermes_utils._log"):
+                                stdout, code = _run_hermes_with_pty(
+                                    cmd=["hermes"],
+                                    worker_tag="",
+                                    timeout_seconds=30,
+                                    workdir="/tmp",
+                                )
+        assert code == 0
+
+    def test_oserror_in_read_breaks_loop(self):
+        """OSError from os.read is caught, loop breaks."""
+        with patch("pty.openpty", return_value=(5, 6)):
+            with patch("subprocess.Popen") as mock_popen:
+                with patch("select.select") as mock_select:
+                    with patch("os.set_blocking"):
+                        with patch("os.close"):
+                            mock_proc = MagicMock()
+                            mock_popen.return_value = mock_proc
+                            mock_select.return_value = ([5], [], [])
+                            mock_proc.poll.return_value = 0
+                            mock_proc.wait.return_value = 0
+                            with patch(
+                                "os.read",
+                                side_effect=OSError("bad read"),
+                            ):
+                                with patch("hermes_loop.hermes_utils._log"):
+                                    stdout, code = _run_hermes_with_pty(
+                                        cmd=["hermes"],
+                                        worker_tag="",
+                                        timeout_seconds=30,
+                                        workdir="/tmp",
+                                    )
+        assert code == 0
+
+    def test_process_already_done_at_start(self):
+        """Process already completed when poll is called."""
+        with patch("pty.openpty", return_value=(5, 6)):
+            with patch("subprocess.Popen") as mock_popen:
+                with patch("select.select") as mock_select:
+                    with patch("os.set_blocking"):
+                        with patch("os.close"):
+                            mock_proc = MagicMock()
+                            mock_popen.return_value = mock_proc
+                            mock_select.return_value = ([], [], [])
+                            mock_proc.poll.return_value = 0
+                            mock_proc.wait.return_value = 0
+
+                            with patch("hermes_loop.hermes_utils._log"):
+                                stdout, code = _run_hermes_with_pty(
+                                    cmd=["hermes"],
+                                    worker_tag="",
+                                    timeout_seconds=30,
+                                    workdir="/tmp",
+                                )
+        assert code == 0
+        assert stdout == ""
+
+    def test_processes_data_before_poll_check(self):
+        """Data available in select is processed even if poll returns soon."""
+        with patch("pty.openpty", return_value=(5, 6)):
+            with patch("subprocess.Popen") as mock_popen:
+                with patch("select.select") as mock_select:
+                    with patch("os.set_blocking"):
+                        with patch("os.close"):
+                            mock_proc = MagicMock()
+                            mock_popen.return_value = mock_proc
+                            mock_select.side_effect = [
+                                ([5], [], []),
+                                ([], [], []),
+                            ]
+                            mock_proc.poll.side_effect = [None, 0]
+                            with patch("os.read") as mock_read:
+                                mock_read.side_effect = [b"final output\n", b""]
+
+                                with patch("hermes_loop.hermes_utils._log"):
+                                    stdout, code = _run_hermes_with_pty(
+                                        cmd=["hermes"],
+                                        worker_tag="",
+                                        timeout_seconds=30,
+                                        workdir="/tmp",
+                                    )
+        assert "final output" in stdout
+
+    def test_calls_pty_openpty_and_subprocess_popen(self):
+        """Calls pty.openpty and creates subprocess with correct args."""
+        with patch("pty.openpty", return_value=(5, 6)) as mock_pty:
+            with patch("subprocess.Popen") as mock_popen:
+                with patch("select.select") as mock_select:
+                    with patch("os.set_blocking"):
+                        with patch("os.close"):
+                            mock_proc = MagicMock()
+                            mock_popen.return_value = mock_proc
+                            mock_select.return_value = ([], [], [])
+                            mock_proc.poll.return_value = 0
+                            mock_proc.wait.return_value = 0
+
+                            with patch("hermes_loop.hermes_utils._log"):
+                                _run_hermes_with_pty(
+                                    cmd=["hermes", "chat", "-q"],
+                                    worker_tag="",
+                                    timeout_seconds=30,
+                                    workdir="/home/user",
+                                )
+
+        mock_pty.assert_called_once()
+        mock_popen.assert_called_once()
+        args, kwargs = mock_popen.call_args
+        assert kwargs["cwd"] == "/home/user"
+        assert kwargs["text"] is True
+        assert kwargs["start_new_session"] is True

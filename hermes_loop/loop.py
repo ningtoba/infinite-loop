@@ -927,13 +927,6 @@ def run_loop(
             )
             write_ledger(state)
 
-        _handle_cooldown(
-            cooldown=cooldown,
-            cooldown_mode=cooldown_mode,
-            eta_tracker=eta_tracker,
-            task_type=task_type,
-        )
-
         # Note: mitigations dict is guaranteed to exist from state initialization
 
         (
@@ -953,6 +946,13 @@ def run_loop(
             cooldown_mode=cooldown_mode,
             use_library=use_library,
             workers=workers,
+        )
+
+        _handle_cooldown(
+            cooldown=cooldown,
+            cooldown_mode=cooldown_mode,
+            eta_tracker=eta_tracker,
+            task_type=task_type,
         )
 
         state["consecutive_successes"] = consecutive_successes

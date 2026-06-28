@@ -223,6 +223,8 @@ async def _broadcast_sse(data: dict[str, Any]) -> None:
             try:
                 q.put_nowait(payload)
             except asyncio.QueueFull:
+                stale.append(q)  # mark for removal — client too slow
+            except Exception:
                 stale.append(q)
         for q in stale:
             try:

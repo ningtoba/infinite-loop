@@ -16,7 +16,6 @@ from .dashboard import (
     _wrap_sse_payload,
     _SSE_DASHBOARD_HTML_TPL,
 )
-from .goal_utils import _goal_hash
 from datetime import datetime, timezone
 
 
@@ -67,107 +66,9 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         elif parsed.path == "/api/status":
             state = read_ledger()
             if state:
-                stats = state.get("stats", {})
-                iterations = state.get("iterations", [])
-                total_iters = state.get("total_iterations", 0)
-                latest = iterations[-1] if iterations else {}
-                et = state.get("error_type_counts", {})
-                goals_specs = state.get("goals_specs", [])
-                goals_completed = state.get("goals_completed", {})
-                goals_list = []
-                for idx, spec in enumerate(goals_specs):
-                    gtext = spec[0] if isinstance(spec, (tuple, list)) else spec
-                    gh = _goal_hash(gtext) if gtext else ""
-                    done = (
-                        gh in goals_completed
-                        and goals_completed[gh].get("status") == "completed"
-                    )
-                    active = False
-                    if state.get("goal_index") is not None:
-                        active = idx == state["goal_index"]
-                    goals_list.append(
-                        {"text": gtext[:100], "done": done, "active": active}
-                    )
-                # Compute throughput metrics from available iteration data
-                # (same logic as _build_sse_payload in dashboard.py)
-                avg_chars_per_iter = None
-                avg_throughput = None
-                if iterations:
-                    chars_list = [it.get("output_chars", 0) or 0 for it in iterations]
-                    if chars_list:
-                        avg_chars_per_iter = int(sum(chars_list) // len(chars_list))
-                    cps_list = [
-                        it.get("chars_per_second", 0) or 0
-                        for it in iterations
-                        if it.get("chars_per_second", 0)
-                    ]
-                    if cps_list:
-                        avg_throughput = round(sum(cps_list) / len(cps_list), 1)
-                metrics_summary_parts = []
-                if avg_chars_per_iter is not None:
-                    metrics_summary_parts.append(f"{avg_chars_per_iter} chars/iter")
-                if avg_throughput is not None:
-                    metrics_summary_parts.append(f"{avg_throughput} cps avg")
-                if stats.get("avg_duration_seconds", 0):
-                    metrics_summary_parts.append(
-                        f'{stats["avg_duration_seconds"]:.0f}s avg'
-                    )
-                metrics_summary = (
-                    ", ".join(metrics_summary_parts) if metrics_summary_parts else ""
-                )
-                iters_per_goal = None
-                if goals_list and total_iters > 0:
-                    iters_per_goal = max(1, total_iters // max(len(goals_list), 1))
-
-                self._send_json(
-                    200,
-                    {
-                        "loop_status": state.get("status", "unknown"),
-                        "ledger": {
-                            "status": state.get("status", "unknown"),
-                            "total_iterations": state.get("total_iterations", 0),
-                            "max_iterations": state.get("max_iterations", 0),
-                            "goal": (state.get("initial_command") or "")[:80],
-                            "evolved_goal": state.get("evolved_goal", ""),
-                            "started_at": state.get("started_at", ""),
-                            "last_updated": state.get("last_updated", ""),
-                            "cooldown": state.get("cooldown", 0),
-                        },
-                        "latest_iteration": latest,
-                        "stats": {
-                            "success_count": stats.get("success_count", 0),
-                            "error_count": stats.get("error_count", 0),
-                            "total_duration_seconds": stats.get(
-                                "total_duration_seconds", 0
-                            ),
-                            "avg_duration_seconds": stats.get(
-                                "avg_duration_seconds", 0
-                            ),
-                            "consecutive_errors": stats.get("consecutive_errors", 0),
-                            "consecutive_successes": stats.get(
-                                "consecutive_successes", 0
-                            ),
-                        },
-                        "error_counts": {
-                            "timeout": et.get("timeout", 0),
-                            "network": et.get("network", 0),
-                            "schema": et.get("schema", 0),
-                            "heartbeat": et.get("heartbeat", 0),
-                            "unknown": et.get("unknown", 0),
-                        },
-                        "mitigations": state.get("mitigations", {}),
-                        "eta": state.get("eta", {}),
-                        "goals": goals_list,
-                        "avg_chars_per_iter": avg_chars_per_iter,
-                        "avg_throughput": avg_throughput,
-                        "est_cost": state.get("est_cost"),
-                        "iters_per_goal": iters_per_goal,
-                        "metrics_summary": metrics_summary,
-                        "consecutive_errors": stats.get("consecutive_errors", 0),
-                        "consecutive_successes": stats.get("consecutive_successes", 0),
-                        "cooldown": state.get("cooldown", 0),
-                    },
-                )
+                payload = _build_sse_payload(state)
+                wrapped = _wrap_sse_payload(payload)
+                self._send_json(200, wrapped["data"])
             else:
                 self._send_json(
                     200,

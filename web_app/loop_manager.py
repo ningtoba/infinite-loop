@@ -280,6 +280,34 @@ class LoopManager:
         iterations = ledger.get("iterations", [])
         latest = iterations[-1] if iterations else None
 
+        # Compute throughput metrics from iteration data (matching _build_sse_payload)
+        avg_chars_per_iter_v = None
+        avg_throughput_v = None
+        if iterations:
+            chars_list = [it.get("output_chars", 0) or 0 for it in iterations]
+            if chars_list:
+                avg_chars_per_iter_v = int(sum(chars_list) // len(chars_list))
+            cps_list = [
+                it.get("chars_per_second", 0) or 0
+                for it in iterations
+                if it.get("chars_per_second", 0)
+            ]
+            if cps_list:
+                avg_throughput_v = round(sum(cps_list) / len(cps_list), 1)
+        metrics_parts = []
+        if avg_chars_per_iter_v is not None:
+            metrics_parts.append(f"{avg_chars_per_iter_v} chars/iter")
+        if avg_throughput_v is not None:
+            metrics_parts.append(f"{avg_throughput_v} cps avg")
+        if stats.get("avg_duration_seconds", 0):
+            metrics_parts.append(f'{stats["avg_duration_seconds"]:.0f}s avg')
+        metrics_summary_v = ", ".join(metrics_parts) if metrics_parts else ""
+        iters_per_goal_v = None
+        goals_count = len(ledger.get("goals_specs", [])) or 1
+        total_iters = ledger.get("total_iterations", 0)
+        if total_iters > 0:
+            iters_per_goal_v = max(1, total_iters // goals_count)
+
         return {
             "loop_status": self._status,
             "pid": self._process.pid if self._process else None,
@@ -305,10 +333,10 @@ class LoopManager:
             "error_counts": ledger.get("error_type_counts", {}),
             "mitigations": ledger.get("mitigations", {}),
             "eta": ledger.get("eta", {}),
-            "avg_chars_per_iter": ledger.get("avg_chars_per_iter"),
-            "avg_throughput": ledger.get("avg_throughput"),
-            "iters_per_goal": ledger.get("iters_per_goal"),
-            "metrics_summary": ledger.get("metrics_summary", ""),
+            "avg_chars_per_iter": avg_chars_per_iter_v,
+            "avg_throughput": avg_throughput_v,
+            "iters_per_goal": iters_per_goal_v,
+            "metrics_summary": metrics_summary_v,
             "est_cost": ledger.get("est_cost"),
             "latest_iteration": latest,
             "live_iteration": self._live_iteration,

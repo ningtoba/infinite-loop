@@ -819,7 +819,6 @@ def _build_sse_payload(state: dict) -> dict:
         iters_per_goal = max(1, total_iters // max(len(goals_list), 1))
     return {
         "iteration": latest,
-        "_iterations": iterations[-20:],  # last 20 for SSE dashboard init
         "status": state.get("status", "unknown"),
         "total_iterations": total_iters,
         "max_iterations": state.get("max_iterations", 0),
@@ -841,6 +840,7 @@ def _build_sse_payload(state: dict) -> dict:
             "timeout": et.get("timeout", 0),
             "network": et.get("network", 0),
             "schema": et.get("schema", 0),
+            "heartbeat": et.get("heartbeat", 0),
             "unknown": et.get("unknown", 0),
         },
         "mitigations": mitigations,

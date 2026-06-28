@@ -354,6 +354,7 @@ def run_loop(
             _print_shutdown_summary(
                 state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
             )
+            _broadcast_to_sse_clients(state)
             return
 
         if file_watcher and file_watcher.check_change():
@@ -382,6 +383,7 @@ def run_loop(
                         write_status_file(
                             status_file, state, iteration_count, "stopped: signal"
                         )
+                        _broadcast_to_sse_clients(state)
                         return
                     pause_check = check_sentinel_no_remove(sentinel_path)
                     if pause_check is None:
@@ -416,6 +418,7 @@ def run_loop(
             _print_shutdown_summary(
                 state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
             )
+            _broadcast_to_sse_clients(state)
             return
 
         if max_iterations > 0 and iteration_count >= max_iterations:
@@ -434,6 +437,7 @@ def run_loop(
                 git=git,
                 workers=workers,
             )
+            _broadcast_to_sse_clients(state)
             return
 
         if max_idle_iterations > 0 and consecutive_idle >= max_idle_iterations:
@@ -450,6 +454,7 @@ def run_loop(
             _print_shutdown_summary(
                 state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
             )
+            _broadcast_to_sse_clients(state)
             return
 
         iteration_count += 1
@@ -500,6 +505,7 @@ def run_loop(
                     git=git,
                     workers=workers,
                 )
+                _broadcast_to_sse_clients(state)
                 return
 
             if track_goals and _is_goal_completed(state, goal_text):
@@ -662,6 +668,7 @@ def run_loop(
                 git=git,
                 workers=workers,
             )
+            _broadcast_to_sse_clients(state)
             return
 
         existing_summaries, is_compacted = _compact_summaries(
@@ -984,6 +991,7 @@ def run_loop(
                 git=git,
                 workers=workers,
             )
+            _broadcast_to_sse_clients(state)
             return
 
         if state["mitigations"].get("mitigation_level", 0) >= 3:
@@ -998,4 +1006,5 @@ def run_loop(
             _print_shutdown_summary(
                 state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
             )
+            _broadcast_to_sse_clients(state)
             return

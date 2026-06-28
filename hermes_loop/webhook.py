@@ -118,6 +118,7 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
                             "timeout": et.get("timeout", 0),
                             "network": et.get("network", 0),
                             "schema": et.get("schema", 0),
+                            "heartbeat": et.get("heartbeat", 0),
                             "unknown": et.get("unknown", 0),
                         },
                         "mitigations": state.get("mitigations", {}),

@@ -293,7 +293,7 @@ shell completion scripts whenever CLI flags change. Two ways to enable it:
 | Method | Command | Pro | Con |
 |--------|---------|-----|-----|
 | **`core.hooksPath` (recommended)** | `git config core.hooksPath .githooks` | No sync problem — always uses repo version; survives pulls, branches, rebases | Requires explicit `git config` |
-| **`make install-hooks-path`** | `make install-hooks-path` | One command wrapping `git config core.hooksPath .githooks`; project metadata in `[tool.hermes_loop]` (`pyproject.toml`) documents settings for pip-level tools | Same — delegates to the git config approach |
+| **`make install-hooks-path`** | `make install-hooks-path` | One command wrapping `git config core.hooksPath .githooks`; reads `hooks_method` and `hooks_path` from `[tool.hermes_loop]` in `pyproject.toml`, which is the single source of truth for pip-level auto-configuration | Same — delegates to the git config approach |
 | **`cp`-based** | `make install-hooks` | Auto-run by `make install` / `make install-dev` | Stale copy if `.githooks/` updates — must re-run |
 
 **Recommendation:** Run `make install-hooks-path` once to use the `core.hooksPath`
@@ -310,6 +310,32 @@ git config core.hooksPath .githooks
 
 The old copied hook in `.git/hooks/pre-commit` becomes inactive immediately —
 git ignores `.git/hooks/` when `core.hooksPath` is set.
+
+#### Pip-Level Auto-Configuration (`setup.py` + `pyproject.toml`)
+
+When someone runs `pip install -e .` or `make install` from a git checkout,
+`setup.py` automatically prompts to configure `core.hooksPath = .githooks`.
+This is the "zero-config" path for new contributors — they see the prompt
+immediately after install, without needing to read this file first.
+
+The authoritative configuration lives in the `[tool.hermes_loop]` section of
+`pyproject.toml`. Both `setup.py` and `make install-hooks-path` read their
+settings from this section, making it the single source of truth:
+
+```toml
+[tool.hermes_loop]
+# Recommended hooks installation method: "core.hooksPath" or "cp"
+hooks_method = "core.hooksPath"
+# Path (relative to repo root) used by core.hooksPath
+hooks_path = ".githooks"
+# Target path for cp-based installation (relative to repo root)
+hooks_cp_target = ".git/hooks/pre-commit"
+```
+
+If you add or rename the hooks directory, update `hooks_path` here and both
+`setup.py` and `make install-hooks-path` will pick up the change automatically.
+Do not hardcode the hooks path in multiple places — `[tool.hermes_loop]` is the
+canonical source.
 
 ### 3. Test
 

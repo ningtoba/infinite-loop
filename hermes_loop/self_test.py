@@ -115,7 +115,9 @@ def _run_self_test() -> dict:
         cases.append(
             (
                 "multi-line",
-                lambda: extract_json_from_output('{"summary": "hello", "error": null}'),
+                lambda: extract_json_from_output(
+                    '{\n"summary": "hello",\n"error": null\n}'
+                ),
                 lambda r: (r is not None and r.get("summary") == "hello", f"got {r}"),
             )
         )
@@ -498,6 +500,30 @@ def _run_self_test() -> dict:
                 ),
             )
         )
+        # Stuck without extra flags should suggest use-library and evolve
+        cases.append(
+            (
+                "stuck-suggestion",
+                lambda: _suggest_actionable_fix(None, "stuck", "fix bug"),
+                lambda r: (
+                    r is not None and "--use-library" in r and "--evolve" in r,
+                    f"expected --use-library and --evolve suggestion, got {r!r}",
+                ),
+            )
+        )
+        # Stuck with workers > 1 should suggest reducing workers
+        cases.append(
+            (
+                "stuck-multiworker",
+                lambda: _suggest_actionable_fix(
+                    None, "stuck", "fix auth", workers=3, use_library=False
+                ),
+                lambda r: (
+                    r is not None and "--workers 1" in r and "--use-library" in r,
+                    f"expected worker+library fix, got {r!r}",
+                ),
+            )
+        )
         # Timeout error should suggest session-timeout increase
         cases.append(
             (
@@ -522,16 +548,65 @@ def _run_self_test() -> dict:
                 ),
             )
         )
-        # Stuck with workers > 1 should suggest reducing workers
+        # Regression with ALL flags already enabled should suggest nothing
         cases.append(
             (
-                "stuck-multiworker",
+                "regression-suggestion-all-enabled",
                 lambda: _suggest_actionable_fix(
-                    None, "stuck", "fix auth", workers=3, use_library=False
+                    None,
+                    "regression",
+                    "refactor db",
+                    git=True,
+                    git_commit=True,
+                    force_reset=True,
                 ),
                 lambda r: (
-                    r is not None and "--workers 1" in r and "--use-library" in r,
-                    f"expected worker+library fix, got {r!r}",
+                    r is None,
+                    f"expected no suggestion when git+git-commit+force-reset all enabled, got {r!r}",
+                ),
+            )
+        )
+        # Regression with only git enabled should skip --git but still suggest others
+        cases.append(
+            (
+                "regression-suggestion-git-only",
+                lambda: _suggest_actionable_fix(
+                    None,
+                    "regression",
+                    "refactor db",
+                    git=True,
+                ),
+                lambda r: (
+                    r is not None
+                    and "Add --git to track"
+                    not in r  # should NOT suggest adding the --git flag
+                    and "--git-commit" in r
+                    and "--force-reset" in r,
+                    f"expected --git-commit+force-reset (no --git flag) for git-only, got {r!r}",
+                ),
+            )
+        )
+        # Consecutive errors >= 3 should suggest preflight
+        cases.append(
+            (
+                "consecutive-errors-suggestion",
+                lambda: _suggest_actionable_fix(
+                    "unknown", "stuck", "deploy app", consecutive_errors=5
+                ),
+                lambda r: (
+                    r is not None and "--preflight" in r,
+                    f"expected preflight suggestion for 5 consecutive errors, got {r!r}",
+                ),
+            )
+        )
+        # Schema error should suggest output-schema review
+        cases.append(
+            (
+                "schema-suggestion",
+                lambda: _suggest_actionable_fix("schema", "stuck", "parse data"),
+                lambda r: (
+                    r is not None and "--output-schema" in r,
+                    f"expected schema suggestion, got {r!r}",
                 ),
             )
         )
@@ -539,8 +614,131 @@ def _run_self_test() -> dict:
 
     _run_subtests("test_suggest_actionable_fix", _test_suggest_actionable_fix())
 
-    # Final file-level check: verify stats consistency
+    # ------------------------------------------------------------------
+    # Test: env_utils — validate_env_vars
+    # ------------------------------------------------------------------
+    def _test_validate_env_vars():
+        from .env_utils import validate_env_vars, KNOWN_ENV_VARS, _find_closest_match
+
+        cases = []
+
+        # Known variable should return type "ok"
+        cases.append(
+            (
+                "known-var",
+                lambda: validate_env_vars({"INFINITE_LOOP_GOAL": "fix tests"}),
+                lambda r: (
+                    any(
+                        x["type"] == "ok" and x["key"] == "INFINITE_LOOP_GOAL"
+                        for x in r
+                    ),
+                    f"expected ok for known var, got {r}",
+                ),
+            )
+        )
+
+        # Typo should be detected
+        cases.append(
+            (
+                "typo-detection",
+                lambda: validate_env_vars({"INFINITE_LOOP_COOL_DOWN": "10"}),
+                lambda r: (
+                    any(
+                        x["type"] == "typo"
+                        and "INFINITE_LOOP_COOLDOWN" in x.get("message", "")
+                        for x in r
+                    ),
+                    f"expected typo detection for COOL_DOWN, got {r}",
+                ),
+            )
+        )
+
+        # Unknown var (no close match) should return type "unknown"
+        cases.append(
+            (
+                "unknown-var",
+                lambda: validate_env_vars({"INFINITE_LOOP_ZZZZZZ": "test"}),
+                lambda r: (
+                    any(
+                        x["type"] == "unknown" and x["key"] == "INFINITE_LOOP_ZZZZZZ"
+                        for x in r
+                    ),
+                    f"expected unknown for ZZZZZZ, got {r}",
+                ),
+            )
+        )
+
+        # Non-INFINITE_LOOP_ var should return type "warning"
+        cases.append(
+            (
+                "non-prefix-var",
+                lambda: validate_env_vars({"MY_CUSTOM_VAR": "value"}),
+                lambda r: (
+                    any(
+                        x["type"] == "warning" and x["key"] == "MY_CUSTOM_VAR"
+                        for x in r
+                    ),
+                    f"expected warning for non-prefix var, got {r}",
+                ),
+            )
+        )
+
+        # _find_closest_match should return closest known var name
+        cases.append(
+            (
+                "closest-match",
+                lambda: _find_closest_match("INFINITE_LOOP_COOL_DOWN", KNOWN_ENV_VARS),
+                lambda r: (
+                    r == "INFINITE_LOOP_COOLDOWN",
+                    f"expected COOLDOWN, got {r!r}",
+                ),
+            )
+        )
+
+        # _find_closest_match returns None for very different names
+        cases.append(
+            (
+                "no-close-match",
+                lambda: _find_closest_match("COMPLETELY_UNRELATED", KNOWN_ENV_VARS),
+                lambda r: (
+                    r is None,
+                    f"expected None, got {r!r}",
+                ),
+            )
+        )
+
+        # Missing common required vars
+        cases.append(
+            (
+                "missing-goal",
+                lambda: validate_env_vars({}),
+                lambda r: (
+                    any(
+                        x["type"] == "missing" and x["key"] == "INFINITE_LOOP_GOAL"
+                        for x in r
+                    ),
+                    f"expected missing GOAL warning, got {r}",
+                ),
+            )
+        )
+
+        return cases
+
+    _run_subtests("test_validate_env_vars", _test_validate_env_vars())
+
     total = passed_total + failed_total
+    ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
+    if failed_total == 0:
+        print(
+            f"[{ts}] [SELF-TEST] Result: {passed_total}/{total} tests passed, all OK",
+            flush=True,
+        )
+    else:
+        print(
+            f"[{ts}] [SELF-TEST] Result: {passed_total}/{total} tests passed, {failed_total} FAILURES",
+            flush=True,
+        )
+
     return {
         "passed": passed_total,
         "failed": failed_total,

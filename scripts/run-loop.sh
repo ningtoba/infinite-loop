@@ -1,5 +1,5 @@
 #!/bin/bash
-# run-loop.sh — Unified entrypoint (v14.27.0 — Demo mode + interactive walkthrough)
+# run-loop.sh — Unified entrypoint (v14.36.0 — Demo mode + interactive walkthrough)
 #
 # THE PRIMARY way to create an autonomous delegation loop. No cron jobs.
 #
@@ -222,7 +222,7 @@ fi
 
 if [ "$QUIET" = false ]; then
   echo "╔══════════════════════════════════════════════╗"
-  echo "║  Infinite Loop - v14.35.0                       ║"
+  echo "║  Infinite Loop - v14.36.0                       ║"
   echo "║  Makefile, CONTRIBUTING.md,                       ║"
   echo "║  Improved --help, SSE fix, Dashboard v3 SSE,     ║"
   echo "║  Error Panel, Performance Metrics,               ║"

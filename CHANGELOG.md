@@ -12,6 +12,21 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
   `scripts/run-loop.sh` banner which were already at 14.34.0.
 - **CHANGELOG entry**: Added this missing v14.34.0 changelog section.
 
+## [14.36.0] — 2026-06-28
+
+### Fixed
+- **Privacy leak**: Replaced user's home path (`/home/nekophobia`) in `.env.example`
+  with generic `/home/user` path.
+- **Package discovery**: Added `web_app*` to `[tool.setuptools.packages.find]` in
+  `pyproject.toml` so the `hermes_loop_web` entrypoint works after pip install.
+
+### Changed
+- **CHANGELOG**: Added missing `## [14.6.0]` section header (was blank line).
+- **Documentation**: Updated `scripts/run-loop.sh` docstring version from v14.27.0
+  to v14.35.0.
+
+---
+
 ## [14.35.0] — 2026-06-28
 
 ### Fixed
@@ -788,6 +803,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [14.6.0] — 2026-06-26
 
 ### Added
 - **`--quiet` flag**: Suppresses the verbose startup banner, per-iteration headers (`=== Iteration N ===`), and config dump. Shows only compact one-line status updates. Ideal for background daemon runs (`bash run.sh --quiet` or `INFINITE_LOOP_QUIET=true` in `.env`).

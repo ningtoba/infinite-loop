@@ -20,6 +20,11 @@ class TestValidateJsonOutput:
         result = validate_json_output({"summary": "x"}, None)
         assert result == (True, "")
 
+    def test_empty_dict_schema(self):
+        """Empty dict schema returns (True, '')."""
+        result = validate_json_output({"summary": "x"}, {})
+        assert result == (True, "")
+
     def test_valid_object(self):
         """Valid object against schema returns (True, '')."""
         schema = {
@@ -140,6 +145,19 @@ class TestValidateJsonOutput:
         }
         assert validate_json_output({"items": [1, 2, 3]}, schema) == (True, "")
 
+    def test_array_rejects_dict(self):
+        """Array type rejects dict."""
+        schema = {
+            "type": "object",
+            "required": ["items"],
+            "properties": {
+                "items": {"type": "array"},
+            },
+        }
+        result = validate_json_output({"items": {"a": 1}}, schema)
+        assert result[0] is False
+        assert "expected array" in result[1]
+
     def test_object_type(self):
         """Object type accepts dict."""
         schema = {
@@ -150,6 +168,19 @@ class TestValidateJsonOutput:
             },
         }
         assert validate_json_output({"data": {"key": "val"}}, schema) == (True, "")
+
+    def test_object_rejects_list(self):
+        """Object type rejects list."""
+        schema = {
+            "type": "object",
+            "required": ["data"],
+            "properties": {
+                "data": {"type": "object"},
+            },
+        }
+        result = validate_json_output({"data": [1, 2]}, schema)
+        assert result[0] is False
+        assert "expected object" in result[1]
 
     def test_enum_validation(self):
         """Enum values are validated."""
@@ -178,6 +209,17 @@ class TestValidateJsonOutput:
         assert validate_json_output({"name": "abc"}, schema) == (True, "")
         assert validate_json_output({"name": "ab"}, schema)[0] is False
 
+    def test_min_length_zero(self):
+        """minLength=0 allows empty strings."""
+        schema = {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+                "name": {"type": "string", "minLength": 0},
+            },
+        }
+        assert validate_json_output({"name": ""}, schema) == (True, "")
+
     def test_max_length(self):
         """maxLength validation for strings."""
         schema = {
@@ -192,7 +234,7 @@ class TestValidateJsonOutput:
         assert result[0] is False
         assert "max length" in result[1]
 
-    def test_numeric_minimum(self):
+    def test_minimum(self):
         """minimum validation for numbers."""
         schema = {
             "type": "object",
@@ -204,7 +246,7 @@ class TestValidateJsonOutput:
         assert validate_json_output({"age": 0}, schema) == (True, "")
         assert validate_json_output({"age": -1}, schema)[0] is False
 
-    def test_numeric_maximum(self):
+    def test_maximum(self):
         """maximum validation for numbers."""
         schema = {
             "type": "object",
@@ -233,6 +275,35 @@ class TestValidateJsonOutput:
         }
         assert validate_json_output({"meta": {"version": "1.0"}}, schema) == (True, "")
         assert validate_json_output({"meta": {}}, schema)[0] is False
+
+    def test_deeply_nested(self):
+        """Validate deeply nested objects work correctly."""
+        schema = {
+            "type": "object",
+            "required": ["outer"],
+            "properties": {
+                "outer": {
+                    "type": "object",
+                    "required": ["middle"],
+                    "properties": {
+                        "middle": {
+                            "type": "object",
+                            "required": ["inner"],
+                            "properties": {
+                                "inner": {"type": "number"},
+                            },
+                        },
+                    },
+                },
+            },
+        }
+        assert validate_json_output({"outer": {"middle": {"inner": 42}}}, schema) == (
+            True,
+            "",
+        )
+        result = validate_json_output({"outer": {"middle": {}}}, schema)
+        assert result[0] is False
+        assert "missing required" in result[1]
 
     def test_empty_schema_object(self):
         """Empty properties dict is valid."""
@@ -269,6 +340,53 @@ class TestValidateJsonOutput:
         assert validate_json_output({"code": 200}, schema) == (True, "")
         assert validate_json_output({"code": 302}, schema)[0] is False
 
+    def test_extra_field_ignored(self):
+        """Extra fields not in schema are ignored."""
+        schema = {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": {"type": "integer"},
+            },
+        }
+        assert validate_json_output({"id": 1, "extra": "ignored"}, schema) == (True, "")
+
+    def test_minimum_on_float(self):
+        """minimum works with float type numbers."""
+        schema = {
+            "type": "object",
+            "required": ["temp"],
+            "properties": {
+                "temp": {"type": "number", "minimum": -10.0},
+            },
+        }
+        assert validate_json_output({"temp": -5.0}, schema) == (True, "")
+        assert validate_json_output({"temp": -15.0}, schema)[0] is False
+
+    def test_maximum_on_float(self):
+        """maximum works with float type numbers."""
+        schema = {
+            "type": "object",
+            "required": ["temp"],
+            "properties": {
+                "temp": {"type": "number", "maximum": 100.5},
+            },
+        }
+        assert validate_json_output({"temp": 100.5}, schema) == (True, "")
+        assert validate_json_output({"temp": 101.0}, schema)[0] is False
+
+    def test_bool_is_not_number(self):
+        """Boolean should not pass as number."""
+        schema = {
+            "type": "object",
+            "required": ["val"],
+            "properties": {
+                "val": {"type": "number"},
+            },
+        }
+        result = validate_json_output({"val": True}, schema)
+        assert result[0] is False
+
 
 # ===================================================================
 # load_json_schema
@@ -304,6 +422,23 @@ class TestLoadJsonSchema:
         with patch("builtins.open", mock_open(read_data='["list", "not", "dict"]')):
             result = load_json_schema("/fake/list.json")
         assert result is None
+
+    def test_empty_file(self):
+        """Empty file returns None."""
+        with patch("builtins.open", mock_open(read_data="")):
+            result = load_json_schema("/fake/empty.json")
+        assert result is None
+
+    def test_large_schema(self):
+        """Large schema files are handled."""
+        props = {f"field_{i}": {"type": "string"} for i in range(100)}
+        schema_data = (
+            '{"type": "object", "properties": ' + str(props).replace("'", '"') + "}"
+        )
+        with patch("builtins.open", mock_open(read_data=schema_data)):
+            result = load_json_schema("/fake/large.json")
+        assert result is not None
+        assert len(result["properties"]) == 100
 
     def test_nested_schema(self):
         """Load a schema with nested properties."""

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "hermes-loop"
 description = "Autonomous loop daemon that spawns Hermes sessions with real tools and delegation"
-version = "14.38.0"
+version = "14.38.2"
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"

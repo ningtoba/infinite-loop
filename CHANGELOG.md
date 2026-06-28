@@ -4,6 +4,11 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.38.2] — 2026-06-28
+
+### Added
+- **`IMPROVEMENT_PLAN.md` — Improvement plan scan pass**: Created the improvement plan with comprehensive codebase scan findings. READ 20+ source files across all modules, checked lint (clean), self-tests (12/12 pass), and grep for TODOs/FIXMEs (none found). Populated backlog with 9 findings across 🐛 Bugs (2), 🔧 Refactor (2), ✨ Features (1), 🧹 Hygiene (3), and 🏗️ Infra/CI (4). This iteration was scan-only; next iteration will act on the highest-priority backlog item.
+
 ## [14.38.1] — 2026-06-28
 
 ### Fixed

@@ -39,7 +39,7 @@ class FileLock:
                     os.close(fd)
                     raise TimeoutError(
                         f"Could not acquire lock on {self.path} within {self.timeout}s"
-                    )
+                    ) from None
                 time.sleep(0.1)
 
     def __exit__(self, *args):

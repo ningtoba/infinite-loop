@@ -167,12 +167,20 @@ class LoopManager:
             self._status = "running"
             self._add_log("info", f"Daemon started (PID: {self._process.pid})")
 
-            # Start log readers
-            asyncio.create_task(self._read_stream(self._process.stdout, "stdout"))
-            asyncio.create_task(self._read_stream(self._process.stderr, "stderr"))
+            # Start log readers — store references to prevent GC of pending tasks
+            self._tasks: set[asyncio.Task] = set()
 
-            # Start process monitor
-            asyncio.create_task(self._monitor_process())
+            def _bg(task: asyncio.Task) -> None:
+                self._tasks.discard(task)
+
+            for coro in (
+                self._read_stream(self._process.stdout, "stdout"),
+                self._read_stream(self._process.stderr, "stderr"),
+                self._monitor_process(),
+            ):
+                t = asyncio.create_task(coro)
+                self._tasks.add(t)
+                t.add_done_callback(_bg)
 
             return {"success": True, "pid": self._process.pid}
         except Exception as e:

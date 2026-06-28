@@ -128,7 +128,7 @@ def _log_startup_banner(
     if track_goals:
         parts.append("track-goals")
     if convergence_stop:
-        parts.append(f"converge({convergence_window}×{convergence_threshold})")
+        parts.append(f"converge({convergence_window}x{convergence_threshold})")
     _log(
         f"[DAEMON]   Iteration: {' | '.join(parts) if parts else '(unlimited, no auto-stop)'}"
     )

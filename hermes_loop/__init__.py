@@ -10,4 +10,4 @@ from .cli import main
 VERSION = LAUNCH_LOOP_VERSION
 __version__ = VERSION
 
-__all__ = ["main", "VERSION", "__version__", "LAUNCH_LOOP_VERSION"]
+__all__ = ["LAUNCH_LOOP_VERSION", "VERSION", "__version__", "main"]

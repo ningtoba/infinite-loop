@@ -124,7 +124,7 @@ def _print_shutdown_summary(
 
 
 # Archiving utilities
-from .archiving import (  # noqa: E402
+from .archiving import (  # noqa: E402, RUF100
     _archive_iterations,
     _cleanup_old_archives,
     _enforce_archive_max_size,
@@ -263,7 +263,9 @@ def run_loop(
                 )
 
     goals_tuples = _load_goals_file(goals_file, goal)
-    goals_list: list[GoalSpec] = [GoalSpec(g) for g, p, m, v in goals_tuples]
+    goals_list: list[GoalSpec] = [
+        GoalSpec(g, profile=p, model=m, provider=v) for g, p, m, v in goals_tuples
+    ]
     goals_index = 0
     # Store goals specs in state for SSE dashboard visualization
     state["goals_specs"] = goals_tuples
@@ -721,8 +723,9 @@ def run_loop(
         state["status"] = "running"
 
         if evolve and next_goal and len(goals_list) <= 1:
-            state["current_goal"] = goal
+            state["current_goal"] = next_goal
             goal = next_goal
+            goals_list[0] = GoalSpec(goal)
             state["evolved_goal"] = goal
             _log(f"[EVOLVE] Next goal: {goal[:120]}...")
 

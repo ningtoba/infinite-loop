@@ -591,7 +591,7 @@ def _merge_worktree_branches(
 
     # For workers still not_found after scanning all detected branches,
     # add a descriptive reason mentioning the branch pattern mismatch
-    for wid_str, pws in result["per_worker"].items():
+    for _, pws in result["per_worker"].items():
         if pws["status"] == "not_found":
             pws["reason"] = (
                 "no worktree branch matched this worker — "

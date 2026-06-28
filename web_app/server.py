@@ -29,6 +29,8 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 # SSE client tracking
 _sse_clients: list[asyncio.Queue] = []
 _sse_clients_lock = asyncio.Lock()
+# Hold references to background tasks to prevent GC from cancelling them
+_background_tasks: set[asyncio.Task] = set()
 
 app = FastAPI(
     title="Hermes Loop Web UI",
@@ -354,7 +356,9 @@ async def _status_poller():
 @app.on_event("startup")
 async def startup():
     """Start background tasks on server startup."""
-    asyncio.create_task(_status_poller())
+    task = asyncio.create_task(_status_poller())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 # ── Entry point ─────────────────────────────────────────────────────────────

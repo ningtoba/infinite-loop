@@ -60,7 +60,7 @@ def _archive_iterations(
 
     _log(
         f"[ARCHIVE] Saved {len(iterations)} iterations to {basename} "
-        f"(iter #{iterations[0].get('n')}–#{iterations[-1].get('n')})"
+        f"(iter #{iterations[0].get('n')}-#{iterations[-1].get('n')})"
     )
     return len(iterations)
 

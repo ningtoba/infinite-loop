@@ -4,6 +4,11 @@ import json
 
 from .file_utils import _log
 
+# Maximum recursion depth for nested object validation to prevent stack overflow
+# on circular or excessively deep schemas. JSON Schema allows nesting of "items"
+# (array) and "properties"/"additionalProperties" (object) in a chain.
+_MAX_VALIDATION_DEPTH = 50
+
 
 def validate_json_output(output: dict, schema: dict) -> tuple[bool, str]:
     """Validate a JSON object against a JSON Schema (draft-07 subset).
@@ -11,6 +16,11 @@ def validate_json_output(output: dict, schema: dict) -> tuple[bool, str]:
     Uses stdlib-only validation (no jsonschema dependency). Supports a
     practical subset: required fields, type checking, enum values, and
     string minLength/maxLength. Returns (is_valid, error_message).
+
+    Protection: recursion depth is capped at ``_MAX_VALIDATION_DEPTH``
+    (50) and an identity-based cycle detector tracks already-visited
+    ``(id(schema_node), id(obj))`` pairs to prevent stack overflow on
+    self-referencing or circular schemas.
     """
     if not schema:
         return True, ""
@@ -33,7 +43,35 @@ def validate_json_output(output: dict, schema: dict) -> tuple[bool, str]:
                 return f"{path}: expected {expected}, got {type(value).__name__}"
         return None
 
-    def _validate(obj, schema_node: dict, path: str) -> str | None:
+    def _validate(
+        obj,
+        schema_node: dict,
+        path: str,
+        *,
+        _depth: int = 0,
+        _seen: set | None = None,
+    ) -> str | None:
+        if _depth > _MAX_VALIDATION_DEPTH:
+            return (
+                f"{path}: maximum validation depth "
+                f"({_MAX_VALIDATION_DEPTH}) exceeded"
+            )
+
+        # Cycle detection: track (schema_node, obj) identity pairs.
+        # A well-formed schema won't revisit the same (schema, value) pair
+        # on a valid path, so hitting one signals a circular reference.
+        if _seen is None:
+            _seen = set()
+        pair_id = (id(schema_node), id(obj))
+        # Only track for non-trivial objects (dicts/lists that can nest)
+        if isinstance(obj, (dict, list)):
+            if pair_id in _seen:
+                return (
+                    f"{path}: circular reference detected "
+                    f"(schema id={id(schema_node)}, obj id={id(obj)})"
+                )
+            _seen.add(pair_id)
+
         required = schema_node.get("required", [])
         for field in required:
             if field not in obj:
@@ -45,6 +83,7 @@ def validate_json_output(output: dict, schema: dict) -> tuple[bool, str]:
                 continue
             val = obj[field]
             field_path = f"{path}.{field}" if path else field
+
             expected_type = field_schema.get("type")
 
             if expected_type:
@@ -73,7 +112,13 @@ def validate_json_output(output: dict, schema: dict) -> tuple[bool, str]:
                     return f"{field_path}: maximum {maximum}, got {val}"
 
             if isinstance(val, dict) and "properties" in field_schema:
-                err = _validate(val, field_schema, field_path)
+                err = _validate(
+                    val,
+                    field_schema,
+                    field_path,
+                    _depth=_depth + 1,
+                    _seen=_seen,
+                )
                 if err:
                     return err
 

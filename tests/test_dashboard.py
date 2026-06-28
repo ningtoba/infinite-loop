@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import json
 import queue
-import threading
-import time
-from unittest.mock import MagicMock, PropertyMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -610,7 +608,7 @@ class TestWriteStatusHtml:
         with patch(
             "hermes_loop.dashboard._generate_status_html",
             return_value="<html>TEST</html>",
-        ) as mock_gen:
+        ):
             with patch("hermes_loop.dashboard.os.makedirs") as mock_makedirs:
                 with patch("hermes_loop.dashboard.open") as mock_open:
                     mock_file = MagicMock()

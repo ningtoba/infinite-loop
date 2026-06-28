@@ -28,6 +28,7 @@ _hermes_loop_completions()
         --demo
         --doctor
         --dry-run
+        --dump-env
         --evolve
         --force-reset
         --git

@@ -22,6 +22,7 @@ bool_flags=(
     '--demo[Run an interactive walkthrough of the daemon'\''s full lifecycle]'
     '--doctor[Run comprehensive self-diagnosis and exit]'
     '--dry-run[Print what would happen without spawning any sessions]'
+    '--dump-env[Print all known INFINITE_LOOP_* environment variables with their current default values to stdout and exit]'
     '--evolve[Let iterations propose the next goal (self-directing)]'
     '--force-reset[Clear existing ledger and start fresh]'
     '--git[Capture git diff stats per iteration]'

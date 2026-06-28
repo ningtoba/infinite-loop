@@ -492,6 +492,24 @@ def run_loop(
                 _log(f"    Goals-file: {len(goals_list)} goals loaded")
             _log(f"{'=' * 60}")
 
+        # Guard: detect control signal goals (e.g., "NEXT_ITERATION need_reload")
+        # that may have leaked from a previous pre-fix evolution. A control signal
+        # is NOT a real goal — sending it to a worker wastes an iteration.
+        # The evolve guard (line ~774) prevents new pollution, but an already
+        # polluted goal variable needs runtime detection.
+        if "need_reload" in goal.lower() or goal.strip().startswith("NEXT_ITERATION"):
+            _log(
+                "[CONTROL-SIGNAL] Goal is a control signal, not a real task. "
+                "Replacing with a recovery goal to avoid wasted iteration."
+            )
+            goal = (
+                "analyze the current codebase for any remaining issues or "
+                "technical debt after the recent need_reload fix"
+            )
+            # Also update goals_list[0] since spawn_goal uses it directly
+            if goals_list:
+                goals_list[0].goal = goal
+
         if len(goals_list) > 1:
             idx = goals_index % len(goals_list)
             current_goal_spec = goals_list[idx]

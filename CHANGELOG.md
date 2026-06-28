@@ -4,6 +4,11 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.39.4] — 2026-06-28
+
+### Fixed
+- **`loop.py` — runtime guard against stale control signal goals**: Added iteration-loop detection of `goal` containing `"need_reload"` or starting with `"NEXT_ITERATION"`. When a stale control signal goal from a previous pre-fix evolution reaches the loop, it's now replaced with a recovery goal instead of being sent to a worker. Also updates `goals_list[0]` so `spawn_goal` uses the replacement. (Iteration #29)
+
 ## [14.39.3] — 2026-06-28
 
 ### Fixed

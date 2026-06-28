@@ -421,10 +421,12 @@ async def _status_poller():
             )
             err_counts = str(status.get("error_counts", {}))
             mitigations = str(status.get("mitigations", {}))
-            term_total = sum(len(v) for v in status.get("worker_term", {}).values())
+            worker_term = status.get("worker_term", {})
+            # Hash the last 3 lines of each worker to detect content changes
+            term_content_hash = "".join(
+                "".join(v[-3:]) for v in sorted(worker_term.items(), key=lambda x: x[0])
+            )
             log_count = len(status.get("recent_logs", []))
-            # Include latest iteration's key fields so WT changes (worktree_merge,
-            # summary, error, classification) trigger SSE pushes.
             latest = status.get("latest_iteration", {}) or {}
             latest_sig = "|".join(
                 [
@@ -442,7 +444,7 @@ async def _status_poller():
                     worker_statuses,
                     err_counts,
                     mitigations,
-                    str(term_total),
+                    term_content_hash,
                     str(log_count),
                     latest_sig,
                 ]

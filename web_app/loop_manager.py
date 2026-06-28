@@ -367,9 +367,11 @@ class LoopManager:
                         text,
                         count=1,
                     )
+                    if wid not in self._worker_term:
+                        self._worker_term[wid] = []
                     self._worker_term[wid].append(term_content)
-                    if len(self._worker_term[wid]) > 1000:
-                        self._worker_term[wid] = self._worker_term[wid][-1000:]
+                    if len(self._worker_term[wid]) > 2000:
+                        self._worker_term[wid] = self._worker_term[wid][-2000:]
 
         # Worker spawned
         m = re.search(r"\[SPAWN\s+\(worker\s+#(\d+)\)\]", text)

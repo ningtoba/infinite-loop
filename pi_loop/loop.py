@@ -119,11 +119,17 @@ def _execute_task(
                     # Tool result
                     if ame_type == "content_block_stop":
                         delta = ame.get("delta", {})
-                        if isinstance(delta, dict) and delta.get("type") == "tool_result":
+                        if (
+                            isinstance(delta, dict)
+                            and delta.get("type") == "tool_result"
+                        ):
                             result_content = delta.get("content", "")
                             if isinstance(result_content, list):
                                 for cb in result_content:
-                                    if isinstance(cb, dict) and cb.get("type") == "text":
+                                    if (
+                                        isinstance(cb, dict)
+                                        and cb.get("type") == "text"
+                                    ):
                                         _term(f"[Result: {cb.get('text', '')[:200]}]")
                             elif isinstance(result_content, str):
                                 _term(f"[Result: {result_content[:200]}]")
@@ -155,11 +161,17 @@ def _execute_task(
                     # Tool result
                     if ame_type == "content_block_stop":
                         delta = ame.get("delta", {})
-                        if isinstance(delta, dict) and delta.get("type") == "tool_result":
+                        if (
+                            isinstance(delta, dict)
+                            and delta.get("type") == "tool_result"
+                        ):
                             result_content = delta.get("content", "")
                             if isinstance(result_content, list):
                                 for cb in result_content:
-                                    if isinstance(cb, dict) and cb.get("type") == "text":
+                                    if (
+                                        isinstance(cb, dict)
+                                        and cb.get("type") == "text"
+                                    ):
                                         _term(f"[Result: {cb.get('text', '')[:200]}]")
                             elif isinstance(result_content, str):
                                 _term(f"[Result: {result_content[:200]}]")
@@ -177,7 +189,7 @@ def _execute_task(
                             if cost:
                                 items.append(f"${cost}")
                             if items:
-                                _term(f"[Tokens: {", ".join(items)}]")
+                                _term(f"[Tokens: {', '.join(items)}]")
                         continue
 
                     # agent_start / turn_start — skip ceremony

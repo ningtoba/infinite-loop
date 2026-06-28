@@ -86,12 +86,18 @@ def _run_hermes_with_pty(
     worker_tag: str,
     timeout_seconds: int,
     workdir: str,
+    heartbeat_timeout: int = 0,
 ) -> tuple[str, int]:
     """Spawn hermes with a PTY for true line-buffered output.
 
     Regular pipes cause programs to block-buffer (4KB+). A pseudo-terminal
     forces line-buffered output so we see every tool call and model response
     in real time.
+
+    When ``heartbeat_timeout > 0``, the PTY loop also enforces an idle timeout:
+    if no output is received for ``heartbeat_timeout`` seconds the process is
+    killed.  This catches silent startup hangs that would otherwise survive
+    until the full ``timeout_seconds`` expires.
 
     Returns (accumulated_stdout, exit_code).
     Raises ``subprocess.TimeoutExpired`` if the process exceeds the timeout.
@@ -101,6 +107,7 @@ def _run_hermes_with_pty(
 
     lines: list[str] = []
     start = time.time()
+    last_output_time = start
 
     master_fd, slave_fd = pty.openpty()
 
@@ -125,6 +132,24 @@ def _run_hermes_with_pty(
             proc.wait()
             raise subprocess.TimeoutExpired(cmd, timeout_seconds)
 
+        # Idle timeout: if hermes produces zero output for heartbeat_timeout
+        # seconds, it's likely hung during startup — kill it early.
+        if heartbeat_timeout > 0:
+            idle = time.time() - last_output_time
+            if idle > heartbeat_timeout:
+                _log(
+                    f"[PTY{worker_tag}] No output for {idle:.0f}s "
+                    f"(heartbeat={heartbeat_timeout}s) — killing hung session"
+                )
+                os.close(master_fd)
+                proc.kill()
+                proc.wait()
+                raise subprocess.TimeoutExpired(
+                    cmd,
+                    heartbeat_timeout,
+                    output="\n".join(lines),
+                )
+
         try:
             r, _, _ = select.select([master_fd], [], [], 1.0)
         except (ValueError, OSError):
@@ -135,6 +160,7 @@ def _run_hermes_with_pty(
                 chunk = os.read(master_fd, 4096).decode("utf-8", errors="replace")
                 if not chunk:
                     break
+                last_output_time = time.time()
                 buffer += chunk
                 while "\n" in buffer:
                     line, buffer = buffer.split("\n", 1)
@@ -968,7 +994,11 @@ def spawn_delegation_session(
         else:
             try:
                 stdout, subprocess_exit_code = _run_hermes_with_pty(
-                    cmd, worker_tag, timeout_seconds, workdir or os.getcwd()
+                    cmd,
+                    worker_tag,
+                    timeout_seconds,
+                    workdir or os.getcwd(),
+                    heartbeat_timeout=heartbeat_timeout,
                 )
             except subprocess.TimeoutExpired:
                 elapsed = time.time() - start

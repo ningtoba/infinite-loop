@@ -120,7 +120,12 @@ def _run_heartbeat_monitor(
     proc: subprocess.Popen | None,
     timeout_seconds: int,
 ) -> dict:
-    """Run _monitor_heartbeat in a daemon thread with a timeout cap."""
+    """Run _monitor_heartbeat in a daemon thread with a timeout cap.
+
+    IMPORTANT: When the monitor detects a "lost" or "expired" heartbeat,
+    it kills the subprocess directly — the caller is typically blocked on
+    stdout.readline() and cannot act on the return value.
+    """
     result_container: dict = {}
 
     def _monitor_wrapper():
@@ -138,10 +143,28 @@ def _run_heartbeat_monitor(
     t.join(timeout=max_wait + 60)
     if t.is_alive():
         _log("[HEARTBEAT] Monitor thread timed out — forcibly stopping")
+        if proc is not None and proc.poll() is None:
+            _kill_session(proc, str(proc.pid) if proc.pid else "unknown")
         return {"status": "alive", "age_seconds": 0, "last_heartbeat_data": None}
-    return result_container.get(
+
+    result = result_container.get(
         "result", {"status": "alive", "age_seconds": 0, "last_heartbeat_data": None}
     )
+
+    # Kill the process when heartbeat is lost or expired.
+    # The main thread is blocked on stdout.readline() and can't act,
+    # so we must kill here to unblock it.
+    status = result.get("status", "alive")
+    if status in ("lost", "expired"):
+        pid_str = str(proc.pid) if (proc and proc.pid) else "unknown"
+        _log(
+            f"[HEARTBEAT] Session {status} — killing process {pid_str} "
+            f"(age={result.get('age_seconds', 0):.0f}s)"
+        )
+        if proc is not None and proc.poll() is None:
+            _kill_session(proc, pid_str)
+
+    return result
 
 
 def _kill_session(proc: subprocess.Popen | None, session_id: str) -> None:

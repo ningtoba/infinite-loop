@@ -64,11 +64,18 @@ def _runtime_guard(goal: str, goals_list: list, state: dict) -> tuple[str, list,
         )
         if goals_list:
             goals_list[0].goal = goal
-        if state.get("current_goal") and (
-            "need_reload" in state["current_goal"].lower()
-            or state["current_goal"].strip().lower().startswith("next_iteration")
-        ):
-            state["current_goal"] = goal
+
+    # ALWAYS clean up polluted state in the ledger, regardless of whether
+    # the local `goal` variable is itself a control signal.
+    if state.get("current_goal") and (
+        "need_reload" in state["current_goal"].lower()
+        or state["current_goal"].strip().lower().startswith("next_iteration")
+    ):
+        state["current_goal"] = goal
+    if state.get("evolved_goal") and (
+        "need_reload" in state["evolved_goal"].lower()
+        or state["evolved_goal"].strip().lower().startswith("next_iteration")
+    ):
         state.pop("evolved_goal", None)
     return goal, goals_list, state
 
@@ -188,6 +195,27 @@ class TestStateCleanup:
         # the "need_reload" or "NEXT_ITERATION" check, so it stays unchanged.
         assert state["current_goal"] == "my original goal"
 
+    def test_cleanup_independent_of_goal_pollution(self, polluted_state):
+        """State cleanup runs even when local goal is NOT a control signal (restart scenario)."""
+        state = polluted_state.copy()
+        # Local goal is a normal string (e.g., original --goal CLI arg on restart)
+        _, _, state = _runtime_guard(
+            "fix the unit tests", [GoalSpec("fix the unit tests")], state
+        )
+        # Polluted current_goal is cleaned up even though local goal wasn't a signal
+        assert "NEXT_ITERATION" not in state.get("current_goal", "").upper()
+        # Polluted evolved_goal is removed
+        assert "evolved_goal" not in state
+
+    def test_evolved_goal_cleanup_independent_of_goal(self):
+        """evolved_goal with control signal is cleaned even when local goal is normal."""
+        state = {
+            "current_goal": "normal goal",
+            "evolved_goal": "NEXT_ITERATION need_reload",
+        }
+        _, _, state = _runtime_guard("normal goal", [GoalSpec("")], state)
+        assert "evolved_goal" not in state
+
 
 class TestEdgeCases:
     """Edge cases and resilience."""
@@ -239,7 +267,10 @@ class TestViaModule:
     def test_detection_against_actual_goal_spec(self):
         """The guard works with actual GoalSpec objects used in loop.py."""
         gl = [GoalSpec("NEXT_ITERATION need_reload")]
-        state = {"current_goal": "NEXT_ITERATION need_reload", "evolved_goal": True}
+        state = {
+            "current_goal": "NEXT_ITERATION need_reload",
+            "evolved_goal": "NEXT_ITERATION need_reload",
+        }
 
         goal, goals_list, state = _runtime_guard(
             "NEXT_ITERATION need_reload", gl, state

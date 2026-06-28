@@ -495,7 +495,7 @@ def run_loop(
         # Guard: detect control signal goals (e.g., "NEXT_ITERATION need_reload")
         # that may have leaked from a previous pre-fix evolution. A control signal
         # is NOT a real goal — sending it to a worker wastes an iteration.
-        # The evolve guard (line ~774) prevents new pollution, but an already
+        # The evolve guard (line ~797) prevents new pollution, but an already
         # polluted goal variable needs runtime detection.
         if "need_reload" in goal.lower() or goal.strip().lower().startswith(
             "next_iteration"
@@ -511,13 +511,24 @@ def run_loop(
             # Also update goals_list[0] since spawn_goal uses it directly
             if goals_list:
                 goals_list[0].goal = goal
-            # Clean up polluted state so the ledger/UI shows a valid goal
-            # instead of the stale control signal.
-            if state.get("current_goal") and (
-                "need_reload" in state["current_goal"].lower()
-                or state["current_goal"].strip().lower().startswith("next_iteration")
-            ):
-                state["current_goal"] = goal
+
+        # ALWAYS clean up polluted state in the ledger, regardless of whether
+        # the local `goal` variable is itself a control signal. When the daemon
+        # restarts via os.execv() after a self-modification, the ledger's
+        # current_goal/evolved_goal may carry stale control signal values from
+        # the previous process's evolve path (line ~808). The local `goal`
+        # variable on restart is the original --goal CLI arg (not polluted),
+        # so the `if` guard above would NOT fire, and the polluted state would
+        # persist in memory/ledger forever.
+        if state.get("current_goal") and (
+            "need_reload" in state["current_goal"].lower()
+            or state["current_goal"].strip().lower().startswith("next_iteration")
+        ):
+            state["current_goal"] = goal
+        if state.get("evolved_goal") and (
+            "need_reload" in state["evolved_goal"].lower()
+            or state["evolved_goal"].strip().lower().startswith("next_iteration")
+        ):
             state.pop("evolved_goal", None)
 
         if len(goals_list) > 1:
@@ -803,7 +814,12 @@ def run_loop(
                 _log(
                     "[EVOLVE] next_goal contains 'need_reload' — skipping evolution (control signal, not a real goal)"
                 )
+                # Clean up BOTH evolved_goal AND current_goal to prevent the
+                # polluted state from persisting in the ledger across iterations
+                # (e.g., when HERMES_LOOP_NO_AUTO_RELOAD blocks the reload path
+                # below, write_ledger skips and the stale current_goal sticks).
                 state.pop("evolved_goal", None)
+                state.pop("current_goal", None)
             else:
                 state["current_goal"] = next_goal
                 goal = next_goal

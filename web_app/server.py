@@ -18,9 +18,9 @@ from fastapi.staticfiles import StaticFiles
 from .config_manager import (
     CONFIG_GROUPS,
     CONFIG_PATH,
-    get_config_with_defaults,
+    get_config,
+    save_config,
     get_raw_config,
-    write_json_config,
     build_cli_args,
 )
 from .loop_manager import get_loop_manager
@@ -73,7 +73,7 @@ async def index():
 @app.get("/api/config")
 async def get_config():
     """Get the full configuration with current values."""
-    config = get_config_with_defaults()
+    config = get_config()
     return {
         "groups": CONFIG_GROUPS,
         "config": config,
@@ -101,7 +101,7 @@ async def save_config(request: Request):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body")
 
-    write_json_config(data)
+    save_config(data)
     return {"success": True, "message": "Configuration saved", "path": CONFIG_PATH}
 
 

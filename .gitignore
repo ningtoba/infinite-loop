@@ -9,9 +9,9 @@ build/
 *.egg
 
 # Environment
-.env
-.env.local
-daemon.env
+# .env (removed - config_file used instead)
+# .env.local (removed - config_file used instead)
+# daemon.env (removed - config_file used instead)
 
 # OS
 .DS_Store

@@ -1,13 +1,16 @@
 """
-env_utils — Environment variable validation and discovery.
+env_utils — Environment variable validation, discovery, and loading.
 
-Validates .env files against the canonical set of known INFINITE_LOOP_*
-environment variables. Detects typos, unknown variables, and suggests
-the closest match for misspelled variable names.
+Provides safe environment initialisation that does NOT require a .env file.
+Loading order (last wins):
+  1. pi_loop.config_file defaults (~/.config/pi-loop/config.json)
+  2. .env file in CWD (if it exists — optional, no crash if missing)
+  3. Existing os.environ values (never overwritten)
 """
 
 import difflib
 import os
+from pathlib import Path
 
 from .color_utils import colorizer
 from .file_utils import _log
@@ -108,6 +111,161 @@ DEPRECATED_ENV_VARS: set[str] = set()
 # Internal / non-config env vars that are expected but not user-settable
 INTERNAL_ENV_VARS: set[str] = set()
 
+# ── Sensible defaults for every known env var ─────────────────────────────────
+# Used when no source (config file, .env, os.environ) provides a value.
+SENSIBLE_DEFAULTS: dict[str, str] = {
+    "INFINITE_LOOP_GOAL": "",
+    "INFINITE_LOOP_GOALS_FILE": "",
+    "INFINITE_LOOP_RUN": "false",
+    "INFINITE_LOOP_DRY_RUN": "false",
+    "INFINITE_LOOP_JSON_LOGS": "false",
+    "INFINITE_LOOP_QUIET": "false",
+    "INFINITE_LOOP_CONTINUE": "false",
+    "INFINITE_LOOP_RESUME": "false",
+    "INFINITE_LOOP_FORCE_RESET": "false",
+    "INFINITE_LOOP_GIT": "false",
+    "INFINITE_LOOP_GIT_COMMIT": "false",
+    "INFINITE_LOOP_YOLO": "false",
+    "INFINITE_LOOP_SAFE_MODE": "false",
+    "INFINITE_LOOP_NO_AUTO_TOOLSETS": "false",
+    "INFINITE_LOOP_NO_FAILURE_LEARNING": "false",
+    "INFINITE_LOOP_PREFLIGHT": "false",
+    "INFINITE_LOOP_PREFLIGHT_FAIL_FAST": "false",
+    "INFINITE_LOOP_SELF_TEST": "false",
+    "INFINITE_LOOP_DUMP_ENV": "false",
+    "INFINITE_LOOP_SAVE_CONFIG": "false",
+    "INFINITE_LOOP_STOP_AT_GOALS_END": "false",
+    "INFINITE_LOOP_STORE_GIT_DIFF": "false",
+    "INFINITE_LOOP_TRACK_GOALS": "false",
+    "INFINITE_LOOP_RESET_GOALS": "false",
+    "INFINITE_LOOP_PASS_SESSION_ID": "false",
+    "INFINITE_LOOP_USE_LIBRARY": "false",
+    "INFINITE_LOOP_EVOLVE": "false",
+    "INFINITE_LOOP_COOLDOWN": "30",
+    "INFINITE_LOOP_COOLDOWN_MODE": "none",
+    "INFINITE_LOOP_RETRY_DELAY": "5",
+    "INFINITE_LOOP_MAX_ITERATIONS": "100",
+    "INFINITE_LOOP_MAX_IDLE_ITERATIONS": "5",
+    "INFINITE_LOOP_MAX_RETRIES": "3",
+    "INFINITE_LOOP_MAX_TURNS": "20",
+    "INFINITE_LOOP_MAX_OUTPUT_CHARS": "10000",
+    "INFINITE_LOOP_SESSION_TIMEOUT": "300",
+    "INFINITE_LOOP_HEARTBEAT_TIMEOUT": "30",
+    "INFINITE_LOOP_STARTUP_DELAY": "0",
+    "INFINITE_LOOP_WORKERS": "1",
+    "INFINITE_LOOP_WORKER_URL": "",
+    "INFINITE_LOOP_WORKDIR": "",
+    "INFINITE_LOOP_CONTEXT": "",
+    "INFINITE_LOOP_CONTEXT_FILE": "",
+    "INFINITE_LOOP_MODEL": "",
+    "INFINITE_LOOP_PROVIDER": "",
+    "INFINITE_LOOP_PROMPT_SUFFIX": "",
+    "INFINITE_LOOP_TAG": "",
+    "INFINITE_LOOP_TASK_TYPE": "",
+    "INFINITE_LOOP_PROFILE": "",
+    "INFINITE_LOOP_LOG_FILE": "",
+    "INFINITE_LOOP_LOG_MAX_MB": "10",
+    "INFINITE_LOOP_STATUS_FILE": "",
+    "INFINITE_LOOP_STATUS_HTML": "",
+    "INFINITE_LOOP_IGNORE_RULES": "",
+    "INFINITE_LOOP_IGNORE_USER_CONFIG": "false",
+    "INFINITE_LOOP_SKILLS": "",
+    "INFINITE_LOOP_TOOLSETS": "",
+    "INFINITE_LOOP_ACCEPT_HOOKS": "",
+    "INFINITE_LOOP_ON_ERROR_CMD": "",
+    "INFINITE_LOOP_HTTP_CALLBACK": "",
+    "INFINITE_LOOP_NOTIFY_CMD": "",
+    "INFINITE_LOOP_NOTIFY_DESKTOP": "false",
+    "INFINITE_LOOP_NOTIFY_NTFY": "",
+    "INFINITE_LOOP_NOTIFY_NTFY_SERVER": "",
+    "INFINITE_LOOP_NOTIFY_ON_COMPLETION": "false",
+    "INFINITE_LOOP_NOTIFY_PUSHBULLET": "",
+    "INFINITE_LOOP_WATCH_DIR": "",
+    "INFINITE_LOOP_WATCH_POLL": "2",
+    "INFINITE_LOOP_WEBHOOK_PORT": "0",
+    "INFINITE_LOOP_WORKTREE": "false",
+    "INFINITE_LOOP_CHECKPOINTS": "",
+    "INFINITE_LOOP_COMPACT_EVERY": "0",
+    "INFINITE_LOOP_KEEP_ITERATIONS": "50",
+    "INFINITE_LOOP_CONVERGENCE_STOP": "false",
+    "INFINITE_LOOP_CONVERGENCE_THRESHOLD": "0",
+    "INFINITE_LOOP_CONVERGENCE_WINDOW": "5",
+    "INFINITE_LOOP_ARCHIVE_DIR": "",
+    "INFINITE_LOOP_ARCHIVE_MAX_SIZE": "0",
+    "INFINITE_LOOP_ARCHIVE_RETENTION": "7",
+    "INFINITE_LOOP_SHUTDOWN_SENTINEL": "",
+    "INFINITE_LOOP_SPAWN_SOURCE": "",
+    "INFINITE_LOOP_OUTPUT_SCHEMA": "",
+    "INFINITE_LOOP_OUTPUT_SCHEMA_FILE": "",
+    "INFINITE_LOOP_CONFIG": "",
+}
+
+
+# ---------------------------------------------------------------------------
+# Public API: load_env  — safe, no-crash environment initialisation
+# ---------------------------------------------------------------------------
+
+
+def load_env(
+    env_path: str | None = None,
+) -> dict[str, str]:
+    """Load environment variables from available sources without crashing.
+
+    Resolution order (last wins):
+        1. IN-MEMORY os.environ — never overwritten
+        2. ``pi_loop.config_file``  — ``~/.config/pi-loop/config.json`` (optional)
+        3. ``.env`` file in CWD  — ``.env`` (optional, no crash if missing)
+        4. Sensible defaults — final fallback for any unset known var
+
+    Args:
+        env_path: Path to a ``.env`` file.  Defaults to ``.env`` in CWD.
+
+    Returns:
+        A dict of all known env vars with their resolved values (as seen
+        in ``os.environ`` after loading).
+    """
+    if env_path is None:
+        env_path = os.path.join(os.getcwd(), ".env")
+
+    # ── Step 1: config_file defaults (optional) ─────────────────────────
+    _try_load_config_file()
+
+    # ── Step 2: .env file (optional) ────────────────────────────────────
+    if os.path.isfile(env_path):
+        vars_from_env, _errors = parse_env_vars_from_file(env_path)
+        # .env values fill in gaps (don't override already-set os.environ)
+        for key, val in vars_from_env.items():
+            os.environ.setdefault(key, val)
+
+    # ── Step 3: sensible defaults for every known var ───────────────────
+    for key, val in SENSIBLE_DEFAULTS.items():
+        os.environ.setdefault(key, val)
+
+    # Return a snapshot of all known vars
+    return {key: os.environ.get(key, "") for key in KNOWN_ENV_VARS}
+
+
+def _try_load_config_file() -> None:
+    """Try to load config_file defaults into ``os.environ`` (no-op on failure)."""
+    try:
+        from . import config_file  # type: ignore[import-untyped]
+
+        cfg = config_file.load_config()
+        for key, val in cfg.items():
+            # Normalise to the INFINITE_LOOP_ prefix pattern if needed
+            env_key = key.upper() if key.startswith("INFINITE_LOOP_") else key
+            if val is not None:
+                os.environ.setdefault(env_key, str(val))
+    except (ImportError, AttributeError, OSError, ValueError, Exception):
+        # config_file module may not exist yet (fresh install) or may fail
+        # to read its JSON — safe to ignore.
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Existing public API  (unchanged from original)
+# ---------------------------------------------------------------------------
+
 
 def _find_closest_match(
     name: str, candidates: set[str], cutoff: float = 0.6
@@ -145,15 +303,21 @@ def parse_env_vars_from_file(env_path: str) -> tuple[dict[str, str], list[str]]:
 
     Each non-empty, non-comment line is parsed as KEY=VALUE.
     Errors are lines that could not be parsed (no '=' sign, etc.).
+    Returns ({{}}, []) if the file does not exist — **does not crash**.
     """
     if not os.path.isfile(env_path):
-        return {}, [f"File not found: {env_path}"]
+        return {}, []  # ← no crash, just empty
 
     vars_found: dict[str, str] = {}
     errors: list[str] = []
 
-    with open(env_path) as f:
-        for line_no, raw_line in enumerate(f, 1):
+    try:
+        fh = open(env_path)
+    except OSError as exc:
+        return {}, [f"Cannot open file: {exc}"]
+
+    with fh:
+        for line_no, raw_line in enumerate(fh, 1):
             line = raw_line.strip()
             if not line or line.startswith("#"):
                 continue
@@ -342,10 +506,19 @@ def format_validation_results(results: list[dict], colorize: bool = True) -> str
 
 
 def check_env_file(env_path: str | None = None) -> int:
-    """Validate a .env file and print results. Returns exit code (0=OK, 1=issues)."""
+    """Validate a .env file and print results. Returns exit code (0=OK, 1=issues).
+
+    **Does not crash** if the file is missing — logs an info message and
+    exits cleanly (code 0).
+    """
 
     if env_path is None:
         env_path = os.path.join(os.getcwd(), ".env")
+
+    if not os.path.isfile(env_path):
+        _log(f"[INFO] No .env file at {env_path} — skipping validation.")
+        _log("[INFO] All env vars will use sensible defaults.")
+        return 0
 
     vars_found, parse_errors = parse_env_vars_from_file(env_path)
 

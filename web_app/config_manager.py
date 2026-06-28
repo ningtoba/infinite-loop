@@ -1,15 +1,12 @@
 """Configuration manager — reads/writes JSON config and provides config schema.
 
-The web UI is the sole source of truth. Config is persisted as a flat
-JSON dict at CONFIG_PATH (no .env file needed).
+The web UI is the sole source of truth. Config is persisted via
+pi_loop.config_file (no .env file needed).
 """
 
-import json
-import os
 from typing import Any
 
-# Where the config JSON is stored
-CONFIG_PATH = "/tmp/pi-loop/config.json"
+from pi_loop.config_file import CONFIG_PATH, load_config, save_config as _save_config
 
 
 # Default configuration values matching .env.example
@@ -588,50 +585,39 @@ CONFIG_GROUPS = [
 ]
 
 
-def read_json_config(path: str | None = None) -> dict[str, str]:
-    """Read persisted JSON config. Returns empty dict if file doesn't exist.
-    Values are coerced according to CONFIG_DEFAULTS types for round-trip consistency."""
-    target = path or CONFIG_PATH
-    if not os.path.exists(target):
-        return {}
-    try:
-        with open(target, "r") as f:
-            data = json.load(f)
-        if isinstance(data, dict):
-            config: dict[str, str] = {}
-            for k, v in data.items():
-                if not k.startswith("INFINITE_LOOP_"):
-                    continue
-                meta = CONFIG_DEFAULTS.get(k, {})
-                t = meta.get("type", "string")
-                if t == "bool":
-                    config[k] = "true" if str(v).lower() == "true" else "false"
-                elif t == "int":
-                    try:
-                        config[k] = str(int(v))
-                    except (ValueError, TypeError):
-                        config[k] = str(v)
-                elif t == "float":
-                    try:
-                        config[k] = str(float(v))
-                    except (ValueError, TypeError):
-                        config[k] = str(v)
-                elif t in ("select", "string"):
-                    config[k] = str(v)
-                else:
-                    config[k] = str(v)
-            return config
-        return {}
-    except (json.JSONDecodeError, OSError):
-        return {}
+def _read_stored() -> dict[str, str]:
+    """Read stored config via pi_loop.config_file.load_config()."""
+    stored = load_config()
+    # Return only keys known to web CONFIG_DEFAULTS, coerced to strings
+    config: dict[str, str] = {}
+    for k, meta in CONFIG_DEFAULTS.items():
+        val = stored.get(k)
+        if val is None:
+            config[k] = meta["default"]
+            continue
+        t = meta.get("type", "string")
+        if t == "bool":
+            config[k] = "true" if str(val).lower() == "true" else "false"
+        elif t == "int":
+            try:
+                config[k] = str(int(val))
+            except (ValueError, TypeError):
+                config[k] = str(val)
+        elif t == "float":
+            try:
+                config[k] = str(float(val))
+            except (ValueError, TypeError):
+                config[k] = str(val)
+        elif t in ("select", "string"):
+            config[k] = str(val)
+        else:
+            config[k] = str(val)
+    return config
 
 
-def write_json_config(config: dict[str, str], path: str | None = None) -> None:
-    """Persist config dict as JSON."""
-    target = path or CONFIG_PATH
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    with open(target, "w") as f:
-        json.dump(config, f, indent=2)
+def save_config(config: dict[str, str]) -> None:
+    """Persist config dict via pi_loop.config_file.save_config()."""
+    _save_config(config)
 
 
 def validate_config(config: dict[str, str]) -> dict[str, bool | list[str]]:
@@ -643,9 +629,9 @@ def validate_config(config: dict[str, str]) -> dict[str, bool | list[str]]:
     return {"valid": len(errors) == 0, "errors": errors}
 
 
-def get_config_with_defaults() -> dict[str, dict[str, Any]]:
-    """Get full config schema with current values from persisted JSON."""
-    current = read_json_config()
+def get_config() -> dict[str, dict[str, Any]]:
+    """Get full config schema with current values from persisted config."""
+    current = _read_stored()
     result: dict[str, dict[str, Any]] = {}
 
     for key, meta in CONFIG_DEFAULTS.items():
@@ -658,13 +644,7 @@ def get_config_with_defaults() -> dict[str, dict[str, Any]]:
 
 def get_raw_config() -> dict[str, str]:
     """Get raw key-value config, filling defaults for unset keys."""
-    current = read_json_config()
-    result: dict[str, str] = {}
-    for key, meta in CONFIG_DEFAULTS.items():
-        result[key] = (
-            current.get(key) or str(meta["default"]) if meta.get("default") else ""
-        )
-    return result
+    return _read_stored()
 
 
 def build_cli_args(config: dict[str, str]) -> list[str]:

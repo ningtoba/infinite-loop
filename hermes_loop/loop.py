@@ -933,18 +933,7 @@ def run_loop(
             task_type=task_type,
         )
 
-        state.setdefault(
-            "mitigations",
-            {
-                "timeout_increased": False,
-                "cooldown_elevated": False,
-                "force_subprocess": False,
-                "reduced_workers": False,
-                "mitigation_level": 0,
-                "last_applied": "",
-                "actions": [],
-            },
-        )
+        # Note: mitigations dict is guaranteed to exist from state initialization
 
         (
             session_timeout,

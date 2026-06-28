@@ -261,6 +261,7 @@ class LoopManager:
                 "evolved_goal": ledger.get("evolved_goal", ""),
                 "max_iterations": ledger.get("max_iterations", 0),
                 "tag": ledger.get("tag", ""),
+                "cooldown": ledger.get("cooldown", 0),
             },
             "stats": {
                 "success_count": stats.get("success_count", 0),

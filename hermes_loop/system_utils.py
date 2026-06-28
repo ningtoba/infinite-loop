@@ -62,11 +62,10 @@ def get_system_usage() -> dict:
                 utime = int(fields[11])
                 stime = int(fields[12])
                 try:
-                    clk_tck = os.sysconf_names.get("SC_CLK_TCK")
-                except (AttributeError, KeyError, ValueError, OSError):
-                    clk_tck = None
-                try:
-                    ticks_per_sec = os.sysconf(clk_tck) if clk_tck is not None else 100
+                    clk_tck_name = os.sysconf_names.get("SC_CLK_TCK")
+                    ticks_per_sec = (
+                        os.sysconf(clk_tck_name) if clk_tck_name is not None else 100
+                    )
                 except (AttributeError, ValueError, OSError):
                     ticks_per_sec = 100
                 total_ticks = utime + stime

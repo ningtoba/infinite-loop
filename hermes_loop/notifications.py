@@ -23,7 +23,7 @@ def _send_desktop_notification(
             body += f" ({duration:.0f}s)"
         if error:
             body += f" ⚠ {error[:60]}"
-        subprocess.run([notify_bin, "--", title, body], timeout=3)
+        subprocess.run([notify_bin, "--", title, body], timeout=3, capture_output=True)
     except (subprocess.TimeoutExpired, OSError):
         pass
 

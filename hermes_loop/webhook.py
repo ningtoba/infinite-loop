@@ -222,7 +222,7 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
 
-        q: queue.Queue = queue.Queue(maxsize=1)
+        q: queue.Queue = queue.Queue()
         with _sse_clients_lock:
             _sse_clients.append(q)
 

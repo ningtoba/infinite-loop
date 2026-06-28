@@ -79,6 +79,7 @@ _hermes_loop_completions()
         --heartbeat-timeout
         --help-topic
         --http-callback
+        --http-callback-secret
         --keep-iterations
         --log-file
         --log-max-mb
@@ -142,7 +143,7 @@ _hermes_loop_completions()
             return 0
             ;;
 
-        --archive-max-size|--archive-retention|--compact-every|--context|--convergence-threshold|--convergence-window|--cooldown|--explain|--goal|--heartbeat-timeout|--help-topic|--http-callback|--keep-iterations|--log-max-mb|--max-idle-iterations|--max-iterations|--max-output-chars|--max-retries|--max-turns|--model|--notify-cmd|--notify-ntfy|--notify-ntfy-server|--notify-pushbullet|--on-error-cmd|--output-schema|--profile|--prompt-suffix|--provider|--retry-delay|--session-timeout|--shutdown-sentinel|--skills|--spawn-source|--startup-delay|--tag|--task-type|--toolsets|--watch-poll|--webhook-port|--worker-url|--workers)
+        --archive-max-size|--archive-retention|--compact-every|--context|--convergence-threshold|--convergence-window|--cooldown|--explain|--goal|--heartbeat-timeout|--help-topic|--http-callback|--http-callback-secret|--keep-iterations|--log-max-mb|--max-idle-iterations|--max-iterations|--max-output-chars|--max-retries|--max-turns|--model|--notify-cmd|--notify-ntfy|--notify-ntfy-server|--notify-pushbullet|--on-error-cmd|--output-schema|--profile|--prompt-suffix|--provider|--retry-delay|--session-timeout|--shutdown-sentinel|--skills|--spawn-source|--startup-delay|--tag|--task-type|--toolsets|--watch-poll|--webhook-port|--worker-url|--workers)
             return 0
             ;;
     esac

@@ -53,7 +53,7 @@ def _execute_task(
     web UI's existing xterm.js terminal shows real-time output.
     Returns a result dict with 'output', 'error', 'duration_seconds', etc.
     """
-    cmd = ["pi", "-p", goal]
+    cmd = ["pi", "-a", "-p", goal]
     if context:
         cmd.extend(["--append-system-prompt", context])
 
@@ -718,11 +718,19 @@ def run_loop(
             _recalc_stats(state)
             write_ledger(state)
 
-        # Evolution placeholder (manual override or future auto-evolution)
+        # Evolve: check pi output for NEXT_GOAL: marker
         if evolve and not combined_error and len(goals_list) <= 1:
-            _log(
-                "[EVOLVE] Evolve mode enabled — goal stays unchanged (auto-evolution not implemented)"
-            )
+            _evolve_goal(result.get("output", ""), state, iteration_count)
+
+
+def _evolve_goal(output: str, state: dict, iteration: int) -> None:
+    """Check pi output for NEXT_GOAL: header, update state if found."""
+    for line in output.split("\n"):
+        if line.strip().upper().startswith("NEXT_GOAL:"):
+            next_goal = line.split(":", 1)[1].strip()
+            if next_goal:
+                _log(f"[EVOLVE] Iteration {iteration} proposed next goal: {next_goal[:80]}")
+                state["evolved_goal"] = next_goal
 
 
 def _build_dashboard_html(state: dict) -> str:

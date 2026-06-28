@@ -127,7 +127,7 @@ def _adapt_to_error(
                 f"[MITIGATION] Timeout errors: increased timeout to {new_timeout}s"
             )
         elif error_type == "network":
-            new_cooldown = min(300, max(cooldown, cooldown * 4))
+            new_cooldown = min(300, max(_ORIGINAL_COOLDOWN, cooldown * 4))
             if new_cooldown < 30:
                 new_cooldown = 30
             new_mode = "fixed"
@@ -139,7 +139,7 @@ def _adapt_to_error(
                 "[MITIGATION] Schema errors: monitoring (no parameter changes yet)"
             )
         elif error_type == "unknown":
-            new_cooldown = min(120, max(cooldown, cooldown * 2))
+            new_cooldown = min(120, max(_ORIGINAL_COOLDOWN, cooldown * 2))
             if new_cooldown < 15:
                 new_cooldown = 15
             new_mode = "fixed"
@@ -150,7 +150,7 @@ def _adapt_to_error(
 
     if new_level >= 2 and level_before < 2:
         if error_type == "timeout":
-            new_cooldown = min(120, max(cooldown, cooldown * 2))
+            new_cooldown = min(120, max(_ORIGINAL_COOLDOWN, cooldown * 2))
             new_mode = "fixed"
             actions.append(
                 f"[MITIGATION] Timeout errors (escalated): cooldown → {new_cooldown}s"

@@ -67,6 +67,7 @@ def load_or_create_ledger(
                     "network": 0,
                     "schema": 0,
                     "unknown": 0,
+                    "heartbeat": 0,
                 }
             if "mitigations" not in existing:
                 existing["mitigations"] = {
@@ -108,6 +109,7 @@ def load_or_create_ledger(
             "network": 0,
             "schema": 0,
             "unknown": 0,
+            "heartbeat": 0,
         },
         "mitigations": {
             "timeout_increased": False,

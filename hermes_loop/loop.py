@@ -959,6 +959,7 @@ def run_loop(
         )
 
         state["consecutive_successes"] = consecutive_successes
+        state["consecutive_errors"] = consecutive_errors
         state.setdefault("stats", {})["consecutive_errors"] = consecutive_errors
         state.setdefault("stats", {})["consecutive_successes"] = consecutive_successes
 

@@ -149,8 +149,46 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
             while True:
                 try:
                     data = q.get(timeout=30)
+                    raw = json.loads(data) if isinstance(data, str) else data
+                    # Build a status dict matching the web_app format the SSE dashboard JS expects
+                    # (the JS references loop_status, latest_iteration, and ledger sub-keys)
+                    wrapped = {
+                        "type": "status_update",
+                        "data": {
+                            "loop_status": raw.get("status", "unknown"),
+                            "ledger": {
+                                "status": raw.get("status", "unknown"),
+                                "total_iterations": raw.get("total_iterations", 0),
+                                "max_iterations": raw.get("max_iterations", 0),
+                                "goal": raw.get("goal", ""),
+                                "evolved_goal": raw.get("evolved_goal", ""),
+                                "started_at": raw.get("started_at", ""),
+                                "last_updated": raw.get("last_updated", ""),
+                                "cooldown": raw.get("cooldown", 0),
+                            },
+                            "latest_iteration": raw.get("iteration", {}),
+                            "stats": raw.get("stats", {}),
+                            "error_counts": raw.get("error_counts", {}),
+                            "mitigations": raw.get("mitigations", {}),
+                            "eta": raw.get("eta", {}),
+                            "goals": raw.get("goals", []),
+                            "avg_chars_per_iter": raw.get("avg_chars_per_iter"),
+                            "avg_throughput": raw.get("avg_throughput"),
+                            "est_cost": raw.get("est_cost"),
+                            "iters_per_goal": raw.get("iters_per_goal"),
+                            "metrics_summary": raw.get("metrics_summary", ""),
+                            "consecutive_errors": raw.get("consecutive_errors", 0),
+                            "consecutive_successes": raw.get(
+                                "consecutive_successes", 0
+                            ),
+                            "cooldown": raw.get("cooldown", 0),
+                            "iteration": raw.get("iteration", {}),
+                        },
+                    }
                     self.wfile.write(
-                        f"event: iteration\ndata: {data}\n\n".encode("utf-8")
+                        f"event: update\ndata: {json.dumps(wrapped, default=str)}\n\n".encode(
+                            "utf-8"
+                        )
                     )
                     self.wfile.flush()
                 except queue.Empty:

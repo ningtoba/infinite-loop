@@ -48,6 +48,12 @@ If you are new to the project, start with
 - [HTTP Callback Payload](#http-callback-payload)
 - [Sentinel File Protocol](#sentinel-file-protocol)
 - [Module Map](#module-map)
+- [Web Stack Architecture](#web-stack-architecture)
+  - [Static HTML Dashboard (`dashboard.py`)](#static-html-dashboard-dashboardpy)
+  - [SSE Live Dashboard (`dashboard.py`)](#sse-live-dashboard-dashboardpy)
+  - [FastAPI SPA (`web_app/`)](#fastapi-spa-web_app)
+  - [Docker Deployment](#docker-deployment)
+- [Iteration Lifecycle (Full Sequence Diagram)](#iteration-lifecycle-full-sequence-diagram)
 
 ---
 
@@ -723,4 +729,515 @@ Source file → primary responsibility:
 | `similarity.py` | Text similarity / convergence detection |
 | `library_worker.py` | In-process AIAgent runner (`--use-library`) |
 | `env_utils.py` | `.env` file parsing and validation |
-| `web_app/` | FastAPI-based web UI (requires `pip install web` extras) |
+|| `web_app/` | FastAPI-based web UI (requires `pip install web` extras) |
+|
+|---
+
+## Web Stack Architecture
+
+The project ships three distinct web-facing components, each serving a different
+audience:
+
+| Component | Technology | Purpose | Port / Path |
+|-----------|-----------|---------|-------------|
+| Static HTML Dashboard (`dashboard.py`) | stdlib `http.server`, inline HTML/CSS | Quick monitoring (static file, no JS framework) | Configurable via `--status-html PATH` (writes `.html` file) |
+| SSE Live Dashboard (`dashboard.py`) | Inline HTML + JS `EventSource`, SSE | Live-updating dark-theme dashboard with iteration rows, error cards, mitigations, goals tracking, worker status | Written to file + SSE broadcast |
+| FastAPI Web UI (`web_app/`) | FastAPI + uvicorn + xterm.js | Full SPA: daemon start/stop, config editor, iteration browser, live logs, per-worker xterm.js terminal | Default `http://0.0.0.0:8090` (`/live` for SSE) |
+
+All three share the same data source: the JSON ledger at
+`/tmp/infinite-loop-state.json`.
+
+### Static HTML Dashboard (`dashboard.py`)
+
+The simplest monitoring surface. Written by `_write_status_html()` in
+`dashboard.py` after every iteration when `--status-html PATH` is set.
+
+- Single self-contained HTML page with inline `<style>` and JS
+- Uses `<meta http-equiv="refresh" content="30">` for auto-refresh (no SSE)
+- Compact mode toggle (stored in `localStorage`): hides all tables, shows a
+  terse one-liner suitable for status-bar widgets or tmux bottom-panels
+- Supports both dark and light mode via `prefers-color-scheme`
+- Icon: `♾️` (infinity symbol as inline SVG favicon)
+
+**CSS variables** for theming:
+
+```css
+:root { --bg: #0d1117; --fg: #c9d1d9; --card-bg: #161b22; --border: #30363d; ... }
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f6f8fa; --fg: #24292f; --card-bg: #ffffff; ... }
+}
+```
+
+### SSE Live Dashboard (`dashboard.py`)
+
+A richer version of the static dashboard driven by Server-Sent Events. Enabled
+when `--status-html` is set *and* the daemon's loop calls
+`_broadcast_to_sse_clients()`.
+
+**Architecture:**
+
+```
+Daemon (loop.py)                    SSE Clients (browser)
+      │                                     │
+      ├─ _build_iteration_record()          │
+      ├─ _recalc_stats()                    │
+      ├─ _write_status_html(state)          │
+      └─ _broadcast_to_sse_clients(state)───┤
+                                            ├─ EventSource('/live')
+                                            ├─ {type: "init", data: status}
+                                            ├─ {type: "update", data: {type:"status_update", data: status}}
+                                            └─ {type: "update", data: {type:"log_entry", entry: ...}}
+```
+
+**SSE event types:**
+
+| Event Name | Payload | Frequency |
+|-----------|---------|-----------|
+| `init` | Full status snapshot | On connection |
+| `update` | `{"type":"status_update","data":status}` | On any state change (iteration, error, mitigation, log) |
+| `update` | `{"type":"log_entry","entry":{"timestamp","message"}}` | Per new log line |
+| `heartbeat` | `{"type":"heartbeat","time":"..."}` | Every 15s idle, to detect stale connections |
+
+**Client management:**
+
+- `_sse_clients`: list of `queue.Queue` objects, one per connected browser
+- Bounded queues (size 128) prevent unbounded memory growth from slow clients
+- Stale-client detection: `QueueFull` or `Exception` on `put_nowait()` →
+  client removed
+- `_sse_client_last_active`: monotonic-time tracking, stale after 60s
+
+**Smart change detection:**
+
+The `_broadcast_to_sse_clients()` method builds a hash from iteration number,
+worker statuses, error_counts, mitigations, log count, terminal lines, and the
+latest iteration's key fields (worktree_merge, summary, error, classification).
+Only broadcasts when the hash changes, avoiding redundant pushes.
+
+**Dashboard features:**
+
+- Status badge: `running` (blue), `stopped` (red), `paused` (yellow), `reloading` (red)
+- Stats grid: success/error counts, avg duration, consecutive errors, ETA
+- Progress bar: % of max_iterations
+- Error cards: timeout/network/schema/heartbeat/unknown with left-color-border
+- Mitigations panel: active mitigations (timeout+, cooldown+, no-library, workers-)
+- Goals panel: progress bar + per-goal rows (✓ done, ▶ active, ○ pending)
+  - Shows up to 30 goals, "+ N more" overflow indicator
+  - Deleted goals with strikethrough
+- Metrics panel: chars/iter, throughput (cps), est cost, iters/goal
+- Iterations table: newest-first, capped at 100 rows
+  - Error rows highlighted with `error-row` class
+  - Worktree merge column: `wt:3✓ 0✗` with tooltip (branches, per-worker details,
+    merge counts, conflicts)
+  - Remote cleanup column: `clean:r1del/s1` with tooltip
+  - Reset detection: if total_iterations drops (loop was reset), table clears
+- Compact mode toggle (localStorage-persisted)
+- Links to JSON API (`/api/status`), simple status (`/status`), health (`/health`)
+
+### FastAPI SPA (`web_app/`)
+
+Full Single-Page Application for managing the daemon from a browser. Requires
+`pip install "hermes-loop[web]"` (installs `fastapi`, `uvicorn`,
+`python-dotenv`).
+
+**Entry points:**
+
+| Method | Command |
+|--------|---------|
+| `hermes_loop_web` | Console script registered in `pyproject.toml` |
+| `python -m web_app` | Module invocation |
+| Docker | `ENTRYPOINT ["python", "-m", "web_app", "--host", "0.0.0.0"]` |
+
+**Package structure:**
+
+```
+web_app/
+├── __init__.py       # Version marker
+├── __main__.py       # Allow python -m web_app
+├── server.py         # FastAPI app, REST endpoints, SSE, status poller
+├── config_manager.py # Config schema, persistence, CLI args builder
+├── loop_manager.py   # Daemon subprocess lifecycle manager
+└── static/
+    ├── index.html    # SPA shell (sidebar + 5 tabs)
+    ├── app.js        # All UI logic, SSE client, rendering
+    └── style.css     # Dark-first design system with light mode support
+```
+
+**REST API endpoints:**
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/` | Serve SPA shell |
+| GET | `/api/config` | Full config with defaults + current values + groups |
+| GET | `/api/config/groups` | Config group names/ids only (lightweight) |
+| GET | `/api/config/raw` | Raw key-value config dict |
+| POST | `/api/config` | Save config to `/tmp/hermes-loop/config.json` |
+| GET | `/api/config/cli-preview` | Preview generated `--flag value` args |
+| POST | `/api/loop/start` | Start daemon subprocess |
+| POST | `/api/loop/stop` | Write sentinel + SIGTERM + SIGKILL fallback |
+| POST | `/api/loop/pause` | Write "pause" to sentinel |
+| POST | `/api/loop/resume` | Remove sentinel to wake paused daemon |
+| POST | `/api/loop/reset` | Delete ledger + lock file |
+| GET | `/api/status` | Combined loop + ledger + live iteration status |
+| GET | `/api/ledger` | Full ledger state |
+| GET | `/api/iterations` | Paginated iteration history (`?limit=N&offset=M`) |
+| GET | `/api/logs` | Last N log entries from the web manager |
+| GET | `/api/health` | Health check: `{"status":"ok","timestamp":"..."}` |
+| GET | `/live` | SSE stream (EventSource) |
+| GET | `/static/*` | Static files (app.js, style.css) |
+
+**Config persistence:**
+
+Config is stored as a flat JSON dict at `/tmp/hermes-loop/config.json` — no
+`.env` file needed when using the web UI. The config_manager.py maps env var
+names to CLI flags via `build_cli_args()`:
+
+```python
+# Example: INFINITE_LOOP_GOAL="Fix lint errors" → --goal "Fix lint errors"
+#           INFINITE_LOOP_GIT=true               → --git
+```
+
+Each config key has a schema entry:
+```python
+CONFIG_DEFAULTS = {
+    "INFINITE_LOOP_GOAL": {
+        "default": "", "type": "string", "group": "core",
+        "label": "Goal", "description": "...", "multiline": True,
+    },
+    ...
+}
+```
+
+The web UI renders fields dynamically from `CONFIG_DEFAULTS` + `CONFIG_GROUPS`.
+Supported types: `string`, `int`, `float`, `bool`, `select` (with `options`
+array), `multiline`. Required fields show a `*` marker.
+
+**CSS design system** (`style.css`):
+
+- Dark-first: `--bg-primary: #09090b` base, light mode via `prefers-color-scheme`
+- Purple accent: `--accent: #6c5ce7`
+- Shadow and glow: `--accent-glow: rgba(108, 92, 231, 0.15)`
+- Sidebar layout: 240px sidebar + flex main
+- Status cards: rounded with hover border highlight
+- Tables: sticky headers, hover rows, error-row highlighting
+- Config: split layout (group sidebar + settings panel), inline descriptions
+- Workers tab: xterm.js terminal per worker via CDN
+- Responsive: sidebar collapses at 768px, config layout stacks vertically
+
+**LoopManager** (`loop_manager.py`) — daemon lifecycle:
+
+```
+LoopManager
+  ├─ start()      → kills stale daemons (pkill -f), reads config,
+  │                 builds CLI args, creates_subprocess_exec,
+  │                 starts stdout/stderr readers + process monitor
+  ├─ stop()       → writes sentinel, kills process group (SIGTERM,
+  │                 SIGKILL after 5s timeout)
+  ├─ pause()      → writes "pause" to sentinel
+  ├─ resume()     → removes sentinel file
+  ├─ get_status() → merges ledger state (JSON file) with live iteration
+  │                 state (parsed from daemon stdout) + worker logs
+  │                 + recent web manager logs
+  └─ get_ledger() → reads /tmp/infinite-loop-state.json
+```
+
+**Live stream parsing** (`_parse_daemon_line`):
+
+The LoopManager parses daemon stdout in real-time to extract structured worker
+state from log lines:
+
+| Log Pattern | Parsed State |
+|-------------|-------------|
+| `[HH:MM:SS]   Iteration N` | `live_iteration.n = N`, resets workers |
+| `[STDOUT (worker #N)]` / `[STDERR (worker #N)]` | Worker status = running |
+| `[TERM (worker #N)] ...` | Appended to `worker_term[N]` for xterm.js |
+| `[SPAWN (worker #N)]` | Worker registered as spawned |
+| `[WORKER (worker #N)] Response in Xs (status=ok)` | Worker completed with duration |
+| `[BEAT] Iteration N still running (Xs)` | `live_iteration.elapsed_seconds = X` |
+| `[ERROR-TYPE] timeout` | `live_iteration.error_type = timeout` |
+
+The `worker_term` storage is what powers the xterm.js terminal view in the
+Workers tab — raw ANSI sequences are preserved, so colored output renders
+correctly in-browser.
+
+**Background status poller:**
+
+A server-side asyncio task (`_status_poller`) wakes every 2 seconds, reads the
+ledger via `LoopManager.get_status()`, builds a hash (iteration number × worker
+statuses × error counts × mitigations × log count × terminal lines × latest
+iteration fields), and broadcasts only on hash change (with a 10s keepalive
+fallback). New log entries are dispatched individually as `log_entry` SSE events
+with dedup via a `_seen_log_keys` set (capped at 5000 entries).
+
+### Docker Deployment
+
+**`Dockerfile`:**
+
+```dockerfile
+FROM python:3.12-slim
+RUN apt-get update && apt-get install -y git curl procps
+WORKDIR /app
+COPY pyproject.toml .
+RUN pip install fastapi uvicorn python-dotenv
+COPY web_app/ ./web_app/
+COPY hermes_loop/ ./hermes_loop/
+ENV WEB_PORT=8090
+HEALTHCHECK --interval=30s ... CMD curl -fs http://localhost:${WEB_PORT}/api/health
+ENTRYPOINT ["python", "-m", "web_app", "--host", "0.0.0.0"]
+```
+
+**`docker-compose.yml`:**
+
+```yaml
+services:
+  hermes-loop:
+    build: .
+    network_mode: host      # needs host network for nsenter to run hermes on host
+    pid: host               # access host process namespace for nsenter
+    privileged: true        # nsenter requires CAP_SYS_PTRACE or privileged
+    volumes:
+      - ${INFINITE_LOOP_WORKDIR:-/tmp}:/workdir  # your target project
+      - hermes-loop-data:/tmp                     # ledger persistence
+    environment:
+      - WEB_PORT=8090
+```
+
+**Critical design decisions:**
+
+| Decision | Rationale |
+|----------|-----------|
+| `network_mode: host` | The container uses `nsenter` to run Hermes on the host, so it needs host networking to reach the Hermes binary's API endpoint |
+| `pid: host` | Access the host's process namespace so `nsenter` can enter any host process |
+| `privileged: true` | `nsenter` needs `CAP_SYS_PTRACE` to attach to non-child processes |
+| Ledger at `/tmp` via named volume | `/tmp/infinite-loop-state.json` is the canonical ledger path; persisting it across restarts is critical |
+| Workdir as bind mount | `INFINITE_LOOP_WORKDIR` maps to `/workdir` inside the container; the daemon reads/writes the target project here |
+| `python -m web_app` | The container only runs the Web UI, not the daemon directly — the daemon is spawned as a subprocess within the container, which delegates to the host Hermes via nsenter |
+
+**`.dockerignore`** excludes research/, references/, scripts/, run.sh, .env,
+Makefile, CHANGELOG.md, CONTRIBUTING.md, and other runtime-unnecessary files.
+
+---
+
+## Iteration Lifecycle (Full Sequence Diagram)
+
+Below is the complete lifecycle of a single iteration in the Infinite Loop
+Daemon, shown as a sequence diagram. Each "→" represents a call or message
+between components.
+
+```
+                                                                  ┌─ Spawned ─┐
+                                              ┌─ Daemon Loop ──┐ │ Hermes    │
+  User            run.sh          loop.py      iteration.py       │ Session   │
+   │               │               │               │             │           │
+   │   bash run.sh │               │               │             │           │
+   │──────────────→│               │               │             │           │
+   │               │──source .env─→│               │             │           │
+   │               │──launch-loop→│               │             │           │
+   │               │               │               │             │           │
+   │               │               │ run_loop()    │             │           │
+   │               │               │──────────────→│             │           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 1: Pre-Iteration ──           │
+   │               │               │               │             │           │
+   │               │               │ check_sentinel│             │           │
+   │               │               │←─────────────│             │           │
+   │               │               │ shutdown?     │             │           │
+   │               │               │ max_iters?    │             │           │
+   │               │               │ converge?     │             │           │
+   │               │               │ idle?         │             │           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 2: Goal Selection ──          │
+   │               │               │               │             │           │
+   │               │               │ _cycle_goal() │             │           │
+   │               │               │←─────────────│             │           │
+   │               │               │  goal_text    │             │           │
+   │               │               │               │             │           │
+   │               │               │ _build_progressive_context()            │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 3: Git Snapshot ──            │
+   │               │               │               │             │           │
+   │               │               │ git_before    │             │           │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │ cleanup_stale_worktrees()               │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │ _cleanup_stale_remote_branches()         │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 4: Spawn Session(s) ──         │
+   │               │               │               │             │           │
+   │               │               │_execute_iteration()                      │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │               │ hermes chat -q ...      │
+   │               │               │               │─────────────→│          │
+   │               │               │               │             │           │
+   │               │               │               │  ┌─ Inside Session ──┐  │
+   │               │               │               │  │ read context      │  │
+   │               │               │               │  │ read tools        │  │
+   │               │               │               │  │ work()            │  │
+   │               │               │               │  │ delegate_task() │  │
+   │               │               │               │  │   → subagent(s)   │  │
+   │               │               │               │  │ print JSON        │  │
+   │               │               │               │  │ exit              │  │
+   │               │               │               │  └───────────────────┘  │
+   │               │               │               │             │           │
+   │               │               │               │ stdout JSON │           │
+   │               │               │               │←───────────│           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 5: Merge Results ──            │
+   │               │               │               │             │           │
+   │               │               │ _merge_worker_results()                  │
+   │               │               │←─────────────│             │           │
+   │               │               │  combined_error, total_duration,         │
+   │               │               │  primary_error_type, next_goal           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 6: Worktree Merge ──           │
+   │               │               │               │             │           │
+   │               │               │ _merge_worktree_branches()                │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 7: Git Snapshot ──             │
+   │               │               │               │             │           │
+   │               │               │ git_after     │             │           │
+   │               │               │←─────────────│             │           │
+   │               │               │ _git_auto_commit()                        │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 8: Analysis ────                │
+   │               │               │               │             │           │
+   │               │               │ _detect_convergence()                     │
+   │               │               │←─────────────│             │           │
+   │               │               │ _compact_summaries()                      │
+   │               │               │←─────────────│             │           │
+   │               │               │ _build_iteration_record()                  │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 9: Ledger Update ──             │
+   │               │               │               │             │           │
+   │               │               │ state["iterations"].append(record)        │
+   │               │               │←─────────────│             │           │
+   │               │               │ _recalc_stats()                           │
+   │               │               │←─────────────│             │           │
+   │               │               │ write_ledger(state) {file lock + atomic}  │
+   │               │               │←─────────────│             │           │
+   │               │               │ write_status_file()                       │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 10: Broadcast ──                │
+   │               │               │               │             │           │
+   │               │               │ _handle_notifications()                   │
+   │               │               │←─────────────│             │           │
+   │               │               │ _write_status_html()   (if --status-html) │
+   │               │               │←─────────────│             │           │
+   │               │               │ _handle_callbacks() (HTTP callback / cmd) │
+   │               │               │←─────────────│             │           │
+   │               │               │ _broadcast_to_sse_clients()               │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │  ── Phase 11: Backoff & Sleep ──          │
+   │               │               │               │             │           │
+   │               │               │ _adapt_to_error() (mitigate if errors)    │
+   │               │               │←─────────────│             │           │
+   │               │               │ _handle_backoff()  (sleep if cooldown)    │
+   │               │               │←─────────────│             │           │
+   │               │               │               │             │           │
+   │               │               │  ← back to top of while loop →           │
+   │               │               │               │             │           │
+```
+
+**Key timing notes:**
+
+- The entire iteration is synchronous from the daemon's perspective — it blocks
+  on the spawned Hermes session completion.
+- The heartbeat monitor runs on a background thread (polls every 5s). If the
+  spawned session's heartbeat file goes stale, the daemon kills the subprocess
+  with SIGTERM → SIGKILL and marks the iteration as `heartbeat` error.
+- With `--workers N`, Phases 4–7 run in a `ThreadPoolExecutor` with N parallel
+  sessions. `_merge_worker_results()` collects all results before proceeding.
+- `_handle_backoff()` uses exponential backoff when `consecutive_errors` > 0:
+  `delay = retry_delay * (attempt_number + 1)`.
+- The SSE broadcast (`_broadcast_to_sse_clients()`) happens inside the main
+  thread after the iteration loop, not in a background thread, ensuring that
+  the broadcasted state is always consistent with what was written to the ledger.
+
+**Data flow through one iteration:**
+
+```
+goal_text + context
+        │
+        ▼
+_build_delegation_prompt()
+        │
+        ▼
+[ "You are iteration #N (worker #W) of an autonomous loop daemon..."
+  + goal + context + tools + JSON contract ]
+        │
+        ▼
+hermes chat -q "..." -t terminal,file,delegation -Q --max-turns 500
+        │
+        ▼  (parsed from stdout)
+extract_json_from_output()
+  ├─ Strategy 1: reverse brace scan (fast path)
+  └─ Strategy 2: forward scan of all JSON objects (fallback)
+        │
+        ▼
+{ summary, duration_seconds, error, next_goal, context }
+        │
+        ▼
+iteration record merged + analyzed → ledger → broadcast
+```
+
+**State transitions within a single worker session:**
+
+```
+IDLE → SPAWNED (hermes chat -q launched)
+            │
+            ▼
+        RUNNING (stdout streaming, terminal output to web UI)
+            │
+      ┌─────┴──────┐
+      │            │
+      ▼            ▼
+   SUCCESS       ERROR
+   (exit=0,     (exit≠0,
+    JSON OK)     no JSON / timeout / network fail)
+      │            │
+      ▼            ▼
+   MERGED → iteration record built → recorded in ledger
+```
+
+**Worktree merge sequence** (when `--worktree` is set):
+
+```
+Before iteration:
+    Per-worker: git worktree add hermes/w0/iterN
+                                  hermes/w1/iterN
+    Each worker commits to its own branch in the worktree.
+
+After iteration:
+    1. git checkout main (or base branch)
+    2. For each worker branch:
+         git merge hermes/wN/iterN --no-edit
+       If merge succeeds: merged++
+       If merge conflicts: git merge --abort, failed++
+    3. git worktree remove hermes/wN/iterN
+    4. git push origin main
+    5. Remote cleanup: delete stale hermes/* branches from remote
+```
+
+**Error mitigation escalation** (during `_adapt_to_error()`):
+
+```
+Error count thresholds:
+  timeout=3  → --session-timeout *= 2    (mild)
+  timeout=5  → --cooldown elevated        (moderate)
+  timeout=8  → force subprocess mode      (severe - stop)
+  network=3  → force subprocess mode
+  schema=3   → no mitigation (usually content issue)
+  heartbeat>0→ force subprocess mode immediately
+
+Each mitigation is tracked in state["mitigations"]["actions"]
+and displayed in the SSE dashboard's mitigations panel.
+```

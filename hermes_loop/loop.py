@@ -728,7 +728,7 @@ def run_loop(
         if next_context:
             progressive_context = f"[Context from previous iteration]: {next_context}"
 
-        if combined_error is None and next_goal and "need_reload" in next_goal:
+        if not combined_error and next_goal and "need_reload" in next_goal:
             _log("[RELOAD] Spawned session signaled need_reload. Restarting daemon...")
             state["status"] = "reloading"
             state["last_updated"] = datetime.now(timezone.utc).isoformat()

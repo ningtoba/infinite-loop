@@ -12,6 +12,7 @@ from .file_utils import _log, read_ledger
 from .dashboard import (
     _sse_clients,
     _sse_clients_lock,
+    _build_sse_payload,
     _SSE_DASHBOARD_HTML_TPL,
 )
 from .goal_utils import _goal_hash
@@ -224,6 +225,58 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         q: queue.Queue = queue.Queue(maxsize=1)
         with _sse_clients_lock:
             _sse_clients.append(q)
+
+        # Send init event with current ledger state (so JS renders immediately)
+        try:
+            state = read_ledger()
+            if state:
+                init_raw = _build_sse_payload(state)
+                init_wrapped = {
+                    "type": "status_update",
+                    "data": {
+                        "loop_status": init_raw.get("status", "unknown"),
+                        "ledger": {
+                            "status": init_raw.get("status", "unknown"),
+                            "total_iterations": init_raw.get("total_iterations", 0),
+                            "max_iterations": init_raw.get("max_iterations", 0),
+                            "goal": init_raw.get("goal", ""),
+                            "evolved_goal": init_raw.get("evolved_goal", ""),
+                            "started_at": init_raw.get("started_at", ""),
+                            "last_updated": init_raw.get("last_updated", ""),
+                            "cooldown": init_raw.get("cooldown", 0),
+                        },
+                        "latest_iteration": init_raw.get("iteration", {}),
+                        "stats": init_raw.get("stats", {}),
+                        "error_counts": init_raw.get("error_counts", {}),
+                        "mitigations": init_raw.get("mitigations", {}),
+                        "eta": init_raw.get("eta", {}),
+                        "goals": init_raw.get("goals", []),
+                        "avg_chars_per_iter": init_raw.get("avg_chars_per_iter"),
+                        "avg_throughput": init_raw.get("avg_throughput"),
+                        "est_cost": init_raw.get("est_cost"),
+                        "iters_per_goal": init_raw.get("iters_per_goal"),
+                        "metrics_summary": init_raw.get("metrics_summary", ""),
+                        "consecutive_errors": init_raw.get("consecutive_errors", 0),
+                        "consecutive_successes": init_raw.get(
+                            "consecutive_successes", 0
+                        ),
+                        "cooldown": init_raw.get("cooldown", 0),
+                        "iteration": init_raw.get("iteration", {}),
+                    },
+                }
+                self.wfile.write(
+                    f"event: init\ndata: {json.dumps(init_wrapped, default=str)}\n\n".encode(
+                        "utf-8"
+                    )
+                )
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            with _sse_clients_lock:
+                try:
+                    _sse_clients.remove(q)
+                except ValueError:
+                    pass
+            return
 
         try:
             while True:

@@ -754,7 +754,7 @@ def _run_demo() -> None:
     _code(
         'hermes chat -q "<prompt>" -t terminal,file,delegation,web,skills,browser,memory'
     )
-    _code("            -Q --max-turns 500 --session-timeout 7200")
+    _code("            -Q --max-turns 500")
     print()
     print(
         f"  {c.colorize('Key differences from simple -z oneshot:', 'bold', 'yellow')}"
@@ -801,8 +801,6 @@ def _run_demo() -> None:
             "-Q",
             "--max-turns",
             "10",
-            "--session-timeout",
-            "120",
         ]
         print(f"  {c.dim('Running:')}")
         _code(

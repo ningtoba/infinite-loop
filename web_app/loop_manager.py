@@ -39,6 +39,26 @@ class LoopManager:
     def live_iteration(self) -> dict[str, Any]:
         return self._live_iteration
 
+    def _kill_stale_daemons(self) -> None:
+        """Kill any hermes_loop daemon processes left over from previous runs.
+
+        Uses a precise pattern to avoid matching non-daemon python processes.
+        Only targets processes whose full command line contains
+        ``-m hermes_loop --run`` (the exact daemon invocation pattern).
+        """
+        import subprocess
+
+        try:
+            r = subprocess.run(
+                ["pkill", "-f", r"python.*-m\s+hermes_loop.*--run"],
+                capture_output=True,
+                timeout=5,
+            )
+            if r.returncode == 0:
+                self._add_log("info", "Cleaned up stale daemon processes")
+        except Exception:
+            pass
+
     @property
     def status(self) -> str:
         return self._status
@@ -76,6 +96,9 @@ class LoopManager:
         """Start the loop daemon as a subprocess."""
         if self.is_running:
             return {"success": False, "error": "Loop is already running"}
+
+        # Kill any stale daemon processes from previous web server instances
+        self._kill_stale_daemons()
 
         # Read current config from JSON
         config = get_raw_config()

@@ -726,6 +726,85 @@ def _run_self_test() -> dict:
 
     _run_subtests("test_validate_env_vars", _test_validate_env_vars())
 
+    # ------------------------------------------------------------------
+    # Test: signal_handlers — _build_exec_argv
+    # ------------------------------------------------------------------
+    def _test_build_exec_argv():
+        from .signal_handlers import _build_exec_argv
+
+        cases = []
+        import sys as _sys
+
+        _orig_argv = list(_sys.argv)
+
+        # Wrapper: set argv, call func, return result
+        def _with_argv(argv, fn):
+            _sys.argv.clear()
+            _sys.argv.extend(argv)
+            return fn()
+
+        # Normal invocation: python3 launch-loop.py --run
+        def _run_normal():
+            return _with_argv(["launch-loop.py", "--run"], _build_exec_argv)
+
+        cases.append(
+            (
+                "normal-invocation",
+                _run_normal,
+                lambda r: (
+                    r == [_sys.executable, "launch-loop.py", "--run"],
+                    f"expected [executable, launch-loop.py, --run], got {r!r}",
+                ),
+            )
+        )
+
+        # Module invocation: python3 -m hermes_loop --run
+        def _run_module():
+            return _with_argv(["-m", "hermes_loop", "--run"], _build_exec_argv)
+
+        cases.append(
+            (
+                "module-invocation",
+                _run_module,
+                lambda r: (
+                    r == [_sys.executable, "-m", "hermes_loop", "--run"],
+                    f"expected [executable, -m, hermes_loop, --run], got {r!r}",
+                ),
+            )
+        )
+
+        # Module with extra args
+        def _run_module_args():
+            return _with_argv(
+                ["-m", "hermes_loop", "--run", "--workers", "3"], _build_exec_argv
+            )
+
+        cases.append(
+            (
+                "module-with-args",
+                _run_module_args,
+                lambda r: (
+                    r
+                    == [
+                        _sys.executable,
+                        "-m",
+                        "hermes_loop",
+                        "--run",
+                        "--workers",
+                        "3",
+                    ],
+                    f"expected multi-arg argv, got {r!r}",
+                ),
+            )
+        )
+
+        # Restore original argv after all cases
+        _sys.argv.clear()
+        _sys.argv.extend(_orig_argv)
+        return cases
+
+    _run_subtests("test_build_exec_argv", _test_build_exec_argv())
+
     total = passed_total + failed_total
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
     if failed_total == 0:

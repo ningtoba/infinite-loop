@@ -120,6 +120,20 @@ def _snapshot_file(path: str) -> tuple[float, int] | None:
         return None
 
 
+def _build_exec_argv() -> list[str]:
+    """Build argv for os.execv, handling -m invocation.
+
+    Reconstructs sys.argv correctly for both direct invocation
+    (``python3 launch-loop.py --run``) and module invocation
+    (``python3 -m hermes_loop --run``).  In the -m case, sys.argv
+    is ``['-m', 'hermes_loop', ...]`` so we need to insert
+    ``sys.executable`` before ``-m`` to make os.execv work.
+    """
+    if sys.argv[0] == "-m":
+        return [sys.executable, "-m"] + sys.argv[1:]
+    return [sys.executable] + sys.argv
+
+
 def init_auto_reload(workdir: str | None) -> None:
     """Initialize the file snapshots for auto-reload detection.
 
@@ -132,6 +146,7 @@ def init_auto_reload(workdir: str | None) -> None:
     global _startup_file_snapshots, _startup_file_snapshots_initialized
     if os.environ.get("HERMES_LOOP_NO_AUTO_RELOAD") == "1":
         _startup_file_snapshots_initialized = True  # mark done, but empty
+        _log("[AUTO-RELOAD] Disabled via HERMES_LOOP_NO_AUTO_RELOAD (web UI mode)")
         return
     if not workdir:
         return
@@ -193,12 +208,8 @@ def _check_auto_reload(
             worker_manager.stop()
         except Exception:
             pass
-    # Reconstruct argv for -m invocation: sys.argv is ['-m', 'hermes_loop', ...]
-    # os.execv replaces the process — everything (env, cwd, fd) is preserved.
-    if sys.argv[0] == "-m":
-        exec_argv = [sys.executable, "-m"] + sys.argv[1:]
-    else:
-        exec_argv = [sys.executable] + sys.argv
+    # Reconstruct argv for -m invocation using shared helper
+    exec_argv = _build_exec_argv()
     _log("[AUTO-RELOAD] Executing os.execv() with updated code...")
     os.execv(sys.executable, exec_argv)
 

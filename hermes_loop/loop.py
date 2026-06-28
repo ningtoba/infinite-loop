@@ -13,6 +13,7 @@ from .signal_handlers import (
     _shutdown_requested,
     _check_auto_reload,
     init_auto_reload,
+    _build_exec_argv,
 )
 from .goal_utils import GoalSpec, _is_goal_completed, _mark_goal_completed
 from .error_recovery import (
@@ -742,10 +743,7 @@ def run_loop(
             write_status_file(status_file, state, iteration_count, "reloading")
             if worker_manager:
                 worker_manager.stop()
-            if sys.argv[0] == "-m":
-                exec_argv = [sys.executable, "-m"] + sys.argv[1:]
-            else:
-                exec_argv = [sys.executable] + sys.argv
+            exec_argv = _build_exec_argv()
             _log("[RELOAD] Executing os.execv() with updated code...")
             os.execv(sys.executable, exec_argv)
 

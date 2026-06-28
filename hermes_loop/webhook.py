@@ -184,6 +184,8 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
             self._handle_sse()
         elif parsed.path == "/dashboard":
             self._serve_dashboard_html()
+        elif parsed.path == "/api/iterations":
+            self._handle_api_iterations()
         else:
             self._send_json(404, {"error": "not_found"})
 
@@ -377,6 +379,22 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _handle_api_iterations(self):
+        """Handle GET /api/iterations — return recent iteration records."""
+        state = read_ledger()
+        iterations = state.get("iterations", []) if state else []
+        # Return most recent first
+        reversed_iters = list(reversed(iterations))
+        self._send_json(
+            200,
+            {
+                "iterations": reversed_iters[:50],
+                "total": len(iterations),
+                "limit": 50,
+                "offset": 0,
+            },
+        )
 
     def _send_json(self, status_code: int, data: dict):
         body = json.dumps(data, default=str).encode("utf-8")

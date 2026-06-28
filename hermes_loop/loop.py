@@ -15,6 +15,9 @@ from .signal_handlers import (
     init_auto_reload,
     _build_exec_argv,
 )
+
+# Import signal_handlers module for state/worker ref wiring
+from . import signal_handlers as _sh_mod
 from .goal_utils import GoalSpec, _is_goal_completed, _mark_goal_completed
 from .error_recovery import (
     _adapt_to_error,
@@ -222,9 +225,8 @@ def run_loop(
         )
 
     # Wire up signal-safe state reference for graceful shutdown
-    global _shutdown_state_ref, _hermes_worker_ref
-    _shutdown_state_ref = state
-    _hermes_worker_ref = worker_manager
+    _sh_mod._shutdown_state_ref = state
+    _sh_mod._hermes_worker_ref = worker_manager
 
     iteration_count = state["total_iterations"]
     existing_summaries = [it.get("summary", "") for it in state.get("iterations", [])]

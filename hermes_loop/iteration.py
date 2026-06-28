@@ -467,13 +467,13 @@ def _handle_backoff(
         delay = retry_delay * min(consecutive_errors, 5)
         if not adapt_actions:
             _log(f"[BACKOFF] Waiting {delay}s...")
-        try:
-            time.sleep(delay)
-        except KeyboardInterrupt:
-            _log("\n[STOP] KeyboardInterrupt")
-            state["status"] = "stopped: ctrl-c"
+        if _sleep_with_shutdown_check(delay):
+            _log("\n[STOP] Shutdown during backoff.")
+            state["status"] = "stopped: shutdown-during-backoff"
             write_ledger(state)
-            write_status_file(status_file, state, iteration_count, "stopped: ctrl-c")
+            write_status_file(
+                status_file, state, iteration_count, "stopped: shutdown-during-backoff"
+            )
             return True
     return False
 

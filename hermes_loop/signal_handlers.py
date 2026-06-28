@@ -3,6 +3,7 @@
 import os
 import signal
 import sys
+import threading
 import time
 import subprocess as _subprocess
 from datetime import datetime, timezone
@@ -57,24 +58,26 @@ def _handle_shutdown(signum, frame):
     try:
         # Kill descendant processes — try SIGTERM first, then SIGKILL
         # Kill the process group for immediate children, then pkill -P for descendants
-        import signal as _sig
-
         try:
             pgid = os.getpgid(os.getpid())
-            os.killpg(pgid, _sig.SIGTERM)
+            os.killpg(pgid, signal.SIGTERM)
         except (ProcessLookupError, OSError, PermissionError):
             pass
         _subprocess.run(
-            ["pkill", "-15", "-P", str(os.getpid())], capture_output=True, timeout=3
+            ["pkill", "-15", "-P", str(os.getpid())],
+            capture_output=True,
+            timeout=3,
         )
         time.sleep(2)
         # Force-kill any remaining
         _subprocess.run(
-            ["pkill", "-9", "-P", str(os.getpid())], capture_output=True, timeout=3
+            ["pkill", "-9", "-P", str(os.getpid())],
+            capture_output=True,
+            timeout=3,
         )
         if pgid is not None:
             try:
-                os.killpg(pgid, _sig.SIGKILL)
+                os.killpg(pgid, signal.SIGKILL)
             except (ProcessLookupError, OSError, PermissionError):
                 pass
     except Exception:
@@ -107,8 +110,21 @@ def _handle_shutdown(signum, frame):
     except Exception:
         pass
 
-    _log(f"[STOP] {signame} received. Worker and child processes cleaned up. Exiting.")
-    sys.exit(128 + signum)
+    _log(
+        f"[STOP] {signame} received. "
+        f"Workers killed — main loop will handle final cleanup."
+    )
+
+    # Fallback: if the main loop is blocked and never checks _shutdown_requested,
+    # exit after a timeout. The main loop's _sleep_with_shutdown_check checks
+    # every second; subprocess runs have heartbeat_timeout. This is a safety net.
+    def _hard_exit() -> None:
+        _log("[STOP] Main loop did not clean up — forcing exit.")
+        sys.exit(128 + signum)
+
+    timer = threading.Timer(30.0, _hard_exit)
+    timer.daemon = True
+    timer.start()
 
 
 def _snapshot_file(path: str) -> tuple[float, int] | None:

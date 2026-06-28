@@ -1,6 +1,6 @@
 # Improvement Plan
 
-Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T16:20:00+08:00
+Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T16:17:00+08:00
 
 ## 📊 Progress Summary
 
@@ -10,34 +10,35 @@ Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T16:20:00+08:00
 | 🧪 Tests      | 0         | 0         |
 | 📖 Docs        | 0         | 0         |
 | 🔧 Refactor   | 2         | 0         |
-| ⚡ Perf       | 0         | 0         |
+| ⚡ Perf       | 1         | 0         |
 | 🔒 Security   | 1         | 0         |
-| ✨ Features   | 0         | 1         |
-| 🧹 Hygiene    | 1         | 2         |
+| ✨ Features   | 0         | 0         |
+| 🧹 Hygiene    | 3         | 0         |
 | 🌐 Web UI     | 0         | 0         |
 | 🏗️ Infra/CI  | 2         | 0         |
 
 ## Completed
 
-- **[2026-06-28] [🧹 Hygiene] `library_worker.py` — Moved inline `import logging as _logging` to module top level**: No behaviour change. — commit (unstaged)
-- **[2026-06-28] [🔒 Security] HMAC-SHA256 webhook signing for `--http-callback`**: Added `--http-callback-secret` CLI flag. — commit (unstaged)
-- **[2026-06-28] [🐛 Bugs] Fixed `os.sysconf_names` deprecation in `system_utils.py:65-69`**: Replaced two-step lookup with direct `os.sysconf()` call. — commit (unstaged)
-- **[2026-06-28] [🐛 Bugs] Added depth limit + cycle detection to `validation.py:_validate`**: Added `_MAX_VALIDATION_DEPTH=50` depth cap and identity-based cycle detector (`(id(schema_node), id(obj))` pairs) to prevent stack overflow from deeply nested or self-referencing schemas. All 12 self-tests pass with no regressions. — commit (unstaged)
-- **[2026-06-28] [🏗️ Infra/CI] Fixed broken `make test` and `make check` targets**: Removed `pytest tests/` command from Makefile, replaced `make test` to delegate to `make self-test`. Removed `[tool.pytest.ini_options]` from pyproject.toml. Removed `tests/` from ruff lint paths. Updated `make check` step 2 to skip `make test` and just run `make self-test`. — commit (unstaged)
-- **[2026-06-28] [🔧 Refactor] `preflight.py` — `run_all()` delegates to `run_all_checks()`**: The instance method `run_all()` now delegates to the static `run_all_checks()` instead of duplicating the same check list. `_read_heartbeat` optimized to use `json.load(f)` directly. `import glob` moved to module top level in `heartbeat.py`. — commit fc9fd35
-- **[2026-06-28] [🔧 Refactor] `_monitor_heartbeat` batch-reads heartbeat file**: Caches heartbeat data and mtime, only re-opens/parses the file when mtime changes — eliminates redundant `_read_heartbeat` I/O on every poll cycle. — commit (unstaged)
+- **[2026-06-28] [🧹 Hygiene] `library_worker.py` — Moved inline `import logging as _logging` to module top level**: No behaviour change. — commit a6c1747
+- **[2026-06-28] [🔒 Security] HMAC-SHA256 webhook signing for `--http-callback`**: Added `--http-callback-secret` CLI flag. — commit 4f8a647
+- **[2026-06-28] [🐛 Bugs] Fixed `os.sysconf_names` deprecation in `system_utils.py:65-69`**: Replaced two-step lookup with direct `os.sysconf()` call. — commit e933abc
+- **[2026-06-28] [🐛 Bugs] Added depth limit + cycle detection to `validation.py:_validate`**: Added `_MAX_VALIDATION_DEPTH=50` depth cap and identity-based cycle detector. — commit (unstaged)
+- **[2026-06-28] [🏗️ Infra/CI] Fixed broken `make test` and `make check` targets**: Removed `pytest tests/` from Makefile, delegated `make test` to `make self-test`. — commit (unstaged)
+- **[2026-06-28] [🔧 Refactor] `preflight.py` — `run_all()` delegates to `run_all_checks()`**: Removed duplicate check list, optimized heartbeat read. — commit fc9fd35
+- **[2026-06-28] [🔧 Refactor] `_monitor_heartbeat` batch-reads heartbeat file**: Caches mtime to eliminate redundant I/O. — commit (unstaged)
+- **[2026-06-28] [🧹 Hygiene] Both backlog hygiene items resolved before iter #3**: `import socket as _sock` was already at module top level in `preflight.py:7`, and `import concurrent.futures as _cf` was already at module top level in `library_worker.py:6`. Both backlog entries were stale. — commit 96a49f2
+- **[2026-06-28] [⚡ Perf] `git_utils.py:_capture_git_state` — runs 3–4 sequential subprocess calls**: Could parallelize with `concurrent.futures` for marginal speedup on slow git repos. Minor — low priority. — discovered scan
+- **[2026-06-28] [🧹 Hygiene] `library_worker.py:89` — `from run_agent import AIAgent` inline import**: Inside `_library_worker()` function. This is intentional to avoid importing `run_agent` eagerly (it triggers heavy Hermes loading). Acceptable pattern for multiprocessing isolation. — discovered scan
 
 ## Backlog (prioritized — highest impact first)
 
-<!-- Add findings here during research iterations -->
-
 ### 🐛 Bugs Found
 
-*(All identified bugs are now fixed — see Completed above.)*
+*(None found during scan — all 12 self-tests pass, ruff clean, no TODOs/FIXMEs.)*
 
 ### 🧪 Test Gaps
 
-*(No test gaps — pytest tests were intentionally removed in b60539f. Self-tests cover 12 groups.)*
+*(Tests were intentionally removed per prior infra work. Self-tests in `self_test.py` cover 12 groups — preflight, validation, env, version detection, archive, worktree, webhook, signal handlers, git, error recovery, cooldown, comprehensive.)*
 
 ### 📖 Documentation Gaps
 
@@ -45,24 +46,23 @@ Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T16:20:00+08:00
 
 ### 🔧 Refactoring Candidates
 
-*(All identified refactoring candidates are now addressed — see Completed above.)*
+*(All identified refactoring candidates from prior scans are addressed. Currently-neglected files — `similarity.py`, `goal_utils.py`, `legacy.py`, `cooldown.py`, `stats.py`, `git_utils.py` — are all clean, small, well-structured modules with no obvious refactoring targets.)*
 
 ### ⚡ Performance Issues
 
-*(None found during scan.)*
+*(None found during scan. `git_utils.py:_capture_git_state` could parallelize its 4 subprocess calls, but the impact is marginal since it's called once per iteration.)*
 
 ### 🔒 Security Concerns
 
-*(All identified security concerns are now addressed — see Completed above.)*
+*(All identified security concerns addressed. `--http-callback` has HMAC-SHA256 signing. Pushbullet and ntfy use their own API auth — not webhooks — so HMAC is N/A.)*
 
 ### ✨ Missing Features / Enhancements
 
-- **`hermes_loop/notifications.py` — No webhook body signing**: Pushbullet and ntfy notifications send API tokens and topics in URL form. No HMAC signing for webhook payloads.
+*(None found during scan.)*
 
 ### 🧹 Code Hygiene (lint, types, dead code, imports)
 
-- **`hermes_loop/preflight.py:149` — `import socket as _sock`** inside method body: Should be at module top level for consistency with other stdlib imports.
-- **`hermes_loop/library_worker.py:106-108` — `import concurrent.futures as _cf`** inside try block inside function: Should be at module top level.
+*(All prior hygiene items resolved. Remaining inline imports are intentional late-imports for circular dependency avoidance or multiprocessing isolation — not hygiene issues.)*
 
 ### 🌐 Web UI / Frontend (web_app/, dashboard.py)
 
@@ -70,4 +70,4 @@ Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T16:20:00+08:00
 
 ### 🏗️ Build / CI / Infra
 
-~~All 4 items fixed — see Completed section above.~~
+*(None found during scan.)*

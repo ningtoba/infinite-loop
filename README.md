@@ -1,4 +1,4 @@
-# Infinite Loop Daemon — v14.39.1
+# Infinite Loop Daemon — v14.39.2
 
 A self-looping background daemon that spawns Hermes sessions with **real tools**
 (terminal, file, web, skills, browser, memory) **and** `delegate_task()` for

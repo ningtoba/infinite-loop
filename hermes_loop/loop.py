@@ -263,6 +263,8 @@ def run_loop(
     goals_tuples = _load_goals_file(goals_file, goal)
     goals_list: list[GoalSpec] = [GoalSpec(g) for g, p, m, v in goals_tuples]
     goals_index = 0
+    # Store goals specs in state for SSE dashboard visualization
+    state["goals_specs"] = goals_tuples
 
     write_status_file(status_file, state, iteration_count, "running")
 
@@ -905,6 +907,7 @@ def run_loop(
                     _log(f"[ARCHIVE] Failed to archive iterations: {e}")
             state["iterations"] = state["iterations"][-keep_iterations:]
             state["total_iterations"] = iteration_count
+            _recalc_stats(state)
             _log(
                 f"[SHRINK] Trimmed ledger from {old_count} to {keep_iterations} iterations"
                 f" (archived {len(discarded)} to archive)"

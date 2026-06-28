@@ -70,7 +70,7 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "  bash run.sh --git --git-commit        # Enable git auto-commit"
   echo ""
   echo "ALL other flags are forwarded directly to launch-loop.py."
-  echo "See: python3 launch-loop.py --help  (for the full flag reference)"
+  echo "See: hermes_loop --help  (for the full flag reference)"
   echo ""
   echo "QUICK REFERENCE:"
   echo "  Install:   make install              # hermes_loop on PATH"
@@ -253,7 +253,7 @@ if [ "$QUIET" = false ]; then
   echo "    Pause:  echo 'pause'  > ${INFINITE_LOOP_SHUTDOWN_SENTINEL:-/tmp/infinite-loop-stop}"
   echo "    Status: ${INFINITE_LOOP_STATUS_FILE:-/tmp/loop-status.json}"
   echo "    Log:    tail -f ${INFINITE_LOOP_LOG_FILE:-/tmp/infinite-loop.log}"
-  echo "    Help:   python3 launch-loop.py --help"
+  echo "    Help:   hermes_loop --help"
   echo ""
 fi
 

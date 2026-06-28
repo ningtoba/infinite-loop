@@ -4,6 +4,13 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.38.1] — 2026-06-28
+
+### Fixed
+- **`hermes_loop/self_test.py` — 5 lint errors (4x F541 extraneous f-prefix + 1x F401 unused import)**: Removed `f` prefix from 4 plain string assertions and removed the unused `import random` inside `_test_concurrent_access()`.
+- **`scripts/run-loop.sh` — Stale version banner**: Updated v14.37.0 banner to v14.38.0.
+- **`CONTRIBUTING.md` — Stale version reference**: Updated `LAUNCH_LOOP_VERSION` reference from 14.37.0 to 14.38.0.
+
 ## [14.38.0] — 2026-06-28
 
 ### Fixed

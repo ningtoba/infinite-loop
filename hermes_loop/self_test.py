@@ -760,7 +760,7 @@ def _run_self_test() -> dict:
                 _test_queue_full_drop,
                 lambda r: (
                     r is True,
-                    f"expected maxsize=1 queue to stay at 1, got qsize check",
+                    "expected maxsize=1 queue to stay at 1, got qsize check",
                 ),
             )
         )
@@ -802,7 +802,7 @@ def _run_self_test() -> dict:
                 _test_stale_sweep,
                 lambda r: (
                     r is True,
-                    f"expected only fresh client in alive list, stale skipped",
+                    "expected only fresh client in alive list, stale skipped",
                 ),
             )
         )
@@ -834,7 +834,7 @@ def _run_self_test() -> dict:
             (
                 "isinstance-backward-compat-str-and-dict",
                 _test_isinstance_compat,
-                lambda r: (r is True, f"isinstance compat failed"),
+                lambda r: (r is True, "isinstance compat failed"),
             )
         )
 
@@ -843,7 +843,6 @@ def _run_self_test() -> dict:
         # no deadlocks or data races using threading primitives.
 
         def _test_concurrent_access():
-            import random
 
             n_clients = 16
             n_broadcasts = 8
@@ -894,7 +893,7 @@ def _run_self_test() -> dict:
                 _test_concurrent_access,
                 lambda r: (
                     r is True,
-                    f"thread deadlock or timeout during concurrent broadcast",
+                    "thread deadlock or timeout during concurrent broadcast",
                 ),
             )
         )

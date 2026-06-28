@@ -53,8 +53,7 @@ def validate_json_output(output: dict, schema: dict) -> tuple[bool, str]:
     ) -> str | None:
         if _depth > _MAX_VALIDATION_DEPTH:
             return (
-                f"{path}: maximum validation depth "
-                f"({_MAX_VALIDATION_DEPTH}) exceeded"
+                f"{path}: maximum validation depth ({_MAX_VALIDATION_DEPTH}) exceeded"
             )
 
         # Cycle detection: track (schema_node, obj) identity pairs.

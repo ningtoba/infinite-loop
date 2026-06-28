@@ -50,15 +50,13 @@ def _execute_task(
 ) -> dict:
     """Execute a single task via pi subprocess.
 
-    Emits worker lifecycle markers on stdout for the web UI to track.
+    Streams pi output line-by-line with [TERM (worker #1)] prefix so the
+    web UI's existing xterm.js terminal shows real-time output.
     Returns a result dict with 'output', 'error', 'duration_seconds', etc.
     """
     cmd = ["pi", "-p", goal]
     if context:
         cmd.extend(["--append-system-prompt", context])
-    # Pi comes with its full default toolset (read, bash, edit, write, etc.)
-    # Do NOT pass --tools — the old hermes toolset names (terminal, file, delegation, etc.)
-    # are NOT pi tool names, and passing them restricts pi to a broken subset.
 
     print(f"[SPAWN (worker #1)] pi -p {goal[:60]}")
     sys.stdout.flush()
@@ -67,47 +65,64 @@ def _execute_task(
     attempts = 0
     max_attempts = max(1, max_retries + 1)
     last_error = None
-    output_lines = []
+    all_output = []
+
+    def _prefix(line: str) -> None:
+        """Write a TERM-prefixed line to daemon stdout for web UI consumption."""
+        sys.stdout.write(f"[TERM (worker #1)] {line}\n")
+        sys.stdout.flush()
 
     while attempts < max_attempts:
         attempts += 1
         attempt_start = time.time()
         try:
-            r = subprocess.run(
+            proc = subprocess.Popen(
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=session_timeout,
                 cwd=workdir or os.getcwd(),
             )
+            stdout_lines = []
+
+            # Stream stdout line-by-line
+            if proc.stdout is None:
+                raise RuntimeError("pi subprocess has no stdout pipe")
+            for raw_line in proc.stdout:
+                line = raw_line.rstrip("\n").rstrip("\r")
+                stdout_lines.append(line)
+                _prefix(line)
+
+            proc.wait(timeout=session_timeout)
             duration = time.time() - attempt_start
-            stdout = r.stdout or ""
-            stderr = r.stderr or ""
+            stdout_text = "\n".join(stdout_lines)
+
+            # Read any remaining stderr
+            stderr_text = ""
+            if proc.stderr:
+                stderr_text = proc.stderr.read()
 
             print(
-                f"[WORKER (worker #1)] Response in {duration:.1f}s (status={'ok' if r.returncode == 0 else 'failed'})"
+                f"[WORKER (worker #1)] Response in {duration:.1f}s (status={'ok' if proc.returncode == 0 else 'failed'})"
             )
             sys.stdout.flush()
-            duration = time.time() - attempt_start
-            stdout = r.stdout or ""
-            stderr = r.stderr or ""
 
-            if r.returncode == 0:
+            if proc.returncode == 0:
                 return {
-                    "output": stdout[:max_output_chars] if max_output_chars else stdout,
+                    "output": stdout_text[:max_output_chars] if max_output_chars else stdout_text,
                     "error": None,
                     "duration_seconds": round(duration, 1),
                     "returncode": 0,
                 }
             else:
-                last_error = f"exit code {r.returncode}: {stderr[:500] or stdout[:500]}"
+                last_error = f"exit code {proc.returncode}: {stderr_text[:500] or stdout_text[:500]}"
                 if attempts < max_attempts:
                     _log(
                         f"[RETRY] Attempt {attempts}/{max_attempts} failed: {last_error[:120]}"
                     )
                     time.sleep(retry_delay)
                 else:
-                    output_lines.append(stdout)
+                    all_output.append(stdout_text)
 
         except subprocess.TimeoutExpired:
             duration = time.time() - attempt_start
@@ -132,9 +147,9 @@ def _execute_task(
                 time.sleep(retry_delay)
 
     return {
-        "output": "\n".join(output_lines)[:max_output_chars]
+        "output": "\n".join(all_output)[:max_output_chars]
         if max_output_chars
-        else "\n".join(output_lines),
+        else "\n".join(all_output),
         "error": last_error,
         "duration_seconds": round(time.time() - start_time, 1),
         "returncode": -1,

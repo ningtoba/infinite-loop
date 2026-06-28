@@ -134,7 +134,7 @@ class LoopManager:
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    env=os.environ.copy(),
+                    env={**os.environ.copy(), "PYTHONUNBUFFERED": "1"},
                     preexec_fn=os.setsid,
                 ),
                 timeout=30,

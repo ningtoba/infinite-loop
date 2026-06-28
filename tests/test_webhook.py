@@ -666,3 +666,118 @@ class TestStartWebhookServer:
             with patch("threading.Thread"):
                 _start_webhook_server(port=9999, trigger_fn=mock_fn)
         assert WebhookHandler._shutdown_sentinel == ""
+
+
+# ===================================================================
+# log_message
+# ===================================================================
+
+
+class TestLogMessage:
+    def test_log_message_formats_and_logs(self):
+        "log_message calls _log with formatted address and message."
+        # Must NOT use _make_handler since that sets handler.log_message = MagicMock()
+        # which replaces the actual method. Instead create a minimal handler with
+        # the real log_message method.
+        handler = WebhookHandler.__new__(WebhookHandler)
+        handler.command = "GET"
+        handler.path = "/health"
+        handler.headers = {}
+        handler.rfile = io.BytesIO()
+        handler.wfile = io.BytesIO()
+        handler.client_address = ("127.0.0.1", 54321)
+        handler.server = MagicMock()
+        handler.request = b""
+        handler.close_connection = True
+        handler.requestline = "GET /health HTTP/1.1"
+        handler.request_version = "HTTP/1.1"
+        handler.server.server_address = ("0.0.0.0", 8888)
+        # Do NOT set handler.log_message — we want the real method
+
+        with patch("hermes_loop.webhook._log") as mock_log:
+            handler.log_message("GET %s HTTP/1.1", "/health")
+        mock_log.assert_called_once()
+        args = mock_log.call_args[0][0]
+        assert "[WEBHOOK]" in args
+        assert "127.0.0.1" in args
+        assert "/health" in args
+
+    def test_log_message_with_no_args(self):
+        "log_message works with just a format string and no args."
+        handler = WebhookHandler.__new__(WebhookHandler)
+        handler.command = "GET"
+        handler.path = "/health"
+        handler.headers = {}
+        handler.rfile = io.BytesIO()
+        handler.wfile = io.BytesIO()
+        handler.client_address = ("127.0.0.1", 54321)
+        handler.server = MagicMock()
+        handler.request = b""
+        handler.close_connection = True
+        handler.requestline = "GET /health HTTP/1.1"
+        handler.request_version = "HTTP/1.1"
+        handler.server.server_address = ("0.0.0.0", 8888)
+        # Do NOT set handler.log_message — we want the real method
+
+        with patch("hermes_loop.webhook._log") as mock_log:
+            handler.log_message("plain message")
+        mock_log.assert_called_once_with("[WEBHOOK] 127.0.0.1 - plain message")
+
+
+# ===================================================================
+# _handle_sse — ValueError paths (already-removed client)
+# ===================================================================
+class TestHandleSseValueError:
+    """Cover the ValueError except blocks in _handle_sse."""
+
+    def test_init_broken_pipe_and_value_error_on_remove(self):
+        """BrokenPipeError in init + ValueError on remove: both caught."""
+        handler = _make_handler(path="/live")
+        handler.wfile = io.BytesIO()
+
+        # Make init write fail
+        real_wfile = handler.wfile
+
+        def failing_write(data, _orig=real_wfile.write):
+            if b"event:" in data:
+                raise BrokenPipeError("broken")
+            return _orig(data)
+
+        handler.wfile.write = failing_write
+
+        class ValueErrorList(list):
+            def remove(self, q):
+                raise ValueError("not in list")
+
+        mock_list = ValueErrorList()
+
+        with patch("hermes_loop.webhook.read_ledger", return_value={"status": "ok"}):
+            with patch("hermes_loop.webhook._build_sse_payload", return_value={}):
+                with patch("hermes_loop.webhook._wrap_sse_payload", return_value={}):
+                    with patch("hermes_loop.webhook._sse_clients", mock_list):
+                        with patch("hermes_loop.webhook._sse_clients_lock"):
+                            handler._handle_sse()  # Should not raise
+
+    def test_main_loop_oserror_and_value_error_on_remove(self):
+        """OSError in main loop + ValueError on remove: both caught."""
+        handler = _make_handler(path="/live")
+        handler.wfile = io.BytesIO()
+
+        class ValueErrorList(list):
+            def remove(self, q):
+                raise ValueError("not in list")
+
+        mock_list = ValueErrorList()
+
+        with patch("hermes_loop.webhook.read_ledger", return_value={"status": "ok"}):
+            with patch("hermes_loop.webhook._build_sse_payload", return_value={}):
+                with patch("hermes_loop.webhook._wrap_sse_payload", return_value={}):
+                    with patch("hermes_loop.webhook._sse_clients", mock_list):
+                        with patch("hermes_loop.webhook._sse_clients_lock"):
+                            with patch(
+                                "queue.Queue.get",
+                                side_effect=OSError("connection reset"),
+                            ):
+                                handler._handle_sse()  # Should not raise
+                    with patch("queue.Queue.get", side_effect=OSError("reset")):
+                        handler._handle_sse()  # should not raise

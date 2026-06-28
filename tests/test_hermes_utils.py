@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import subprocess
+import json
 
 
 from hermes_loop.hermes_utils import (
@@ -16,6 +17,7 @@ from hermes_loop.hermes_utils import (
     _read_stderr_real_time,
     _read_stdout_live,
     _run_hermes_with_pty,
+    spawn_delegation_session,
 )
 
 # ===================================================================
@@ -1048,3 +1050,1227 @@ class TestRunHermesWithPty:
         assert kwargs["cwd"] == "/home/user"
         assert kwargs["text"] is True
         assert kwargs["start_new_session"] is True
+
+
+class TestSpawnDelegationSessionSubprocess:
+    """Tests for spawn_delegation_session -- subprocess mode (PTY and heartbeat)."""
+
+    # ------------------------------------------------------------------
+    # Subprocess PTY mode (heartbeat_timeout=0)
+    # ------------------------------------------------------------------
+
+    def test_subprocess_basic_json_success(self):
+        mock_parsed = {
+            "summary": "success",
+            "duration_seconds": 1.5,
+            "error": None,
+        }
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=('{"summary":"success","duration_seconds":1.5}', 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=mock_parsed,
+                    ):
+                        with patch(
+                            "hermes_loop.hermes_utils.classify_error", return_value=None
+                        ):
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils.time.time",
+                                    return_value=100.0,
+                                ):
+                                    result = spawn_delegation_session(
+                                        iteration=1,
+                                        goal="test",
+                                        context="",
+                                        toolsets=["terminal"],
+                                        workdir=None,
+                                        timeout_seconds=30,
+                                    )
+        assert result["summary"] == "success"
+        assert result["duration_seconds"] == 1.5
+        assert result["error"] is None
+        assert result["exit_code"] == 0
+
+    def test_subprocess_pty_timeout(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    side_effect=subprocess.TimeoutExpired(cmd=["hermes"], timeout=30),
+                ):
+                    with patch("hermes_loop.hermes_utils._log"):
+                        with patch(
+                            "hermes_loop.hermes_utils.time.time", return_value=130.0
+                        ):
+                            result = spawn_delegation_session(
+                                iteration=1,
+                                goal="test",
+                                context="",
+                                toolsets=["terminal"],
+                                workdir=None,
+                                timeout_seconds=30,
+                            )
+        assert result["error_type"] == "timeout"
+        assert "TIMEOUT" in result["summary"]
+        assert result["exit_code"] == -1
+
+    def test_subprocess_pty_json_with_next_goal(self):
+        mock_parsed = {
+            "summary": "did work",
+            "duration_seconds": 2.0,
+            "error": None,
+            "next_goal": "do more",
+            "context": "some context",
+        }
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("output", 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=mock_parsed,
+                    ):
+                        with patch(
+                            "hermes_loop.hermes_utils.classify_error", return_value=None
+                        ):
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils.time.time",
+                                    return_value=100.0,
+                                ):
+                                    result = spawn_delegation_session(
+                                        iteration=1,
+                                        goal="test",
+                                        context="",
+                                        toolsets=["terminal"],
+                                        workdir=None,
+                                        timeout_seconds=30,
+                                    )
+        assert result["next_goal"] == "do more"
+        assert result["context"] == "some context"
+
+    def test_subprocess_pty_schema_valid(self):
+        mock_parsed = {"summary": "valid", "duration_seconds": 1.0, "error": None}
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=('{"summary":"valid"}', 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=mock_parsed,
+                    ):
+                        with patch(
+                            "hermes_loop.hermes_utils.validate_json_output",
+                            return_value=(True, ""),
+                        ):
+                            with patch(
+                                "hermes_loop.hermes_utils.classify_error",
+                                return_value=None,
+                            ):
+                                with patch("hermes_loop.hermes_utils._log"):
+                                    with patch(
+                                        "hermes_loop.hermes_utils.time.time",
+                                        return_value=100.0,
+                                    ):
+                                        result = spawn_delegation_session(
+                                            iteration=1,
+                                            goal="test",
+                                            context="",
+                                            toolsets=["terminal"],
+                                            workdir=None,
+                                            timeout_seconds=30,
+                                            output_schema={"type": "object"},
+                                        )
+        assert result["schema_valid"] is True
+        assert result["schema_error"] is None
+
+    def test_subprocess_pty_schema_invalid(self):
+        mock_parsed = {"summary": "invalid", "duration_seconds": 1.0, "error": None}
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=('{"summary":"invalid"}', 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=mock_parsed,
+                    ):
+                        with patch(
+                            "hermes_loop.hermes_utils.validate_json_output",
+                            return_value=(False, "missing required field"),
+                        ):
+                            with patch(
+                                "hermes_loop.hermes_utils.classify_error",
+                                return_value="validation",
+                            ):
+                                with patch("hermes_loop.hermes_utils._log"):
+                                    with patch(
+                                        "hermes_loop.hermes_utils.time.time",
+                                        return_value=100.0,
+                                    ):
+                                        result = spawn_delegation_session(
+                                            iteration=1,
+                                            goal="test",
+                                            context="",
+                                            toolsets=["terminal"],
+                                            workdir=None,
+                                            timeout_seconds=30,
+                                            output_schema={"type": "object"},
+                                        )
+        assert result["schema_valid"] is False
+        assert result["schema_error"] == "missing required field"
+        assert result["error"] == "missing required field"
+        assert result["error_type"] == "validation"
+
+    # ------------------------------------------------------------------
+    # Session ID extraction
+    # ------------------------------------------------------------------
+
+    def test_subprocess_extracts_session_id(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("session_id: abc-123\nother output", 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value={
+                            "summary": "ok",
+                            "duration_seconds": 1.0,
+                            "error": None,
+                        },
+                    ):
+                        with patch(
+                            "hermes_loop.hermes_utils.classify_error", return_value=None
+                        ):
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils.time.time",
+                                    return_value=100.0,
+                                ):
+                                    result = spawn_delegation_session(
+                                        iteration=1,
+                                        goal="test",
+                                        context="",
+                                        toolsets=["terminal"],
+                                        workdir=None,
+                                        timeout_seconds=30,
+                                    )
+        assert result["spawned_session_id"] == "abc-123"
+
+    # ------------------------------------------------------------------
+    # No JSON parsed -- various subprocess exit scenarios
+    # ------------------------------------------------------------------
+
+    def test_subprocess_no_json_exit_zero(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("some output text", 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=None,
+                    ):
+                        with patch("hermes_loop.hermes_utils._log"):
+                            with patch(
+                                "hermes_loop.hermes_utils.time.time", return_value=100.0
+                            ):
+                                result = spawn_delegation_session(
+                                    iteration=1,
+                                    goal="test",
+                                    context="",
+                                    toolsets=["terminal"],
+                                    workdir=None,
+                                    timeout_seconds=30,
+                                )
+        assert result["summary"] == "some output text"
+        assert result["error"] is None
+        assert result["exit_code"] == 0
+
+    def test_subprocess_no_json_exit_nonzero_output_gt_30(self):
+        output = "x" * 40 + "\nactual result here"
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=(output, 1),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=None,
+                    ):
+                        with patch("hermes_loop.hermes_utils._log"):
+                            with patch(
+                                "hermes_loop.hermes_utils.time.time", return_value=100.0
+                            ):
+                                result = spawn_delegation_session(
+                                    iteration=1,
+                                    goal="test",
+                                    context="",
+                                    toolsets=["terminal"],
+                                    workdir=None,
+                                    timeout_seconds=30,
+                                )
+        assert result["error"] is None
+        assert result["exit_code"] == 1
+
+    def test_subprocess_no_json_exit_nonzero_stderr_gt_50(self):
+        stderr_content = "x" * 60
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch("hermes_loop.hermes_utils._kill_session"):
+                    with patch("hermes_loop.hermes_utils._cleanup_heartbeat_file"):
+                        mock_proc = MagicMock()
+                        mock_proc.pid = 12345
+                        mock_proc.wait.return_value = 1
+                        mock_proc.returncode = 1
+                        mock_proc.args = ["hermes"]
+                        mock_stdout = MagicMock()
+                        mock_stdout.readline.side_effect = ["short\n", ""]
+                        mock_proc.stdout = mock_stdout
+                        mock_stderr = MagicMock()
+                        mock_stderr.readline.side_effect = [stderr_content, ""]
+                        mock_proc.stderr = mock_stderr
+                        with patch("subprocess.Popen", return_value=mock_proc):
+                            with patch(
+                                "hermes_loop.hermes_utils._heartbeat_path",
+                                return_value="/tmp/hb",
+                            ):
+                                with patch("threading.Thread"):
+                                    with patch(
+                                        "hermes_loop.hermes_utils.extract_json_from_output",
+                                        return_value=None,
+                                    ):
+                                        with patch("hermes_loop.hermes_utils._log"):
+                                            with patch(
+                                                "hermes_loop.hermes_utils.time.time",
+                                                return_value=100.0,
+                                            ):
+                                                result = spawn_delegation_session(
+                                                    iteration=1,
+                                                    goal="test",
+                                                    context="",
+                                                    toolsets=["terminal"],
+                                                    workdir=None,
+                                                    timeout_seconds=30,
+                                                    heartbeat_timeout=10,
+                                                )
+        # In heartbeat mode, stderr is streamed by the reader thread so
+        # stderr is empty. With no JSON, exit non-zero, and short stdout
+        # (<30), we hit the FAILED path despite stderr being long.
+        assert "FAILED" in result.get("summary", "")
+        assert result["exit_code"] == 1
+
+    def test_subprocess_no_json_exit_nonzero_no_output(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("short", 2),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=None,
+                    ):
+                        with patch("hermes_loop.hermes_utils._log"):
+                            with patch(
+                                "hermes_loop.hermes_utils.time.time", return_value=100.0
+                            ):
+                                result = spawn_delegation_session(
+                                    iteration=1,
+                                    goal="test",
+                                    context="",
+                                    toolsets=["terminal"],
+                                    workdir=None,
+                                    timeout_seconds=30,
+                                )
+        assert "FAILED" in result["summary"]
+        assert result["error"] is not None
+        assert result["error_type"] == "unknown"
+
+    def test_subprocess_empty_stdout(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("", 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=None,
+                    ):
+                        with patch("hermes_loop.hermes_utils._log"):
+                            with patch(
+                                "hermes_loop.hermes_utils.time.time", return_value=100.0
+                            ):
+                                result = spawn_delegation_session(
+                                    iteration=1,
+                                    goal="test",
+                                    context="",
+                                    toolsets=["terminal"],
+                                    workdir=None,
+                                    timeout_seconds=30,
+                                )
+        assert result["summary"] == "(no output)"
+
+    # ------------------------------------------------------------------
+    # Heartbeat mode (heartbeat_timeout > 0)
+    # ------------------------------------------------------------------
+
+    def test_heartbeat_mode_success(self):
+        mock_proc = MagicMock()
+        mock_proc.pid = 12345
+        mock_proc.wait.return_value = 0
+        mock_proc.args = ["hermes"]
+        mock_stdout = MagicMock()
+        mock_stdout.readline.side_effect = ["line1\n", "line2\n", ""]
+        mock_proc.stdout = mock_stdout
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch("subprocess.Popen", return_value=mock_proc) as mock_popen:
+                    with patch(
+                        "hermes_loop.hermes_utils._heartbeat_path",
+                        return_value="/tmp/hb",
+                    ):
+                        mock_thread = MagicMock()
+                        with patch("threading.Thread", return_value=mock_thread):
+                            with patch(
+                                "hermes_loop.hermes_utils.extract_json_from_output",
+                                return_value={
+                                    "summary": "ok",
+                                    "duration_seconds": 1.0,
+                                    "error": None,
+                                },
+                            ):
+                                with patch(
+                                    "hermes_loop.hermes_utils.classify_error",
+                                    return_value=None,
+                                ):
+                                    with patch("hermes_loop.hermes_utils._log"):
+                                        with patch(
+                                            "hermes_loop.hermes_utils.time.time",
+                                            return_value=100.0,
+                                        ):
+                                            result = spawn_delegation_session(
+                                                iteration=1,
+                                                goal="test",
+                                                context="",
+                                                toolsets=["terminal"],
+                                                workdir=None,
+                                                timeout_seconds=30,
+                                                heartbeat_timeout=10,
+                                            )
+        mock_popen.assert_called_once()
+        assert mock_thread.start.call_count == 2
+        assert result["summary"] == "ok"
+
+    def test_heartbeat_mode_timeout(self):
+        mock_proc = MagicMock()
+        mock_proc.pid = 12345
+        mock_proc.args = ["hermes"]
+        mock_stdout = MagicMock()
+        mock_stdout.readline.side_effect = subprocess.TimeoutExpired(
+            cmd=["hermes"], timeout=30
+        )
+        mock_proc.stdout = mock_stdout
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch("subprocess.Popen", return_value=mock_proc):
+                    with patch(
+                        "hermes_loop.hermes_utils._heartbeat_path",
+                        return_value="/tmp/hb",
+                    ):
+                        mock_thread = MagicMock()
+                        with patch("threading.Thread", return_value=mock_thread):
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils._kill_session"
+                                ) as mock_kill:
+                                    with patch(
+                                        "hermes_loop.hermes_utils._cleanup_heartbeat_file"
+                                    ) as mock_clean:
+                                        with patch(
+                                            "hermes_loop.hermes_utils.time.time",
+                                            return_value=130.0,
+                                        ):
+                                            result = spawn_delegation_session(
+                                                iteration=1,
+                                                goal="test",
+                                                context="",
+                                                toolsets=["terminal"],
+                                                workdir=None,
+                                                timeout_seconds=30,
+                                                heartbeat_timeout=10,
+                                            )
+        mock_kill.assert_called_once()
+        mock_clean.assert_called_once()
+        assert result["error_type"] == "timeout"
+        assert result["exit_code"] == -1
+
+    # ------------------------------------------------------------------
+    # Error handlers -- top-level except blocks (lines 1125-1157)
+    # ------------------------------------------------------------------
+
+    def test_error_timeout_expired_top_level(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    side_effect=subprocess.TimeoutExpired(cmd=["hermes"], timeout=30),
+                ):
+                    with patch("hermes_loop.hermes_utils._log"):
+                        with patch(
+                            "hermes_loop.hermes_utils.time.time",
+                            side_effect=[100.0, 130.0],
+                        ):
+                            result = spawn_delegation_session(
+                                iteration=1,
+                                goal="test",
+                                context="",
+                                toolsets=["terminal"],
+                                workdir=None,
+                                timeout_seconds=30,
+                            )
+        assert result["error_type"] == "timeout"
+        assert result["exit_code"] == -1
+
+    def test_error_file_not_found(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    side_effect=FileNotFoundError("No such file"),
+                ):
+                    with patch("hermes_loop.hermes_utils._log"):
+                        result = spawn_delegation_session(
+                            iteration=1,
+                            goal="test",
+                            context="",
+                            toolsets=["terminal"],
+                            workdir=None,
+                            timeout_seconds=30,
+                        )
+        assert "binary not found" in result["summary"]
+        assert result["error_type"] == "network"
+        assert result["exit_code"] == -1
+
+    def test_error_generic_exception(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    side_effect=RuntimeError("something broke"),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.classify_error",
+                        return_value="unknown",
+                    ):
+                        with patch("hermes_loop.hermes_utils._log"):
+                            with patch(
+                                "hermes_loop.hermes_utils.time.time",
+                                side_effect=[100.0, 100.0],
+                            ):
+                                result = spawn_delegation_session(
+                                    iteration=1,
+                                    goal="test",
+                                    context="",
+                                    toolsets=["terminal"],
+                                    workdir=None,
+                                    timeout_seconds=30,
+                                )
+        assert "FAILED" in result["summary"]
+        assert "something broke" in result["error"]
+        assert result["exit_code"] == -1
+
+
+class TestSpawnDelegationSessionLib:
+    """Tests for spawn_delegation_session -- library mode (use_library=True)."""
+
+    def test_library_success_with_json(self):
+        mock_agent = MagicMock()
+        mock_conv_result = {
+            "session_id": "sess-1",
+            "final_response": '{"summary":"done","duration_seconds":0.5,"error":null}',
+        }
+        mock_agent.run_conversation.return_value = mock_conv_result
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch.dict("sys.modules", {"run_agent": MagicMock()}):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output"
+                    ) as mock_extract:
+                        mock_extract.return_value = {
+                            "summary": "done",
+                            "duration_seconds": 0.5,
+                        }
+                        with patch(
+                            "hermes_loop.hermes_utils.classify_error", return_value=None
+                        ):
+                            with patch(
+                                "concurrent.futures.ThreadPoolExecutor"
+                            ) as mock_executor:
+                                mock_future = MagicMock()
+                                mock_future.result.return_value = mock_conv_result
+                                mock_executor.return_value.__enter__.return_value.submit.return_value = (
+                                    mock_future
+                                )
+                                with patch("hermes_loop.hermes_utils._log"):
+                                    with patch(
+                                        "hermes_loop.hermes_utils.time.time",
+                                        side_effect=[100.0, 100.5],
+                                    ):
+                                        result = spawn_delegation_session(
+                                            iteration=1,
+                                            goal="test",
+                                            context="",
+                                            toolsets=["terminal"],
+                                            workdir=None,
+                                            timeout_seconds=30,
+                                            use_library=True,
+                                        )
+        assert result["summary"] == "done"
+        assert result["exit_code"] == 0
+
+    def test_library_timeout(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch.dict("sys.modules", {"run_agent": MagicMock()}):
+                    with patch(
+                        "concurrent.futures.ThreadPoolExecutor"
+                    ) as mock_executor:
+                        from concurrent.futures import TimeoutError as _TimeoutError
+
+                        mock_future = MagicMock()
+                        mock_future.result.side_effect = _TimeoutError()
+                        mock_executor.return_value.__enter__.return_value.submit.return_value = (
+                            mock_future
+                        )
+                        with patch("hermes_loop.hermes_utils._log"):
+                            with patch(
+                                "hermes_loop.hermes_utils.time.time",
+                                side_effect=[100.0, 130.0],
+                            ):
+                                result = spawn_delegation_session(
+                                    iteration=1,
+                                    goal="test",
+                                    context="",
+                                    toolsets=["terminal"],
+                                    workdir=None,
+                                    timeout_seconds=30,
+                                    use_library=True,
+                                )
+        assert "TIMEOUT" in result["summary"]
+        assert result["error_type"] == "timeout"
+
+    def test_library_no_json_extracted(self):
+        mock_agent = MagicMock()
+        mock_conv_result = {
+            "session_id": "sess-2",
+            "final_response": "just some text without json",
+        }
+        mock_agent.run_conversation.return_value = mock_conv_result
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch.dict("sys.modules", {"run_agent": MagicMock()}):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=None,
+                    ):
+                        with patch(
+                            "concurrent.futures.ThreadPoolExecutor"
+                        ) as mock_executor:
+                            mock_future = MagicMock()
+                            mock_future.result.return_value = mock_conv_result
+                            mock_executor.return_value.__enter__.return_value.submit.return_value = (
+                                mock_future
+                            )
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils.time.time",
+                                    side_effect=[100.0, 101.0],
+                                ):
+                                    result = spawn_delegation_session(
+                                        iteration=1,
+                                        goal="test",
+                                        context="",
+                                        toolsets=["terminal"],
+                                        workdir=None,
+                                        timeout_seconds=30,
+                                        use_library=True,
+                                    )
+        assert "just some text" in result["summary"]
+        assert result["error"] is None
+
+    def test_library_schema_validation(self):
+        mock_agent = MagicMock()
+        mock_conv_result = {
+            "session_id": "sess-3",
+            "final_response": '{"summary":"test","duration_seconds":1.0}',
+        }
+        mock_agent.run_conversation.return_value = mock_conv_result
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch.dict("sys.modules", {"run_agent": MagicMock()}):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output"
+                    ) as mock_extract:
+                        mock_extract.return_value = {
+                            "summary": "test",
+                            "duration_seconds": 1.0,
+                        }
+                        with patch(
+                            "hermes_loop.hermes_utils.validate_json_output",
+                            return_value=(True, ""),
+                        ):
+                            with patch(
+                                "hermes_loop.hermes_utils.classify_error",
+                                return_value=None,
+                            ):
+                                with patch(
+                                    "concurrent.futures.ThreadPoolExecutor"
+                                ) as mock_executor:
+                                    mock_future = MagicMock()
+                                    mock_future.result.return_value = mock_conv_result
+                                    mock_executor.return_value.__enter__.return_value.submit.return_value = (
+                                        mock_future
+                                    )
+                                    with patch("hermes_loop.hermes_utils._log"):
+                                        with patch(
+                                            "hermes_loop.hermes_utils.time.time",
+                                            side_effect=[100.0, 101.0],
+                                        ):
+                                            result = spawn_delegation_session(
+                                                iteration=1,
+                                                goal="test",
+                                                context="",
+                                                toolsets=["terminal"],
+                                                workdir=None,
+                                                timeout_seconds=30,
+                                                use_library=True,
+                                                output_schema={"type": "object"},
+                                            )
+        assert result["schema_valid"] is True
+        assert result["schema_error"] is None
+
+    def test_library_import_error_fallback(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("fallback output", 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=None,
+                    ):
+                        with patch.dict("sys.modules", {"run_agent": None}):
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils.time.time",
+                                    return_value=100.0,
+                                ):
+                                    result = spawn_delegation_session(
+                                        iteration=1,
+                                        goal="test",
+                                        context="",
+                                        toolsets=["terminal"],
+                                        workdir=None,
+                                        timeout_seconds=30,
+                                        use_library=True,
+                                    )
+        assert result["summary"] == "fallback output"
+
+    def test_library_exception_fallback(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("fallback from exception", 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=None,
+                    ):
+                        with patch.dict("sys.modules", {"run_agent": MagicMock()}):
+                            with patch(
+                                "concurrent.futures.ThreadPoolExecutor"
+                            ) as mock_executor:
+                                mock_future = MagicMock()
+                                mock_future.result.side_effect = RuntimeError(
+                                    "agent crashed"
+                                )
+                                mock_executor.return_value.__enter__.return_value.submit.return_value = (
+                                    mock_future
+                                )
+                                with patch("hermes_loop.hermes_utils._log"):
+                                    with patch(
+                                        "hermes_loop.hermes_utils.time.time",
+                                        return_value=100.0,
+                                    ):
+                                        result = spawn_delegation_session(
+                                            iteration=1,
+                                            goal="test",
+                                            context="",
+                                            toolsets=["terminal"],
+                                            workdir=None,
+                                            timeout_seconds=30,
+                                            use_library=True,
+                                        )
+        assert "fallback from exception" in result["summary"]
+
+
+class TestSpawnDelegationSessionWorker:
+    """Tests for spawn_delegation_session -- worker URL mode."""
+
+    def test_worker_url_success(self):
+        raw_json = json.dumps({"response": "work done", "status": "ok"})
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch("urllib.request.urlopen") as mock_urlopen:
+                    mock_resp = MagicMock()
+                    mock_resp.read.return_value = raw_json.encode()
+                    mock_urlopen.return_value.__enter__.return_value = mock_resp
+                    with patch("hermes_loop.hermes_utils._log"):
+                        with patch(
+                            "hermes_loop.hermes_utils.time.time",
+                            side_effect=[100.0, 101.0],
+                        ):
+                            result = spawn_delegation_session(
+                                iteration=1,
+                                goal="test",
+                                context="",
+                                toolsets=["terminal"],
+                                workdir=None,
+                                timeout_seconds=30,
+                                worker_url="http://localhost:8080",
+                            )
+        assert result["summary"] == "work done"
+        assert result["exit_code"] == 0
+
+    def test_worker_url_non_dict_response(self):
+        raw_json = json.dumps(["item1", "item2"])
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch("urllib.request.urlopen") as mock_urlopen:
+                    mock_resp = MagicMock()
+                    mock_resp.read.return_value = raw_json.encode()
+                    mock_urlopen.return_value.__enter__.return_value = mock_resp
+                    with patch("hermes_loop.hermes_utils._log"):
+                        with patch(
+                            "hermes_loop.hermes_utils.time.time",
+                            side_effect=[100.0, 101.0],
+                        ):
+                            result = spawn_delegation_session(
+                                iteration=1,
+                                goal="test",
+                                context="",
+                                toolsets=["terminal"],
+                                workdir=None,
+                                timeout_seconds=30,
+                                worker_url="http://localhost:8080",
+                            )
+        # Non-dict response: the raw response is returned as string (Python repr)
+        assert "item1" in result["summary"]
+        assert "item2" in result["summary"]
+
+    def test_worker_url_error_response(self):
+        raw_json = json.dumps(
+            {"response": "failed", "error": "bad request", "status": "error"}
+        )
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch("urllib.request.urlopen") as mock_urlopen:
+                    mock_resp = MagicMock()
+                    mock_resp.read.return_value = raw_json.encode()
+                    mock_urlopen.return_value.__enter__.return_value = mock_resp
+                    with patch("hermes_loop.hermes_utils._log"):
+                        with patch(
+                            "hermes_loop.hermes_utils.time.time",
+                            side_effect=[100.0, 101.0],
+                        ):
+                            result = spawn_delegation_session(
+                                iteration=1,
+                                goal="test",
+                                context="",
+                                toolsets=["terminal"],
+                                workdir=None,
+                                timeout_seconds=30,
+                                worker_url="http://localhost:8080",
+                            )
+        assert result["exit_code"] == 1
+
+    def test_worker_url_exception(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "urllib.request.urlopen",
+                    side_effect=ConnectionError("connection refused"),
+                ):
+                    with patch("hermes_loop.hermes_utils._log"):
+                        with patch(
+                            "hermes_loop.hermes_utils.time.time",
+                            side_effect=[100.0, 100.5],
+                        ):
+                            result = spawn_delegation_session(
+                                iteration=1,
+                                goal="test",
+                                context="",
+                                toolsets=["terminal"],
+                                workdir=None,
+                                timeout_seconds=30,
+                                worker_url="http://localhost:8080",
+                            )
+        assert "WORKER FAILED" in result["summary"]
+        assert result["exit_code"] == 1
+        assert result["error"] is not None
+
+
+class TestSpawnDelegationSessionCLI:
+    """Tests for spawn_delegation_session -- CLI argument construction, truncation, edge cases."""
+
+    def test_truncation_and_encoding(self):
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("x" * 5000, 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value={
+                            "summary": "big output",
+                            "duration_seconds": 10.0,
+                            "error": None,
+                        },
+                    ):
+                        with patch(
+                            "hermes_loop.hermes_utils.classify_error", return_value=None
+                        ):
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils.time.time",
+                                    side_effect=[100.0, 110.0],
+                                ):
+                                    result = spawn_delegation_session(
+                                        iteration=1,
+                                        goal="test",
+                                        context="",
+                                        toolsets=["terminal"],
+                                        workdir=None,
+                                        timeout_seconds=30,
+                                        max_output_chars=100,
+                                    )
+        assert result["truncated"] is True
+        assert result["output_chars"] == 5000
+        assert result["chars_per_second"] == 500.0
+
+    def test_json_error_becomes_effective_error(self):
+        mock_parsed = {
+            "summary": "had error",
+            "duration_seconds": 1.0,
+            "error": "something went wrong",
+        }
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=('{"error":"something went wrong"}', 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=mock_parsed,
+                    ):
+                        with patch(
+                            "hermes_loop.hermes_utils.classify_error",
+                            return_value="execution",
+                        ):
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils.time.time",
+                                    return_value=100.0,
+                                ):
+                                    result = spawn_delegation_session(
+                                        iteration=1,
+                                        goal="test",
+                                        context="",
+                                        toolsets=["terminal"],
+                                        workdir=None,
+                                        timeout_seconds=30,
+                                    )
+        assert result["error"] == "something went wrong"
+        assert result["error_type"] == "execution"
+
+    def test_summary_is_string_when_json_summary_is_dict(self):
+        mock_parsed = {
+            "summary": {"nested": "object"},
+            "duration_seconds": 1.0,
+            "error": None,
+        }
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("output", 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=mock_parsed,
+                    ):
+                        with patch(
+                            "hermes_loop.hermes_utils.classify_error", return_value=None
+                        ):
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils.time.time",
+                                    return_value=100.0,
+                                ):
+                                    result = spawn_delegation_session(
+                                        iteration=1,
+                                        goal="test",
+                                        context="",
+                                        toolsets=["terminal"],
+                                        workdir=None,
+                                        timeout_seconds=30,
+                                    )
+        assert (
+            '"nested": "object"' in result["summary"] or "nested" in result["summary"]
+        )
+
+    def test_duration_zero_prevents_division_by_zero(self):
+        mock_parsed = {
+            "summary": "instant",
+            "duration_seconds": 0,
+            "error": None,
+        }
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("output", 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=mock_parsed,
+                    ):
+                        with patch(
+                            "hermes_loop.hermes_utils.classify_error", return_value=None
+                        ):
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils.time.time",
+                                    return_value=100.0,
+                                ):
+                                    result = spawn_delegation_session(
+                                        iteration=1,
+                                        goal="test",
+                                        context="",
+                                        toolsets=["terminal"],
+                                        workdir=None,
+                                        timeout_seconds=30,
+                                    )
+        assert result["chars_per_second"] == 0
+
+    def test_no_output_schema_skips_validation(self):
+        mock_parsed = {
+            "summary": "no schema",
+            "duration_seconds": 1.0,
+            "error": None,
+        }
+        with patch(
+            "hermes_loop.hermes_utils.find_hermes", return_value="/usr/bin/hermes"
+        ):
+            with patch(
+                "hermes_loop.hermes_utils._build_delegation_prompt",
+                return_value="prompt",
+            ):
+                with patch(
+                    "hermes_loop.hermes_utils._run_hermes_with_pty",
+                    return_value=("output", 0),
+                ):
+                    with patch(
+                        "hermes_loop.hermes_utils.extract_json_from_output",
+                        return_value=mock_parsed,
+                    ):
+                        with patch(
+                            "hermes_loop.hermes_utils.classify_error", return_value=None
+                        ):
+                            with patch("hermes_loop.hermes_utils._log"):
+                                with patch(
+                                    "hermes_loop.hermes_utils.time.time",
+                                    return_value=100.0,
+                                ):
+                                    result = spawn_delegation_session(
+                                        iteration=1,
+                                        goal="test",
+                                        context="",
+                                        toolsets=["terminal"],
+                                        workdir=None,
+                                        timeout_seconds=30,
+                                    )
+        # When output_schema is None, schema_valid/schema_error are still included
+        # (initialized as True/"", but not validated)
+        assert result.get("schema_valid") is True
+        assert result.get("schema_error") is None

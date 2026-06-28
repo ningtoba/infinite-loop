@@ -5,12 +5,14 @@ _handle_callbacks, _sleep_with_shutdown_check."""
 from __future__ import annotations
 
 import json
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from hermes_loop.iteration import (
     _sleep_with_shutdown_check,
+    _execute_iteration,
     _merge_worker_results,
     _handle_backoff,
     _detect_convergence,
@@ -932,6 +934,115 @@ class TestBuildIterationRecord:
                 )
         assert record["system"] == sys_diff
 
+    def test_record_with_stderr_and_schema(self):
+        """Single worker record includes stderr and schema fields when present."""
+        with patch("hermes_loop.iteration.get_system_usage", return_value={}):
+            with patch("hermes_loop.iteration.get_system_usage_diff", return_value={}):
+                record = _build_iteration_record(
+                    iteration_count=1,
+                    task_type="general",
+                    spawn_goal=MockGoalSpec(),
+                    goals_list=[],
+                    iteration_start_time="",
+                    total_duration=5,
+                    combined_summary="done",
+                    is_compacted=False,
+                    combined_error=None,
+                    all_results=[
+                        {
+                            "stderr": "some warnings",
+                            "schema_valid": True,
+                            "schema_error": None,
+                        }
+                    ],
+                    workers=1,
+                    toolsets=[],
+                    git_before={},
+                    git_after={},
+                    git=False,
+                    git_commit_hash=None,
+                    next_goal=None,
+                    next_context=None,
+                    resume=False,
+                    pass_session_id=False,
+                    state={},
+                    sys_before={},
+                )
+        assert record["stderr"] == "some warnings"
+        assert record["schema_valid"] is True
+
+    def test_record_with_schema_error(self):
+        """Single worker record includes schema_error when schema_valid is False."""
+        with patch("hermes_loop.iteration.get_system_usage", return_value={}):
+            with patch("hermes_loop.iteration.get_system_usage_diff", return_value={}):
+                record = _build_iteration_record(
+                    iteration_count=1,
+                    task_type="general",
+                    spawn_goal=MockGoalSpec(),
+                    goals_list=[],
+                    iteration_start_time="",
+                    total_duration=5,
+                    combined_summary="done",
+                    is_compacted=False,
+                    combined_error=None,
+                    all_results=[
+                        {
+                            "stderr": "",
+                            "schema_valid": False,
+                            "schema_error": "missing field X",
+                        }
+                    ],
+                    workers=1,
+                    toolsets=[],
+                    git_before={},
+                    git_after={},
+                    git=False,
+                    git_commit_hash=None,
+                    next_goal=None,
+                    next_context=None,
+                    resume=False,
+                    pass_session_id=False,
+                    state={},
+                    sys_before={},
+                )
+        assert record["schema_valid"] is False
+        assert record["schema_error"] == "missing field X"
+
+    def test_record_multi_worker_session_id_propagation(self):
+        """Multi-worker record maps spawned_session_ids to worker_results."""
+        with patch("hermes_loop.iteration.get_system_usage", return_value={}):
+            with patch("hermes_loop.iteration.get_system_usage_diff", return_value={}):
+                record = _build_iteration_record(
+                    iteration_count=1,
+                    task_type="general",
+                    spawn_goal=MockGoalSpec(),
+                    goals_list=[],
+                    iteration_start_time="",
+                    total_duration=5,
+                    combined_summary="done",
+                    is_compacted=False,
+                    combined_error=None,
+                    all_results=[
+                        {"worker_id": 0, "spawned_session_id": "sess_a"},
+                        {"worker_id": 1, "spawned_session_id": "sess_b"},
+                    ],
+                    workers=2,
+                    toolsets=[],
+                    git_before={},
+                    git_after={},
+                    git=False,
+                    git_commit_hash=None,
+                    next_goal=None,
+                    next_context=None,
+                    resume=False,
+                    pass_session_id=False,
+                    state={},
+                    sys_before={},
+                )
+        wr = record["worker_results"]
+        assert wr[0]["spawned_session_id"] == "sess_a"
+        assert wr[1]["spawned_session_id"] == "sess_b"
+
 
 # ===================================================================
 # _handle_notifications
@@ -1182,3 +1293,991 @@ class TestHandleCallbacks:
         assert "state" in payload
         assert "stats" in payload
         assert payload["state"]["status"] == "running"
+
+
+# ===================================================================
+# _merge_worker_results — soft error edge cases (uncovered branches)
+# ===================================================================
+
+
+class TestMergeWorkerResultsSoftEdgeCases:
+    """Edge cases in _is_soft_error that need specific inputs."""
+
+    def test_soft_error_failed_summary_with_output_gt_30(self):
+        "exit_code error, FAILED summary, output_len > 30 => soft (line 326)."
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "FAILED: something went wrong but output exists",
+                "duration_seconds": 10,
+                "error": "exit code 1",
+                "output": "A" * 40,
+                "next_goal": "",
+                "context": "",
+            }
+        ]
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state={"stats": {}},
+        )
+        assert result["combined_error"] is None  # soft error
+
+    def test_soft_error_via_next_goal_gt_30(self):
+        "exit_code error, FAILED summary, output_len <=30, next_goal > 30 => soft (line 330)."
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "FAILED: partial work",
+                "duration_seconds": 10,
+                "error": "exit code 1",
+                "output": "AB",
+                "next_goal": "A" * 40,
+                "context": "",
+            }
+        ]
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state={"stats": {}},
+        )
+        assert result["combined_error"] is None  # soft via next_goal
+
+    def test_soft_error_via_non_serious_error_type(self):
+        "exit_code error, non-serious error_type => soft (line 335)."
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "FAILED: something",
+                "duration_seconds": 10,
+                "error": "exit code 1",
+                "output": "AB",
+                "next_goal": "",
+                "error_type": "config-error",
+            }
+        ]
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state={"stats": {}},
+        )
+        assert result["combined_error"] is None  # soft via error_type
+
+    def test_soft_error_via_stderr_content(self):
+        "exit_code error, stderr > 50 chars and output_len > 5 => soft (line 340)."
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "FAILED: with stderr",
+                "duration_seconds": 10,
+                "error": "exit code 1",
+                "output": "X" * 10,
+                "next_goal": "",
+                "stderr": "Y" * 60,
+            }
+        ]
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state={"stats": {}},
+        )
+        assert result["combined_error"] is None  # soft via stderr
+
+    def test_multi_worker_serious_type_majority(self):
+        "2 workers, 1 hard + 1 soft, serious_type majority => hard error (line 375-380)."
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "FAILED: timeout",
+                "duration_seconds": 30,
+                "error": "timeout after 60s",
+                "output": "",
+                "next_goal": "",
+                "error_type": "timeout",
+            },
+            {
+                "worker_id": 1,
+                "summary": "FAILED: with exit code but work done",
+                "duration_seconds": 25,
+                "error": "exit code 1",
+                "output": "some work output here",
+                "next_goal": "",
+                "error_type": "timeout",
+            },
+        ]
+        state = {"stats": {"consecutive_successes": 3}, "error_type_counts": {}}
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state=state,
+        )
+        # Worker 0 has hard error (timeout, no output)
+        # Worker 1 has soft error (exit code with output, but error_type='timeout' is serious)
+        # Both have some error, num_hard=1 >= 2/2 => combined error
+        assert result["combined_error"] is not None
+
+    def test_no_error_defaults_to_unknown_error_type(self):
+        "Error without error_type defaults to 'unknown' primary_error_type."
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "FAILED",
+                "duration_seconds": 5,
+                "error": "something failed",
+                "output": "",
+                "next_goal": "",
+                "context": "",
+            }
+        ]
+        state = {"error_type_counts": {}}
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state=state,
+        )
+        assert result["primary_error_type"] == "unknown"
+        assert state["error_type_counts"]["unknown"] == 1
+
+
+# ===================================================================
+# _execute_iteration — heartbeat thread
+# ===================================================================
+
+
+class TestExecuteIterationHeartbeat:
+    """Test _execute_iteration heartbeat thread start/stop and single-worker retry."""
+
+    def make_minimal_args(self, **overrides) -> dict:
+        """Minimal keyword args for _execute_iteration."""
+        base = dict(
+            state={},
+            workers=1,
+            goals_list=[],
+            goals_index=0,
+            spawn_goal=MockGoalSpec(goal="test goal"),
+            iteration_count=1,
+            progressive_context="ctx",
+            toolsets=["terminal"],
+            workdir="/tmp",
+            evolve=False,
+            profile="default",
+            model="test-model",
+            provider="test-provider",
+            max_turns=10,
+            task_type="general",
+            failure_context="",
+            effective_worker_url="",
+            session_timeout=300,
+            max_output_chars=5000,
+            use_library=False,
+            pass_session_id=False,
+            checkpoints=False,
+            resume_session_id="",
+            skills="",
+            ignore_rules=False,
+            yolo=False,
+            ignore_user_config=False,
+            spawn_source="webhook",
+            safe_mode=False,
+            accept_hooks=True,
+            worktree=False,
+            continue_session=False,
+            prompt_suffix="",
+            max_retries=0,
+            retry_delay=0,
+            output_schema=None,
+            git=False,
+            store_git_diff=False,
+            heartbeat_timeout=0,
+            quiet=False,
+        )
+        base.update(overrides)
+        return base
+
+    def test_heartbeat_thread_started_and_stopped(self):
+        """Heartbeat thread is started on entry and stopped via event on exit."""
+        mock_event = MagicMock()
+        mock_thread = MagicMock()
+        with patch("hermes_loop.iteration.threading.Event", return_value=mock_event):
+            with patch(
+                "hermes_loop.iteration.threading.Thread", return_value=mock_thread
+            ) as mock_thread_cls:
+                with patch(
+                    "hermes_loop.iteration.spawn_delegation_session",
+                    return_value={"error": None, "summary": "ok"},
+                ):
+                    kwargs = self.make_minimal_args()
+                    _execute_iteration(**kwargs)
+
+        # Thread was created with daemon=True and target=_iteration_heartbeat
+        mock_thread_cls.assert_called_once()
+        call_args = mock_thread_cls.call_args[1]
+        assert call_args.get("daemon") is True
+        assert callable(call_args.get("target"))
+
+        # Event was set to stop the heartbeat
+        mock_event.set.assert_called_once()
+
+        # Thread was joined
+        mock_thread.join.assert_called_once_with(timeout=2)
+
+    def test_iteration_heartbeat_target(self):
+        """_iteration_heartbeat is the callable target of the created thread."""
+        with patch("hermes_loop.iteration._log"):
+            with patch(
+                "hermes_loop.iteration.threading.Event",
+                return_value=MagicMock(wait=MagicMock(return_value=True)),
+            ):
+                with patch("hermes_loop.iteration.threading.Thread") as mock_thread_cls:
+                    with patch(
+                        "hermes_loop.iteration.spawn_delegation_session",
+                        return_value={"error": None},
+                    ):
+                        kwargs = self.make_minimal_args()
+                        _execute_iteration(**kwargs)
+
+        thread_call_args = mock_thread_cls.call_args
+        target_fn = thread_call_args[1]["target"]
+        assert callable(target_fn)
+
+    def test_single_worker_no_retry_on_success(self):
+        """Single worker with no error returns immediately (no retry)."""
+        mock_result = {"error": None, "summary": "success", "output": "done"}
+        with patch("hermes_loop.iteration.threading.Event"):
+            with patch("hermes_loop.iteration.threading.Thread"):
+                with patch(
+                    "hermes_loop.iteration.spawn_delegation_session",
+                    return_value=mock_result,
+                ):
+                    kwargs = self.make_minimal_args()
+                    all_results, _, _ = _execute_iteration(**kwargs)
+
+        assert len(all_results) == 1
+        assert all_results[0]["error"] is None
+
+    def test_single_worker_retry_on_error(self):
+        """Single worker retries when result has error and max_retries > 0."""
+        mock_error_result = {"error": "exit code 1", "summary": "FAILED", "output": ""}
+        mock_success_result = {"error": None, "summary": "success", "output": "done"}
+
+        with patch("hermes_loop.iteration.threading.Event"):
+            with patch("hermes_loop.iteration.threading.Thread"):
+                with patch("time.sleep") as mock_sleep:
+                    with patch(
+                        "hermes_loop.iteration.spawn_delegation_session",
+                        side_effect=[mock_error_result, mock_success_result],
+                    ) as mock_spawn:
+                        kwargs = self.make_minimal_args(max_retries=1, retry_delay=5)
+                        all_results, _, _ = _execute_iteration(**kwargs)
+
+        assert mock_spawn.call_count == 2
+        assert len(all_results) == 1
+        assert all_results[0]["error"] is None
+        mock_sleep.assert_called_once_with(5)
+
+    def test_single_worker_retry_exhausted(self):
+        """Single worker stops retrying after max_retries attempts."""
+        mock_error_result = {"error": "exit code 1", "summary": "FAILED", "output": ""}
+
+        with patch("hermes_loop.iteration.threading.Event"):
+            with patch("hermes_loop.iteration.threading.Thread"):
+                with patch("time.sleep"):
+                    with patch(
+                        "hermes_loop.iteration.spawn_delegation_session",
+                        return_value=mock_error_result,
+                    ) as mock_spawn:
+                        kwargs = self.make_minimal_args(max_retries=2, retry_delay=1)
+                        all_results, _, _ = _execute_iteration(**kwargs)
+
+        assert mock_spawn.call_count == 3
+        assert all_results[0]["error"] == "exit code 1"
+
+    def test_single_worker_use_library_true(self):
+        """Single worker passes use_library=True to spawn_delegation_session."""
+        mock_result = {"error": None, "summary": "done"}
+        with patch("hermes_loop.iteration.threading.Event"):
+            with patch("hermes_loop.iteration.threading.Thread"):
+                with patch(
+                    "hermes_loop.iteration.spawn_delegation_session",
+                    return_value=mock_result,
+                ) as mock_spawn:
+                    kwargs = self.make_minimal_args(use_library=True)
+                    _execute_iteration(**kwargs)
+
+        mock_spawn.assert_called_once()
+        call_kwargs = mock_spawn.call_args[1]
+        assert call_kwargs.get("use_library") is True
+
+    def test_single_worker_retry_delay_zero(self):
+        """Single worker skips sleep when retry_delay is 0."""
+        mock_error = {"error": "exit code 1", "summary": "FAILED", "output": ""}
+        mock_success = {"error": None, "summary": "ok", "output": ""}
+
+        with patch("hermes_loop.iteration.threading.Event"):
+            with patch("hermes_loop.iteration.threading.Thread"):
+                with patch("time.sleep") as mock_sleep:
+                    with patch(
+                        "hermes_loop.iteration.spawn_delegation_session",
+                        side_effect=[mock_error, mock_success],
+                    ):
+                        kwargs = self.make_minimal_args(max_retries=1, retry_delay=0)
+                        _execute_iteration(**kwargs)
+
+        mock_sleep.assert_not_called()
+
+    def test_heartbeat_thread_daemon_flag(self):
+        """Heartbeat thread is created with daemon=True."""
+        mock_event = MagicMock(wait=MagicMock(return_value=True))
+        with patch("hermes_loop.iteration._log"):
+            with patch(
+                "hermes_loop.iteration.threading.Event", return_value=mock_event
+            ):
+                with patch("hermes_loop.iteration.threading.Thread") as mock_thread_cls:
+                    with patch(
+                        "hermes_loop.iteration.spawn_delegation_session",
+                        return_value={"error": None},
+                    ):
+                        kwargs = self.make_minimal_args()
+                        _execute_iteration(**kwargs)
+
+        thread_call_args = mock_thread_cls.call_args
+        assert thread_call_args[1].get("daemon") is True
+
+
+# ===================================================================
+# _execute_iteration — multi-worker library mode
+# ===================================================================
+
+
+class TestExecuteIterationMultiWorkerLibrary:
+    """Test _execute_iteration multi-worker with use_library=True."""
+
+    def make_minimal_args(self, **overrides) -> dict:
+        base = dict(
+            state={},
+            workers=2,
+            goals_list=[MockGoalSpec(goal="goal A"), MockGoalSpec(goal="goal B")],
+            goals_index=0,
+            spawn_goal=MockGoalSpec(goal="test goal"),
+            iteration_count=1,
+            progressive_context="ctx",
+            toolsets=["terminal"],
+            workdir="/tmp",
+            evolve=False,
+            profile="default",
+            model="test-model",
+            provider="test-provider",
+            max_turns=10,
+            task_type="general",
+            failure_context="",
+            effective_worker_url="",
+            session_timeout=300,
+            max_output_chars=5000,
+            use_library=True,
+            pass_session_id=False,
+            checkpoints=False,
+            resume_session_id="",
+            skills="",
+            ignore_rules=False,
+            yolo=False,
+            ignore_user_config=False,
+            spawn_source="webhook",
+            safe_mode=False,
+            accept_hooks=True,
+            worktree=False,
+            continue_session=False,
+            prompt_suffix="",
+            max_retries=0,
+            retry_delay=0,
+            output_schema=None,
+            git=False,
+            store_git_diff=False,
+            heartbeat_timeout=0,
+            quiet=False,
+        )
+        base.update(overrides)
+        return base
+
+    def test_library_mode_calls_run_library_workers_parallel(self):
+        """Library multi-worker calls _run_library_workers_parallel with correct tasks."""
+        mock_results = [
+            {"worker_id": 0, "error": None, "summary": "worker 0 done"},
+            {"worker_id": 1, "error": None, "summary": "worker 1 done"},
+        ]
+
+        with patch("hermes_loop.iteration.threading.Event"):
+            with patch("hermes_loop.iteration.threading.Thread"):
+                with patch(
+                    "hermes_loop.iteration._run_library_workers_parallel",
+                    return_value=mock_results,
+                ) as mock_run:
+                    with patch(
+                        "hermes_loop.iteration._build_delegation_prompt",
+                        return_value="prompt",
+                    ):
+                        kwargs = self.make_minimal_args()
+                        all_results, _, use_lib = _execute_iteration(**kwargs)
+
+        mock_run.assert_called_once()
+        tasks_arg = mock_run.call_args[0][0]
+        assert len(tasks_arg) == 2
+        assert use_lib is True
+        assert len(all_results) == 2
+
+    def test_library_mode_falls_back_on_failure(self):
+        """When library mode raises, falls back to ThreadPoolExecutor."""
+        with patch("hermes_loop.iteration.threading.Event"):
+            with patch("hermes_loop.iteration.threading.Thread"):
+                with patch(
+                    "hermes_loop.iteration._run_library_workers_parallel",
+                    side_effect=Exception("library error"),
+                ):
+                    with patch(
+                        "hermes_loop.iteration._build_delegation_prompt",
+                        return_value="prompt",
+                    ):
+                        with patch(
+                            "hermes_loop.iteration.concurrent.futures.ThreadPoolExecutor"
+                        ) as mock_executor:
+                            exec_instance = (
+                                mock_executor.return_value.__enter__.return_value
+                            )
+                            fut1 = MagicMock()
+                            fut1.result.return_value = {
+                                "error": None,
+                                "summary": "worker 0",
+                            }
+                            fut2 = MagicMock()
+                            fut2.result.return_value = {
+                                "error": None,
+                                "summary": "worker 1",
+                            }
+                            exec_instance.submit.side_effect = [fut1, fut2]
+                            # as_completed: just return the same dict keys (which are the futures)
+                            with patch(
+                                "hermes_loop.iteration.concurrent.futures.as_completed",
+                                side_effect=lambda futs: list(futs.keys()),
+                            ):
+                                kwargs = self.make_minimal_args()
+                                all_results, _, use_lib = _execute_iteration(**kwargs)
+
+        assert use_lib is False
+        assert len(all_results) == 2
+
+
+# ===================================================================
+# _execute_iteration — multi-worker ThreadPool fallback
+# ===================================================================
+
+
+class TestExecuteIterationMultiWorkerThreadPool:
+    """Test _execute_iteration multi-worker with default ThreadPool path."""
+
+    def make_minimal_args(self, **overrides) -> dict:
+        base = dict(
+            state={},
+            workers=2,
+            goals_list=[],
+            goals_index=0,
+            spawn_goal=MockGoalSpec(goal="test goal"),
+            iteration_count=1,
+            progressive_context="ctx",
+            toolsets=["terminal"],
+            workdir="/tmp",
+            evolve=False,
+            profile="default",
+            model="test-model",
+            provider="test-provider",
+            max_turns=10,
+            task_type="general",
+            failure_context="",
+            effective_worker_url="",
+            session_timeout=300,
+            max_output_chars=5000,
+            use_library=False,
+            pass_session_id=False,
+            checkpoints=False,
+            resume_session_id="",
+            skills="",
+            ignore_rules=False,
+            yolo=False,
+            ignore_user_config=False,
+            spawn_source="webhook",
+            safe_mode=False,
+            accept_hooks=True,
+            worktree=False,
+            continue_session=False,
+            prompt_suffix="",
+            max_retries=0,
+            retry_delay=0,
+            output_schema=None,
+            git=False,
+            store_git_diff=False,
+            heartbeat_timeout=0,
+            quiet=False,
+        )
+        base.update(overrides)
+        return base
+
+    def test_threadpool_submits_per_worker(self):
+        """ThreadPoolExecutor submits one task per worker."""
+        fut0 = MagicMock()
+        fut0.result.return_value = {
+            "error": None,
+            "summary": "worker 0",
+            "output": "",
+            "worker_id": 0,
+        }
+        fut1 = MagicMock()
+        fut1.result.return_value = {
+            "error": None,
+            "summary": "worker 1",
+            "output": "",
+            "worker_id": 1,
+        }
+
+        with patch("hermes_loop.iteration.threading.Event"):
+            with patch("hermes_loop.iteration.threading.Thread"):
+                with patch(
+                    "hermes_loop.iteration.concurrent.futures.ThreadPoolExecutor"
+                ) as mock_executor:
+                    exec_instance = mock_executor.return_value.__enter__.return_value
+                    exec_instance.submit.side_effect = [fut0, fut1]
+
+                    def as_completed_side_effect(futs):
+                        return list(futs.keys())
+
+                    with patch(
+                        "hermes_loop.iteration.concurrent.futures.as_completed",
+                        side_effect=as_completed_side_effect,
+                    ):
+                        kwargs = self.make_minimal_args(workers=2)
+                        all_results, _, _ = _execute_iteration(**kwargs)
+
+        assert len(all_results) == 2
+        assert all_results[0]["worker_id"] == 0
+        assert all_results[1]["worker_id"] == 1
+
+    def test_threadpool_worker_exception_caught(self):
+        """When a worker thread raises an exception, it's caught and recorded as error."""
+        fut_fail = MagicMock()
+        fut_fail.result.side_effect = RuntimeError("worker crashed")
+
+        with patch("hermes_loop.iteration.threading.Event"):
+            with patch("hermes_loop.iteration.threading.Thread"):
+                with patch(
+                    "hermes_loop.iteration.concurrent.futures.ThreadPoolExecutor"
+                ) as mock_executor:
+                    exec_instance = mock_executor.return_value.__enter__.return_value
+                    exec_instance.submit.return_value = fut_fail
+
+                    def as_completed_side_effect(futs):
+                        return list(futs.keys())
+
+                    with patch(
+                        "hermes_loop.iteration.concurrent.futures.as_completed",
+                        side_effect=as_completed_side_effect,
+                    ):
+                        kwargs = self.make_minimal_args(workers=2)
+                        all_results, _, _ = _execute_iteration(**kwargs)
+
+        assert len(all_results) == 1
+        assert "worker crashed" in all_results[0].get("error", "")
+
+    def test_threadpool_pending_iteration_cleared(self):
+        """State's pending_iteration is popped at the end."""
+        fut = MagicMock()
+        fut.result.return_value = {"error": None, "summary": "ok"}
+
+        with patch("hermes_loop.iteration.threading.Event"):
+            with patch("hermes_loop.iteration.threading.Thread"):
+                with patch(
+                    "hermes_loop.iteration.concurrent.futures.ThreadPoolExecutor"
+                ) as mock_executor:
+                    exec_instance = mock_executor.return_value.__enter__.return_value
+                    exec_instance.submit.return_value = fut
+
+                    def as_completed_side_effect(futs):
+                        return list(futs.keys())
+
+                    with patch(
+                        "hermes_loop.iteration.concurrent.futures.as_completed",
+                        side_effect=as_completed_side_effect,
+                    ):
+                        state = {"pending_iteration": True}
+                        kwargs = self.make_minimal_args(workers=1, state=state)
+                        _execute_iteration(**kwargs)
+
+        assert "pending_iteration" not in state
+
+
+# ===================================================================
+# _merge_worker_results — uncovered paths
+# ===================================================================
+
+
+class TestMergeWorkerResultsUncovered:
+    """Test _merge_worker_results paths not covered by existing tests."""
+
+    def test_soft_error_via_stderr(self):
+        """Soft error detected via stderr length > 50 and output_len > 5."""
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "completed task",
+                "duration_seconds": 30,
+                "error": "exit code 1",
+                "output": "some meaningful output here that exceeds 5 chars",
+                "stderr": "WARNING: deprecation warning, more stderr content over 50 chars",
+                "next_goal": "",
+                "context": "",
+            }
+        ]
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state={"stats": {}},
+        )
+        assert result["combined_error"] is None
+
+    def test_hard_error_multi_worker_all_errors(self):
+        """All workers with hard errors yields combined_error."""
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "FAILED: crashed",
+                "duration_seconds": 10,
+                "error": "timeout",
+                "output": "",
+                "next_goal": "",
+                "context": "",
+                "error_type": "timeout",
+            },
+            {
+                "worker_id": 1,
+                "summary": "FAILED: crashed",
+                "duration_seconds": 5,
+                "error": "network error",
+                "output": "",
+                "next_goal": "",
+                "context": "",
+                "error_type": "network",
+            },
+        ]
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state={"stats": {}, "error_type_counts": {}},
+        )
+        assert result["combined_error"] is not None
+        assert "timeout" in result["combined_error"]
+
+    def test_multi_worker_mixed_errors_serious_majority(self):
+        """All workers with errors, but some soft; serious types > half: combined_error (lines 375-380)."""
+        # 3 workers. Worker 0: hard error, timeout (serious).
+        # Worker 1: soft error (exit code with output), timeout (serious).
+        # Worker 2: soft error (exit code, non-FAILED summary but generic error_type).
+        # num_hard=1, num_with_any_error=3, serious_count=2 >= 1.5 → combined_error
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "FAILED: timeout",
+                "duration_seconds": 10,
+                "error": "timeout error",
+                "output": "",
+                "next_goal": "",
+                "context": "",
+                "error_type": "timeout",
+            },
+            {
+                "worker_id": 1,
+                "summary": "Some work partially done",
+                "duration_seconds": 8,
+                "error": "exit code 1",
+                "output": "some meaningful output that exceeds 30 chars of length here",
+                "next_goal": "",
+                "context": "",
+                "error_type": "timeout",
+            },
+            {
+                "worker_id": 2,
+                "summary": "FAILED: generic",
+                "duration_seconds": 5,
+                "error": "exit code 1",
+                "output": "",
+                "next_goal": "",
+                "context": "",
+                "error_type": "generic",
+            },
+        ]
+        # Now: num_workers=3, num_hard=1 (worker 0 is hard), num_with_any_error=3
+        # Not all hard (1 != 3), so falls to elif
+        # serious_count: workers 0 (timeout) + worker 1 (timeout) = 2
+        # num_workers/2=1.5, 2 >= 1.5 → True → combined_error = "; ".join(hard_errors)
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state={"stats": {}, "error_type_counts": {}},
+        )
+        assert result["combined_error"] is not None
+        assert "timeout error" in result["combined_error"]
+
+    def test_mixed_errors_no_combined_error(self):
+        """Not all workers have errors, and serious types <= half: no combined_error."""
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "FAILED: timeout",
+                "duration_seconds": 10,
+                "error": "exit code 1",
+                "output": "short",
+                "next_goal": "",
+                "context": "",
+                "error_type": "timeout",
+            },
+            {
+                "worker_id": 1,
+                "summary": "FAILED: generic",
+                "duration_seconds": 5,
+                "error": "exit code 1",
+                "output": "",
+                "next_goal": "",
+                "context": "",
+                "error_type": "generic",
+            },
+            {
+                "worker_id": 2,
+                "summary": "completed work",
+                "duration_seconds": 15,
+                "error": None,
+                "output": "useful output",
+                "next_goal": "",
+                "context": "",
+            },
+        ]
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state={"stats": {}, "error_type_counts": {}},
+        )
+        assert result["combined_error"] is None
+
+    def test_next_context_multi_worker_multiple_contexts(self):
+        """Multiple workers with context get Worker # labels."""
+        all_results = [
+            {
+                "worker_id": 0,
+                "summary": "done",
+                "duration_seconds": 10,
+                "error": None,
+                "output": "",
+                "next_goal": "next0",
+                "context": "Context from worker zero",
+            },
+            {
+                "worker_id": 1,
+                "summary": "done",
+                "duration_seconds": 20,
+                "error": None,
+                "output": "",
+                "next_goal": "next1",
+                "context": "Context from worker one",
+            },
+            {
+                "worker_id": 2,
+                "summary": "done",
+                "duration_seconds": 5,
+                "error": None,
+                "output": "",
+                "next_goal": "next2",
+                "context": "Context from worker two",
+            },
+        ]
+        result = _merge_worker_results(
+            all_results=all_results,
+            max_output_chars=5000,
+            consecutive_errors=0,
+            state={"stats": {}},
+        )
+        assert "[Worker #0]" in result["next_context"]
+        assert "[Worker #1]" in result["next_context"]
+        assert "[Worker #2]" in result["next_context"]
+
+
+# ===================================================================
+# _handle_callbacks — additional paths
+# ===================================================================
+
+
+class TestHandleCallbacksAdditional:
+    """Test _handle_callbacks paths not covered by existing tests."""
+
+    def test_http_callback_without_state(self):
+        """HTTP callback without state sends just the record as payload."""
+        with patch("urllib.request.Request") as mock_request:
+            mock_request.return_value = MagicMock()
+            with patch("urllib.request.urlopen") as mock_urlopen:
+                mock_urlopen.return_value.__enter__.return_value.status = 200
+                _handle_callbacks(
+                    http_callback="http://example.com/cb",
+                    record={"n": 1, "summary": "test"},
+                    notify_cmd=None,
+                    on_error_cmd=None,
+                    combined_error=None,
+                    state=None,
+                )
+
+        mock_request.assert_called_once()
+        call_args, call_kwargs = mock_request.call_args
+        payload_body = call_kwargs.get("data") or call_args[1]
+        payload = json.loads(payload_body.decode("utf-8"))
+        assert "state" not in payload
+        assert payload["n"] == 1
+
+    def test_http_callback_with_state_builds_full_payload(self):
+        """HTTP callback with state builds full payload dict with state and stats."""
+        state = {
+            "status": "running",
+            "total_iterations": 5,
+            "max_iterations": 100,
+            "started_at": "2026-01-01T00:00:00",
+            "last_updated": "2026-01-01T01:00:00",
+            "cooldown": 0,
+            "initial_command": "fix bugs",
+            "evolved_goal": "",
+            "stats": {
+                "consecutive_errors": 0,
+                "success_count": 4,
+                "error_count": 1,
+                "total_duration_seconds": 300,
+                "avg_duration_seconds": 60,
+            },
+            "eta": {"remaining_formatted": "5m"},
+        }
+        record = {"n": 1, "summary": "iteration done", "system": {"cpu": 0.5}}
+
+        with patch("urllib.request.Request") as mock_request:
+            mock_request.return_value = MagicMock()
+            with patch("urllib.request.urlopen") as mock_urlopen:
+                mock_urlopen.return_value.__enter__.return_value.status = 200
+                _handle_callbacks(
+                    http_callback="http://example.com/cb",
+                    record=record,
+                    notify_cmd=None,
+                    on_error_cmd=None,
+                    combined_error=None,
+                    state=state,
+                )
+
+        call_args, call_kwargs = mock_request.call_args
+        payload_body = call_kwargs.get("data") or call_args[1]
+        payload = json.loads(payload_body.decode("utf-8"))
+
+        assert "iteration" in payload
+        assert "state" in payload
+        assert "stats" in payload
+        assert "system" in payload
+        assert "pid" in payload
+        assert payload["state"]["status"] == "running"
+        assert payload["stats"]["success_count"] == 4
+
+    def test_notify_cmd_subprocess_run(self):
+        """notify_cmd runs subprocess with record JSON on stdin."""
+        with patch(
+            "hermes_loop.iteration.subprocess.run",
+            return_value=MagicMock(returncode=0),
+        ) as mock_run:
+            _handle_callbacks(
+                http_callback="",
+                record={"n": 1, "summary": "done"},
+                notify_cmd="echo notify",
+                on_error_cmd=None,
+                combined_error=None,
+                state=None,
+            )
+
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args
+        assert call_args[0][0] == ["sh", "-c", "echo notify"]
+        assert call_args[1].get("input") is not None
+        assert call_args[1].get("timeout") == 30
+        assert call_args[1].get("capture_output") is True
+
+    def test_on_error_cmd_subprocess_run(self):
+        """on_error_cmd runs subprocess with record JSON on stdin."""
+        with patch(
+            "hermes_loop.iteration.subprocess.run",
+            return_value=MagicMock(returncode=0),
+        ) as mock_run:
+            _handle_callbacks(
+                http_callback="",
+                record={"n": 2, "summary": "FAILED"},
+                notify_cmd=None,
+                on_error_cmd="echo on-error",
+                combined_error="timeout",
+                state=None,
+            )
+
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args
+        assert call_args[0][0] == ["sh", "-c", "echo on-error"]
+        assert call_args[1].get("input") is not None
+
+    def test_on_error_cmd_skipped_without_error(self):
+        """on_error_cmd is not run when combined_error is None."""
+        with patch("hermes_loop.iteration.subprocess.run") as mock_run:
+            _handle_callbacks(
+                http_callback="",
+                record={"n": 3},
+                notify_cmd=None,
+                on_error_cmd="echo on-error",
+                combined_error=None,
+                state=None,
+            )
+        mock_run.assert_not_called()
+
+    def test_on_error_cmd_timeout_exception(self):
+        """on_error_cmd subprocess.TimeoutExpired is caught and logged."""
+        with patch(
+            "hermes_loop.iteration.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("cmd", 30),
+        ):
+            with patch("hermes_loop.iteration._log") as mock_log:
+                _handle_callbacks(
+                    http_callback="",
+                    record={"n": 4},
+                    notify_cmd=None,
+                    on_error_cmd="echo on-error",
+                    combined_error="timeout",
+                    state=None,
+                )
+        mock_log.assert_called_once()
+        assert "[ON-ERR]" in mock_log.call_args[0][0]
+
+    def test_on_error_cmd_oserror_exception(self):
+        """on_error_cmd OSError is caught and logged."""
+        with patch(
+            "hermes_loop.iteration.subprocess.run",
+            side_effect=OSError("permission denied"),
+        ):
+            with patch("hermes_loop.iteration._log") as mock_log:
+                _handle_callbacks(
+                    http_callback="",
+                    record={"n": 5},
+                    notify_cmd=None,
+                    on_error_cmd="echo on-error",
+                    combined_error="timeout",
+                    state=None,
+                )
+        mock_log.assert_called_once()
+        assert "[ON-ERR]" in mock_log.call_args[0][0]

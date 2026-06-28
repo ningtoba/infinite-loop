@@ -3,6 +3,7 @@
 import os
 import signal
 import sys
+import time
 import subprocess as _subprocess
 from datetime import datetime, timezone
 
@@ -52,11 +53,30 @@ def _handle_shutdown(signum, frame):
         except Exception:
             pass
 
+    pgid = None
     try:
-        # Kill only descendant processes of this daemon, not all hermes instances
+        # Kill descendant processes — try SIGTERM first, then SIGKILL
+        # Kill the process group for immediate children, then pkill -P for descendants
+        import signal as _sig
+
+        try:
+            pgid = os.getpgid(os.getpid())
+            os.killpg(pgid, _sig.SIGTERM)
+        except (ProcessLookupError, OSError, PermissionError):
+            pass
+        _subprocess.run(
+            ["pkill", "-15", "-P", str(os.getpid())], capture_output=True, timeout=3
+        )
+        time.sleep(2)
+        # Force-kill any remaining
         _subprocess.run(
             ["pkill", "-9", "-P", str(os.getpid())], capture_output=True, timeout=3
         )
+        if pgid is not None:
+            try:
+                os.killpg(pgid, _sig.SIGKILL)
+            except (ProcessLookupError, OSError, PermissionError):
+                pass
     except Exception:
         pass
 

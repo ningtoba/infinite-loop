@@ -128,6 +128,8 @@ def _adapt_to_error(
             )
         elif error_type == "network":
             new_cooldown = min(300, max(cooldown, cooldown * 4))
+            if new_cooldown < 30:
+                new_cooldown = 30
             new_mode = "fixed"
             actions.append(
                 f"[MITIGATION] Network errors: elevated cooldown to {new_cooldown}s"
@@ -138,6 +140,8 @@ def _adapt_to_error(
             )
         elif error_type == "unknown":
             new_cooldown = min(120, max(cooldown, cooldown * 2))
+            if new_cooldown < 15:
+                new_cooldown = 15
             new_mode = "fixed"
             actions.append(
                 f"[MITIGATION] Unknown errors: elevated cooldown to {new_cooldown}s"

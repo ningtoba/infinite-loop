@@ -383,8 +383,10 @@ def _merge_worker_results(
         # else: some workers succeeded or only had soft errors — not a failure
 
     primary_error_type = None
-    consecutive_successes = 0
+    # consecutive_successes: read from stats sub-dict for proper ledger resume
+    consecutive_successes = state.get("stats", {}).get("consecutive_successes", 0)
     if combined_error:
+        consecutive_successes = 0  # reset on error
         error_types_seen = []
         for r in all_results:
             et = r.get("error_type")
@@ -405,7 +407,7 @@ def _merge_worker_results(
             f"(total: {state['error_type_counts'][primary_error_type]})"
         )
     else:
-        consecutive_successes = state.get("consecutive_successes", 0) + 1
+        consecutive_successes = consecutive_successes + 1
 
     consecutive_errors = 0 if not combined_error else consecutive_errors + 1
 

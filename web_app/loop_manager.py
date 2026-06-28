@@ -381,12 +381,15 @@ class LoopManager:
         if m:
             self._live_iteration["error_type"] = m.group(1)
 
-        # Store per-worker log line
+        # Store per-worker log line (skip for TERM lines — already stored as terminal content)
         if wid and wid in self._worker_logs:
-            entry = {"timestamp": ts, "message": text}
-            self._worker_logs[wid].append(entry)
-            if len(self._worker_logs[wid]) > 200:
-                self._worker_logs[wid] = self._worker_logs[wid][-200:]
+            # Check if this is a TERM line (already stored in worker_term above)
+            _is_term_line = bool(re.search(r"\[TERM\s*\(worker", text))
+            if not _is_term_line:
+                entry = {"timestamp": ts, "message": text}
+                self._worker_logs[wid].append(entry)
+                if len(self._worker_logs[wid]) > 200:
+                    self._worker_logs[wid] = self._worker_logs[wid][-200:]
 
         # Keep worker list in sync
         self._live_iteration["workers"] = list(self._worker_states.values())

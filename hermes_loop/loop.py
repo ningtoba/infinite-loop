@@ -224,6 +224,7 @@ def run_loop(
     iteration_count = state["total_iterations"]
     existing_summaries = [it.get("summary", "") for it in state.get("iterations", [])]
     consecutive_errors = state.get("stats", {}).get("consecutive_errors", 0)
+    consecutive_successes = state.get("stats", {}).get("consecutive_successes", 0)
     consecutive_idle = 0
 
     # Pass original baseline values to error_recovery for mitigation comparisons
@@ -726,6 +727,10 @@ def run_loop(
             state["last_updated"] = datetime.now(timezone.utc).isoformat()
             state["consecutive_successes"] = consecutive_successes
             state["consecutive_errors"] = consecutive_errors
+            state.setdefault("stats", {})["consecutive_errors"] = consecutive_errors
+            state.setdefault("stats", {})[
+                "consecutive_successes"
+            ] = consecutive_successes
             write_ledger(state)
             write_status_file(status_file, state, iteration_count, "reloading")
             if worker_manager:
@@ -955,6 +960,7 @@ def run_loop(
 
         state["consecutive_successes"] = consecutive_successes
         state.setdefault("stats", {})["consecutive_errors"] = consecutive_errors
+        state.setdefault("stats", {})["consecutive_successes"] = consecutive_successes
 
         for action in adapt_actions:
             _log(f"[AUTO-RECOVERY] {action}")

@@ -4,6 +4,24 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.38.0] — 2026-06-28
+
+### Fixed
+- **`web_app/server.py` — Server shutdown hang on background tasks**: Replaced
+  `asyncio.gather()` (which blocks forever on infinite-loop tasks) with
+  `asyncio.wait(timeout=5.0)` so the shutdown handler reliably completes
+  within 5 seconds even when background pollers refuse to stop.
+- **`web_app/loop_manager.py` — Redundant local `import subprocess`**: Moved
+  `subprocess` import to the module top level; removed the per-call import
+  inside `_kill_stale_daemons()`.
+- **`web_app/server.py` — Redundant local `import os`**: `os` is already
+  imported at module top level; removed the per-handler import in
+  `reset_ledger()`.
+- **`hermes_loop/dashboard.py` — Cooldown falsy-value fallthrough**: Replaced
+  `state.get("cooldown", 0) or stats.get(...)` with explicit two-step lookup
+  so that a cooldown value of `0` (disabled) is correctly displayed as
+  "None" rather than silently falling through to the stats sub-dict.
+
 ## [14.37.0] — 2026-06-28
 
 ### Fixed

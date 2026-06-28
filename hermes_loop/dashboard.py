@@ -678,7 +678,9 @@ def _generate_status_html(state: dict, compact: bool = False) -> str:
         elif remaining <= 0:
             eta_text = "Done"
 
-    cooldown_val = state.get("cooldown", 0) or stats.get("cooldown", 0)
+    cooldown_val = state.get("cooldown", 0)
+    if not cooldown_val:
+        cooldown_val = stats.get("cooldown", 0)
     cooldown_text = f"{cooldown_val}s" if cooldown_val else "None"
     cooldown_cls = "cooldown-active" if cooldown_val else "cooldown-idle"
 

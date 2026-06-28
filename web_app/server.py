@@ -146,8 +146,6 @@ async def resume_loop():
 @app.post("/api/loop/reset")
 async def reset_ledger():
     """Reset the ledger — deletes iteration history so the next start is fresh."""
-    import os
-
     ledger_path = "/tmp/infinite-loop-state.json"
     lock_path = "/tmp/infinite-loop-state.lock"
     try:
@@ -367,7 +365,15 @@ async def shutdown():
     for task in set(_background_tasks):
         task.cancel()
     if _background_tasks:
-        await asyncio.gather(*_background_tasks, return_exceptions=True)
+        # Use wait() with timeout instead of gather() — _status_poller is
+        # an infinite loop that never finishes on its own. Cancel + wait
+        # with timeout ensures we don't hang the server shutdown.
+        done, pending = await asyncio.wait(
+            _background_tasks, timeout=5.0, return_when=asyncio.ALL_COMPLETED
+        )
+        # Cancel any tasks that didn't finish in time
+        for task in pending:
+            task.cancel()
     _background_tasks.clear()
 
 

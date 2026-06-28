@@ -1,7 +1,6 @@
 """Error classification and progress classification utilities."""
 
 
-
 def classify_error(error_str: str | None) -> str | None:
     """Categorize an error message for better diagnostics.
 

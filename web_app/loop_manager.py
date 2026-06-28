@@ -5,6 +5,7 @@ import json
 import os
 import re
 import signal
+import subprocess
 import sys
 from datetime import datetime, timezone
 from typing import Any
@@ -46,8 +47,6 @@ class LoopManager:
         Only targets processes whose full command line contains
         ``-m hermes_loop --run`` (the exact daemon invocation pattern).
         """
-        import subprocess
-
         try:
             r = subprocess.run(
                 ["pkill", "-f", r"python.*-m\s+hermes_loop.*--run"],

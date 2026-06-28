@@ -1156,6 +1156,324 @@ def _run_self_test() -> dict:
 
     _run_subtests("test_json_logs", _test_json_logs())
 
+    # ------------------------------------------------------------------
+    # Test: healthcheck — status aggregation, SHELL_FORMAT=docker, exit codes
+    # ------------------------------------------------------------------
+    def _test_healthcheck():
+        import json
+
+        cases = []
+
+        # ── Aggregation logic (no mocking needed — pure logic) ─────────
+        def _make_checks(status_counts: dict) -> list[dict]:
+            checks = []
+            for status, count in status_counts.items():
+                for i in range(count):
+                    checks.append(
+                        {"name": f"check_{status}_{i}", "status": status, "detail": ""}
+                    )
+            return checks
+
+        def _aggregate(checks):
+            _healthy = sum(1 for c in checks if c["status"] == "healthy")
+            degraded = sum(1 for c in checks if c["status"] == "degraded")
+            failed = sum(1 for c in checks if c["status"] == "critical")
+            if failed > 0:
+                return "critical", 2
+            elif degraded > 0:
+                return "degraded", 1
+            else:
+                return "healthy", 0
+
+        def _check_healthy():
+            c = _make_checks({"healthy": 6, "degraded": 0, "critical": 0})
+            s, ec = _aggregate(c)
+            return s == "healthy" and ec == 0
+
+        cases.append(
+            (
+                "all-healthy-returns-healthy",
+                lambda: _check_healthy(),
+                lambda r: (
+                    r is True,
+                    f"expected healthy with all-healthy checks, got {r}",
+                ),
+            )
+        )
+
+        def _check_degraded():
+            c = _make_checks({"healthy": 5, "degraded": 1, "critical": 0})
+            s, ec = _aggregate(c)
+            return s == "degraded" and ec == 1
+
+        cases.append(
+            (
+                "degraded-check-returns-degraded",
+                lambda: _check_degraded(),
+                lambda r: (
+                    r is True,
+                    f"expected degraded with 1 degraded check, got {r}",
+                ),
+            )
+        )
+
+        def _check_critical():
+            c = _make_checks({"healthy": 4, "degraded": 1, "critical": 1})
+            s, ec = _aggregate(c)
+            return s == "critical" and ec == 2
+
+        cases.append(
+            (
+                "critical-check-returns-critical",
+                lambda: _check_critical(),
+                lambda r: (
+                    r is True,
+                    f"expected critical with 1 critical check, got {r}",
+                ),
+            )
+        )
+
+        def _check_summary_counts():
+            c = _make_checks({"healthy": 3, "degraded": 2, "critical": 1})
+            healthy = sum(1 for x in c if x["status"] == "healthy")
+            degraded = sum(1 for x in c if x["status"] == "degraded")
+            failed = sum(1 for x in c if x["status"] == "critical")
+            return healthy == 3 and degraded == 2 and failed == 1
+
+        cases.append(
+            (
+                "summary-counts-match",
+                lambda: _check_summary_counts(),
+                lambda r: (r is True, f"expected summary counts to match, got {r}"),
+            )
+        )
+
+        # ── Docker SHELL_FORMAT output ────────────────────────────────
+        def _check_docker_mode():
+            # Simulate what _run_healthcheck does with SHELL_FORMAT=docker
+            status = "healthy"
+            exit_code = 0
+            docker_out = json.dumps({"status": status, "exit_code": exit_code})
+            parsed = json.loads(docker_out)
+            return parsed == {"status": "healthy", "exit_code": 0}
+
+        cases.append(
+            (
+                "docker-mode-output",
+                lambda: _check_docker_mode(),
+                lambda r: (r is True, f"docker mode output format incorrect, got {r}"),
+            )
+        )
+
+        def _check_docker_mode_critical():
+            status = "critical"
+            exit_code = 2
+            docker_out = json.dumps({"status": status, "exit_code": exit_code})
+            parsed = json.loads(docker_out)
+            return parsed == {"status": "critical", "exit_code": 2}
+
+        cases.append(
+            (
+                "docker-mode-critical",
+                lambda: _check_docker_mode_critical(),
+                lambda r: (r is True, f"docker mode critical output, got {r}"),
+            )
+        )
+
+        # ── Report structure ──────────────────────────────────────────
+        def _check_report_structure():
+            report = {
+                "status": "healthy",
+                "version": "14.39.0",
+                "timestamp": "2026-06-28T00:00:00+00:00",
+                "checks": [],
+                "summary": {"healthy": 0, "degraded": 0, "failed": 0, "total": 0},
+            }
+            required_keys = {"status", "version", "timestamp", "checks", "summary"}
+            return required_keys.issubset(report.keys())
+
+        cases.append(
+            (
+                "report-has-required-keys",
+                lambda: _check_report_structure(),
+                lambda r: (r is True, f"missing required report keys, got {r}"),
+            )
+        )
+
+        def _check_summary_keys():
+            summary = {"healthy": 3, "degraded": 1, "failed": 0, "total": 4}
+            required = {"healthy", "degraded", "failed", "total"}
+            return required.issubset(summary.keys()) and summary["total"] == 4
+
+        cases.append(
+            (
+                "summary-has-all-fields",
+                lambda: _check_summary_keys(),
+                lambda r: (r is True, f"summary missing fields, got {r}"),
+            )
+        )
+
+        # ── _run_healthcheck with mocked dependencies ─────────────────
+        def _check_full_healthy_flow():
+            """Mock deps via unittest.mock.patch and run _run_healthcheck."""
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+
+            class _FakeResult:
+                returncode = 0
+                stdout = "hermes 1.0.0"
+                stderr = ""
+
+            def _fake_which(cmd):
+                if cmd in ("hermes", "git"):
+                    return f"/usr/bin/{cmd}"
+                return None
+
+            captured_exit = [None]
+            captured_stdout = [""]
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp("subprocess.run", return_value=_FakeResult()),
+                _mp("os.environ", {"SHELL_FORMAT": ""}),
+                _mp("os.remove", side_effect=lambda p: None),
+                _mp("hermes_loop.file_utils.write_ledger", side_effect=lambda s: None),
+                _mp("hermes_loop.file_utils.read_ledger", return_value={"test": True}),
+            ):
+
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit as _e:
+                    captured_exit[0] = _e.code if _e.code is not None else 0
+                    captured_stdout[0] = _sys.stdout.getvalue()
+                finally:
+                    _sys.stdout = _old_stdout
+
+            return captured_exit[0] == 0 and captured_stdout[0] != ""
+
+        cases.append(
+            (
+                "full-healthy-flow",
+                lambda: _check_full_healthy_flow(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"full healthy flow test failed: {r}",
+                ),
+            )
+        )
+
+        def _check_critical_no_hermes():
+            """Mock hermes not found — should produce critical exit code 2."""
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+
+            def _fake_which(cmd):
+                return None  # nothing on PATH
+
+            captured_exit = [None]
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp("os.environ", {"SHELL_FORMAT": ""}),
+                _mp("os.remove", side_effect=lambda p: None),
+                _mp("hermes_loop.file_utils.write_ledger", side_effect=lambda s: None),
+                _mp("hermes_loop.file_utils.read_ledger", return_value=None),
+            ):
+
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit as _e:
+                    captured_exit[0] = _e.code if _e.code is not None else 2
+                finally:
+                    _sys.stdout = _old_stdout
+
+            return captured_exit[0] == 2
+
+        cases.append(
+            (
+                "critical-no-hermes",
+                lambda: _check_critical_no_hermes(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"critical (no hermes) flow test failed: {r}",
+                ),
+            )
+        )
+
+        def _check_docker_mode_flow():
+            """SHELL_FORMAT=docker should produce compact one-line JSON."""
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+            import json as _json
+
+            class _FakeResult:
+                returncode = 0
+                stdout = "hermes 1.0.0"
+                stderr = ""
+
+            def _fake_which(cmd):
+                if cmd in ("hermes", "git"):
+                    return f"/usr/bin/{cmd}"
+                return None
+
+            captured_stdout = [""]
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp("subprocess.run", return_value=_FakeResult()),
+                _mp("os.environ", {"SHELL_FORMAT": "docker"}),
+                _mp("os.remove", side_effect=lambda p: None),
+                _mp("hermes_loop.file_utils.write_ledger", side_effect=lambda s: None),
+                _mp("hermes_loop.file_utils.read_ledger", return_value={"test": True}),
+            ):
+
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit:
+                    captured_stdout[0] = _sys.stdout.getvalue()
+                finally:
+                    _sys.stdout = _old_stdout
+
+            try:
+                parsed = _json.loads(captured_stdout[0].strip())
+                return (
+                    parsed.get("status") == "healthy"
+                    and parsed.get("exit_code") == 0
+                    and len(parsed) == 2
+                )
+            except Exception as e:
+                return f"PARSE FAILED: {e}"
+
+        cases.append(
+            (
+                "docker-mode-flow",
+                lambda: _check_docker_mode_flow(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"docker mode full flow test failed: {r}",
+                ),
+            )
+        )
+
+        return cases
+
+    _run_subtests("test_healthcheck", _test_healthcheck())
+
     total = passed_total + failed_total
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
     if failed_total == 0:

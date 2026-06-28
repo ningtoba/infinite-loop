@@ -23,6 +23,7 @@ from .heartbeat import (
     _kill_session,
     _cleanup_heartbeat_file,
 )
+from .preflight import hermes_flag_supported
 
 # Regex for stripping ANSI escape codes, TUI control chars, and carriage returns
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\].*?\x07|\x1b\[[0-9]*[KJhlsu]|\r")
@@ -708,6 +709,10 @@ def spawn_delegation_session(
         cmd.append("--worktree")
     if continue_session:
         cmd.append("--continue")
+
+    # Version-gated flags: only add --session-timeout if hermes supports it
+    if hermes_flag_supported("--session-timeout"):
+        cmd.extend(["--session-timeout", str(timeout_seconds)])
 
     worker_tag = f" (worker #{worker_id})" if worker_id is not None else ""
     _log(f"[SPAWN{worker_tag}] hermes chat -q -t {tools_str} (iter #{iteration})")

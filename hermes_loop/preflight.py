@@ -1,13 +1,102 @@
-"""Preflight health checks (v14.38.0)."""
+"""Preflight health checks (v14.39.0) + Hermes version detection utility."""
 
 import json
 import os
+import re
 import shutil
 import socket as _sock
 import subprocess
 
 from .config import SENTINEL_PATH_DEFAULT
 from .file_utils import _log
+
+# ---------------------------------------------------------------------------
+# Hermes version detection — cached, lazy, module-level
+# ---------------------------------------------------------------------------
+
+_HERMES_VERSION_CACHE: tuple[int, int] | None = None
+"""Cached (major, minor) tuple from the installed hermes binary. None until
+:func:`_get_hermes_version_cached` is called at least once."""
+
+# Map of hermes chat -q CLI flags to the minimum Hermes version that supports
+# them.  When adding a new flag, add its entry here rather than guessing.
+# Key: the flag name as passed on the CLI (e.g. "--session-timeout").
+# Value: (major, minor) minimum version tuple.
+_HERMES_FLAG_MIN_VERSIONS: dict[str, tuple[int, int]] = {
+    # --session-timeout was removed from hermes chat in v0.17.0 (it's now
+    # controlled internally by the daemon via subprocess timeout_seconds).
+    # Define the minimum version here for forward compatibility — if a future
+    # Hermes re-adds it, bump the tuple to whatever that minimum is.
+    # "--session-timeout": (0, 17),
+}
+
+# Regex to extract (major, minor) from "Hermes Agent v<major>.<minor>.<patch>"
+_VERSION_RE = re.compile(r"Hermes Agent v(\d+)\.(\d+)")
+
+
+def _get_hermes_version_cached() -> tuple[int, int] | None:
+    """Return cached (major, minor) of the installed Hermes binary.
+
+    Runs ``hermes --version`` once and caches the parsed result in a
+    module-level variable.  Subsequent calls return the cached tuple
+    instantly without spawning a subprocess.
+
+    Returns ``None`` if hermes is not on PATH or the version string
+    cannot be parsed.
+    """
+    global _HERMES_VERSION_CACHE
+    if _HERMES_VERSION_CACHE is not None:
+        return _HERMES_VERSION_CACHE
+
+    hermes = shutil.which("hermes")
+    if not hermes:
+        _HERMES_VERSION_CACHE = None
+        return None
+
+    try:
+        r = subprocess.run(
+            [hermes, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        line = (r.stdout or "").strip()
+        m = _VERSION_RE.search(line)
+        if m:
+            _HERMES_VERSION_CACHE = (int(m.group(1)), int(m.group(2)))
+            return _HERMES_VERSION_CACHE
+    except (subprocess.SubprocessError, OSError, ValueError):
+        pass
+
+    _HERMES_VERSION_CACHE = None
+    return None
+
+
+def hermes_version_ge(major: int, minor: int) -> bool:
+    """Return True if the installed Hermes version is >= (major, minor).
+
+    Uses the cached version from :func:`_get_hermes_version_cached` (which
+    spawns ``hermes --version`` on the first call).  Returns False when the
+    version cannot be determined.
+    """
+    ver = _get_hermes_version_cached()
+    if ver is None:
+        return False
+    return ver >= (major, minor)
+
+
+def hermes_flag_supported(flag_name: str) -> bool:
+    """Return True if the installed Hermes supports *flag_name*.
+
+    Looks up *flag_name* (e.g. ``"--session-timeout"``) in
+    :data:`_HERMES_FLAG_MIN_VERSIONS`.  If no entry exists for that flag,
+    returns **True** — unknown flags are assumed supported.  Only flags
+    that are explicitly version-gated appear in the map.
+    """
+    min_ver = _HERMES_FLAG_MIN_VERSIONS.get(flag_name)
+    if min_ver is None:
+        return True  # unknown flag → assume supported
+    return hermes_version_ge(*min_ver)
 
 
 class PreflightChecker:
@@ -71,11 +160,22 @@ class PreflightChecker:
 
     @staticmethod
     def check_hermes_version() -> tuple[bool, str]:
-        """Check the installed Hermes version for compatibility."""
+        """Check the installed Hermes version for compatibility.
+
+        Also primes the module-level version cache so that downstream
+        callers of :func:`hermes_version_ge` / :func:`hermes_flag_supported`
+        get the cached result without an extra subprocess.
+        """
         hermes = shutil.which("hermes")
         if not hermes:
             return False, "'hermes' not on PATH \u2014 can't check version"
         try:
+            # Prime the module-level cache first
+            ver = _get_hermes_version_cached()
+            if ver:
+                version_str = f"Hermes Agent v{ver[0]}.{ver[1]}.x"
+                return True, f"Hermes version: {version_str}"
+            # Fallback: raw version string from subprocess
             r = subprocess.run(
                 [hermes, "--version"], capture_output=True, text=True, timeout=10
             )

@@ -168,27 +168,34 @@ function updateDashboard(data) {
   const eta = data.eta || {};
   setText('stat-eta', eta.remaining_formatted || 'N/A');
 
-  // Remote cleanup totals (aggregate summary stat card)
+  // Remote cleanup totals (aggregate summary stat card w/ color + icon indicator)
   const rc = data.remote_cleanup_totals || {};
   const rcDel = rc.remote_deleted || 0;
   const rcMerged = rc.remote_merged || 0;
   const rcStale = rc.stale_pruned || 0;
   const rcFail = rc.remote_failed || 0;
-  const hasRC = (rcDel + rcMerged + rcStale + rcFail) > 0;
+  const rcOk = rcDel + rcMerged + rcStale > 0;
+  const hasFail = rcFail > 0;
+  const hasRC = rcOk || hasFail;
   const rcEl = document.getElementById('stat-remote-cleanup');
   if (rcEl) {
+    // Reset classes, then apply color indicator
+    rcEl.classList.remove('card-value-rc-ok', 'card-value-rc-warn');
     if (hasRC) {
       const labelParts = [];
       if (rcMerged > 0) labelParts.push(rcMerged + 'mg');
       if (rcDel > 0) labelParts.push(rcDel + 'del');
       if (rcStale > 0) labelParts.push(rcStale + 'stale');
-      if (rcFail > 0) labelParts.push(rcFail + 'fail');
-      rcEl.textContent = labelParts.join(' / ');
+      if (hasFail) labelParts.push(rcFail + 'fail');
+      // icon prefix: checkmark when all cleanups succeeded, warning when failures
+      const icon = hasFail ? '\u26A0\uFE0F' : '\u2705';
+      rcEl.textContent = icon + ' ' + labelParts.join(' / ');
+      rcEl.classList.add(hasFail ? 'card-value-rc-warn' : 'card-value-rc-ok');
       const tooltipParts = [];
       if (rcMerged > 0) tooltipParts.push(rcMerged + ' merged');
       if (rcDel > 0) tooltipParts.push(rcDel + ' deleted');
       if (rcStale > 0) tooltipParts.push(rcStale + ' stale pruned');
-      if (rcFail > 0) tooltipParts.push(rcFail + ' failed');
+      if (hasFail) tooltipParts.push(rcFail + ' failed');
       rcEl.title = 'Cumulative remote cleanup: ' + tooltipParts.join(', ');
     } else {
       rcEl.textContent = '0';

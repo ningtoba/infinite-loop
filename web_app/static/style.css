@@ -189,6 +189,8 @@ body {
 .status-card:hover { border-color: var(--border-light); }
 .card-label { font-size: 0.72rem; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .card-value { font-size: 1.2rem; font-weight: 700; color: var(--fg-primary); }
+.card-value-rc-ok { color: var(--success); }
+.card-value-rc-warn { color: var(--warning); }
 
 /* ── Badges ─────────────────────────────────────────────────────────────── */
 .badge {

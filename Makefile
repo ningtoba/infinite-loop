@@ -54,6 +54,7 @@ help:
 	@echo "    resume       Write 'resume' to the sentinel file"
 	@echo ""
 	@echo "  Pre-Commit / CI:"
+	@echo "    test         Run self-tests (alias for self-test)"
 	@echo "    check        Full pre-commit gate: lint + self-test + check-env + regenerate completions"
 	@echo "    pre-commit   Quick pre-commit gate: lint + self-test (no .env needed)"
 	@echo ""
@@ -75,6 +76,7 @@ help:
 	@echo "  make explain FLAG=workers      # Help on a specific flag"
 	@echo "  make help-topic TOPIC=notifications  # Flags in a group"
 	@echo "  make check                   # Full pre-commit gate"
+	@echo "  make test                    # Run self-tests (alias for self-test)"
 	@echo "  make self-test               # Run tests"
 	@echo "  make status                  # View ledger"
 	@echo "  make stop                    # Stop the daemon"
@@ -133,10 +135,10 @@ run:
 dry-run:
 	$(RUN_SH) --dry-run $(ARGS)
 
-.PHONY: test
+.PHONY: self-test test
 test:
-	@echo "━━━ Running pytest test suite ━━━"
-	@$(PYTHON) -m pytest tests/ -v --tb=short --cov=hermes_loop --cov=web_app --cov-report=term-missing
+	@echo "━━━ make test → delegating to make self-test ━━━"
+	@$(MAKE) self-test
 
 .PHONY: self-test
 self-test:
@@ -228,8 +230,7 @@ check:
 	@echo "  Step 1/4 — Python + shell syntax check..."
 	@$(MAKE) lint || exit 1
 	@echo ""
-	@echo "  Step 2/4 — pytest + self-tests..."
-	@$(MAKE) test 2>&1 || exit 1
+	@echo "  Step 2/4 — self-tests..."
 	@$(MAKE) self-test 2>&1 || exit 1
 	@echo ""
 	@echo "  Step 3/4 — .env validation..."
@@ -283,7 +284,7 @@ lint:
 	@echo "Checking Python source with ruff..."
 	@ERRORS=0; \
 	if command -v ruff >/dev/null 2>&1; then \
-		ruff check hermes_loop/ web_app/ tests/ session-self-loop.py launch-loop.py; \
+		ruff check hermes_loop/ web_app/ session-self-loop.py launch-loop.py; \
 		RUFF_EXIT=$$?; \
 		if [ "$$RUFF_EXIT" -ne 0 ]; then \
 			ERRORS=$$((ERRORS + RUFF_EXIT)); \

@@ -20,13 +20,6 @@ web = ["fastapi>=0.100.0", "uvicorn>=0.23.0", "python-dotenv>=1.0.0"]
 [tool.setuptools.packages.find]
 include = ["hermes_loop*", "web_app*"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-filterwarnings = ["ignore::DeprecationWarning"]
-
 [tool.coverage.run]
 source = ["hermes_loop", "web_app"]
 omit = ["*/tests/*"]

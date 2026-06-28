@@ -15,11 +15,13 @@ Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T15:46:00+08:00
 | ✨ Features   | 0         | 1         |
 | 🧹 Hygiene    | 0         | 3         |
 | 🌐 Web UI     | 0         | 0         |
-| 🏗️ Infra/CI  | 0         | 2         |
+| 🏗️ Infra/CI  | 2         | 0         |
 
 ## Completed
 
 <!-- Move items here when done. Format: [DATE] [CATEGORY] Description — commit <hash> -->
+
+- **[2026-06-28] [🏗️ Infra/CI] Fixed broken `make test` and `make check` targets**: Removed `pytest tests/` command from Makefile, replaced `make test` to delegate to `make self-test`. Removed `[tool.pytest.ini_options]` from pyproject.toml. Removed `tests/` from ruff lint paths. Updated `make check` step 2 to skip `make test` and just run `make self-test`. — commit (unstaged)
 
 ## Backlog (prioritized — highest impact first)
 
@@ -67,7 +69,4 @@ Created: 2026-06-28T15:44:00+08:00 | Last updated: 2026-06-28T15:46:00+08:00
 
 ### 🏗️ Build / CI / Infra
 
-- **`Makefile:138-139` — `make test` references deleted `tests/` directory**: Since b60539f removed all 33 pytest test files, `make test` now fails with `pytest: error: unrecognized arguments: tests/`. Should either remove the target or skip it gracefully.
-- **`Makefile:231-233` — `make check` step 2 tries to run `make test` which fails**: Same root cause — references deleted test files. `make check` is now broken.
-- **`pyproject.toml:23-28` — `[tool.pytest.ini_options]` references deleted `tests/` path**: Should be removed or updated since tests directory no longer exists.
-- **`Makefile:286` — `ruff check` still references `tests/` directory**: The lint target runs `ruff check hermes_loop/ web_app/ tests/ ...` but `tests/` no longer exists. Currently harmless (ruff ignores missing dirs) but should be cleaned up.
+~~All 4 items fixed — see Completed section above.~~

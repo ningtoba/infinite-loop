@@ -71,7 +71,7 @@ async def index():
 
 
 @app.get("/api/config")
-async def get_config():
+async def get_config_api():
     """Get the full configuration with current values."""
     config = get_config()
     return {
@@ -94,7 +94,7 @@ async def get_raw_config_api():
 
 
 @app.post("/api/config")
-async def save_config(request: Request):
+async def save_config_api(request: Request):
     """Save configuration values to JSON config file."""
     try:
         data = await request.json()

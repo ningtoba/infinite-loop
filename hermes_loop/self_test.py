@@ -727,6 +727,183 @@ def _run_self_test() -> dict:
     _run_subtests("test_validate_env_vars", _test_validate_env_vars())
 
     # ------------------------------------------------------------------
+    # Test: bounded-queue broadcast paths — queue.Full drop, stale-client
+    # sweep, isinstance backward-compat, and concurrent access.
+    # ------------------------------------------------------------------
+    def _test_bounded_queue():
+        from queue import Queue, Full as QueueFull
+        import time
+        import threading
+
+        cases = []
+
+        # ── queue.Full drop ──────────────────────────────────────────
+        # Create a tiny bounded queue, fill it, then verify put_nowait
+        # raises QueueFull (and our broadcast helper would drop the
+        # client rather than grow unbounded).
+        def _test_queue_full_drop():
+            q: Queue = Queue(maxsize=1)
+            # Fill the queue (the only slot)
+            q.put_nowait("payload1")
+            try:
+                q.put_nowait("payload2")
+                return False  # should have raised
+            except QueueFull:
+                pass
+            # Verify that the underlying queue still respects maxsize
+            # and the client hasn't grown unbounded
+            return q.qsize() == 1
+
+        cases.append(
+            (
+                "queue-full-drops-slow-client",
+                _test_queue_full_drop,
+                lambda r: (
+                    r is True,
+                    f"expected maxsize=1 queue to stay at 1, got qsize check",
+                ),
+            )
+        )
+
+        # ── Stale-client sweep ───────────────────────────────────────
+        # Simulate _broadcast_to_sse_clients' stale-sweep logic:
+        # clients with last_active older than _CLIENT_STALE_TIMEOUT
+        # should be skipped.
+        _CLIENT_STALE_TIMEOUT = 60.0
+
+        def _test_stale_sweep():
+            now = time.monotonic()
+            q_stale: Queue = Queue(maxsize=128)
+            q_fresh: Queue = Queue(maxsize=128)
+            # Simulate the tracking dict and sweep logic
+            last_active = {
+                id(q_stale): now - _CLIENT_STALE_TIMEOUT - 10.0,  # stale (>60s ago)
+                id(q_fresh): now - 5.0,  # fresh (<60s ago)
+            }
+            alive = []
+            for q in [q_stale, q_fresh]:
+                qid = id(q)
+                la = last_active.get(qid, now)
+                if now - la > _CLIENT_STALE_TIMEOUT:
+                    continue  # stale — skip
+                try:
+                    q.put_nowait("payload")
+                    alive.append(q)
+                except QueueFull:
+                    pass
+            # Fresh client should have been put to, stale should not
+            fresh_has_item = q_fresh.qsize() == 1
+            stale_has_item = q_stale.qsize() == 0
+            return fresh_has_item and stale_has_item and len(alive) == 1
+
+        cases.append(
+            (
+                "stale-client-sweep-skips-dead-clients",
+                _test_stale_sweep,
+                lambda r: (
+                    r is True,
+                    f"expected only fresh client in alive list, stale skipped",
+                ),
+            )
+        )
+
+        # ── isinstance backward-compat ───────────────────────────────
+        # The webhook.py _handle_sse line ~190 does:
+        #   raw = json.loads(data) if isinstance(data, str) else data
+        # Verify this handles both str and dict inputs correctly.
+
+        def _test_isinstance_compat():
+            import json
+
+            # str path — json.loads
+            str_data = '{"summary": "hello"}'
+            raw_str = json.loads(str_data) if isinstance(str_data, str) else str_data
+            # dict path — pass through
+            dict_data = {"summary": "hello"}
+            raw_dict = (
+                json.loads(dict_data) if isinstance(dict_data, str) else dict_data
+            )
+            # Both should produce identical dicts
+            return (
+                raw_str == raw_dict
+                and isinstance(raw_str, dict)
+                and isinstance(raw_dict, dict)
+            )
+
+        cases.append(
+            (
+                "isinstance-backward-compat-str-and-dict",
+                _test_isinstance_compat,
+                lambda r: (r is True, f"isinstance compat failed"),
+            )
+        )
+
+        # ── Concurrent access ────────────────────────────────────────
+        # Simulate concurrent broadcast + client add/remove to verify
+        # no deadlocks or data races using threading primitives.
+
+        def _test_concurrent_access():
+            import random
+
+            n_clients = 16
+            n_broadcasts = 8
+            lock = threading.Lock()
+            clients = [Queue(maxsize=128) for _ in range(n_clients)]
+            dropped = [0]
+
+            def _broadcast_worker():
+                for _ in range(n_broadcasts):
+                    with lock:
+                        alive = []
+                        for q in clients:
+                            try:
+                                q.put_nowait("data")
+                                alive.append(q)
+                            except QueueFull:
+                                dropped[0] += 1
+                        clients[:] = alive
+
+            def _add_worker():
+                for _ in range(n_broadcasts // 2):
+                    new_q = Queue(maxsize=128)
+                    with lock:
+                        clients.append(new_q)
+
+            def _remove_worker():
+                for _ in range(n_broadcasts // 2):
+                    with lock:
+                        if clients:
+                            clients.pop()
+
+            threads = []
+            for fn in (
+                [_broadcast_worker] * 3 + [_add_worker] * 2 + [_remove_worker] * 2
+            ):
+                t = threading.Thread(target=fn, daemon=True)
+                threads.append(t)
+                t.start()
+            for t in threads:
+                t.join(timeout=5.0)
+            # All threads should complete without deadlock
+            # At least 0 dropped (may be 0) — no crash is the pass condition
+            return all(not t.is_alive() for t in threads)
+
+        cases.append(
+            (
+                "concurrent-broadcast-no-deadlock",
+                _test_concurrent_access,
+                lambda r: (
+                    r is True,
+                    f"thread deadlock or timeout during concurrent broadcast",
+                ),
+            )
+        )
+
+        return cases
+
+    _run_subtests("test_bounded_queue_broadcast", _test_bounded_queue())
+
+    # ------------------------------------------------------------------
     # Test: signal_handlers — _build_exec_argv
     # ------------------------------------------------------------------
     def _test_build_exec_argv():

@@ -109,6 +109,10 @@ class LoopManager:
             if "--worktree" in cli_args:
                 cli_args.remove("--worktree")
 
+        # Disable auto-reload — the daemon's os.execv crashes when spawned
+        # as a subprocess of the web server. The web UI handles restarts.
+        os.environ["HERMES_LOOP_NO_AUTO_RELOAD"] = "1"
+
         # Ensure --run flag is present
         if "--run" not in cli_args:
             cli_args.append("--run")

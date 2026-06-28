@@ -76,11 +76,16 @@ def _detect_worktree_branches(workdir: str | None) -> list[dict]:
                     ref = parts[1].strip("[]")
                     # ref could be a branch name or commit hash in brackets e.g. [hermes/iter-3-w-0]
                     if ref.startswith("hermes/") or ref.startswith("worktree/"):
-                        existing = {b["ref"] for b in branches}
-                        if ref not in existing:
+                        existing_refs = {b["ref"]: i for i, b in enumerate(branches)}
+                        if ref not in existing_refs:
                             branches.append(
                                 {"ref": ref, "name": ref, "worktree_path": path}
                             )
+                        else:
+                            # Update existing entry with worktree_path (lost by the branch --list scan)
+                            idx = existing_refs[ref]
+                            if branches[idx].get("worktree_path") is None and path:
+                                branches[idx]["worktree_path"] = path
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 
@@ -424,7 +429,10 @@ def cleanup_stale_worktrees(workdir: str | None) -> dict:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 
-    # 4. Try to merge and delete each stale branch
+    # 4. Try to merge and delete each stale branch.
+    # Track names of branches that were actually pruned so we can clean up
+    # remote tracking refs for only those (not all detected branches).
+    pruned_branches: list[str] = []
     for branch_info in branches:
         branch = branch_info["name"]
         if not _branch_exists(cwd, branch):
@@ -456,9 +464,23 @@ def cleanup_stale_worktrees(workdir: str | None) -> dict:
         _delete_worktree_branch(cwd, branch)
         _remove_worktree_directory(cwd, branch, branch_info.get("worktree_path"))
         result["pruned"] += 1
+        pruned_branches.append(branch)
 
-    # Push any merged changes
+    # Push only main branch (never worktree branches)
     if result["pruned"] > 0:
+        # Delete remote tracking refs for branches that were actually pruned
+        for branch in pruned_branches:
+            try:
+                subprocess.run(
+                    ["git", "push", "origin", "--delete", branch],
+                    capture_output=True,
+                    text=True,
+                    cwd=cwd,
+                    timeout=15,
+                )
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+        # Push main
         try:
             subprocess.run(
                 ["git", "push", "origin", main_branch],

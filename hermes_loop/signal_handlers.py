@@ -126,8 +126,13 @@ def init_auto_reload(workdir: str | None) -> None:
     Must be called once at daemon startup (from run_loop or equivalent).
     Snapshots the current mtime/size of launch-loop.py, run.sh, and .env
     so _check_auto_reload can detect subsequent changes.
+
+    Skipped when HERMES_LOOP_NO_AUTO_RELOAD=1 (set by web UI).
     """
     global _startup_file_snapshots, _startup_file_snapshots_initialized
+    if os.environ.get("HERMES_LOOP_NO_AUTO_RELOAD") == "1":
+        _startup_file_snapshots_initialized = True  # mark done, but empty
+        return
     if not workdir:
         return
     files_to_check = [

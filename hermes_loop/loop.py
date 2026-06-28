@@ -336,10 +336,6 @@ def run_loop(
             _log("[STOP] Shutdown during startup delay.")
             return
 
-    # Clean up stale worktree branches from previous runs before spawning
-    if worktree and workdir:
-        cleanup_stale_worktrees(workdir)
-
     # Initialize auto-reload file snapshots (must be before main loop)
     init_auto_reload(workdir)
 
@@ -525,6 +521,10 @@ def run_loop(
             _capture_git_state(workdir, store_diff=store_git_diff) if git else {}
         )
         sys_before = get_system_usage()
+
+        # Clean up stale worktree branches before spawning (from crashes/errors)
+        if worktree and workdir:
+            cleanup_stale_worktrees(workdir)
 
         all_results, spawn_goal, use_library = _execute_iteration(
             state=state,

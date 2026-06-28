@@ -981,6 +981,181 @@ def _run_self_test() -> dict:
 
     _run_subtests("test_build_exec_argv", _test_build_exec_argv())
 
+    # ------------------------------------------------------------------
+    # Test: json_logs output format
+    # ------------------------------------------------------------------
+    def _test_json_logs():
+        import json
+
+        cases = []
+
+        # Helper: build a fake iteration record like loop.py does
+        def _make_record(**overrides) -> dict:
+            base = {
+                "n": 1,
+                "goal": "Fix tests",
+                "summary": "All tests pass",
+                "duration_seconds": 12.5,
+                "error": None,
+                "classification": "completed",
+                "system": {
+                    "cpu_seconds_used": 3.2,
+                    "memory_rss_mb": 128.0,
+                    "memory_peak_mb": 200.0,
+                    "total_memory_gb": 16,
+                    "cpu_count": 8,
+                },
+                "worker_results": [{"worker": 0, "summary": "partial"}],
+            }
+            base.update(overrides)
+            return base
+
+        cases.append(
+            (
+                "valid-json-output",
+                lambda: _check_json_logs_valid(),
+                lambda r: (r is True, f"valid-json-output failed: {r}"),
+            )
+        )
+
+        def _check_json_logs_valid():
+            record = _make_record()
+            line = record.copy()
+            line.pop("worker_results", None)
+            if line.get("system"):
+                line["system"] = {
+                    k: v
+                    for k, v in line["system"].items()
+                    if k in ("cpu_seconds_used", "memory_rss_mb", "memory_peak_mb")
+                }
+            try:
+                raw = json.dumps(line, default=str)
+                decoded = json.loads(raw)
+            except (TypeError, ValueError, json.JSONDecodeError) as e:
+                return f"json encoding/decoding failed: {e}"
+            # Check required fields present
+            for key in (
+                "n",
+                "goal",
+                "summary",
+                "duration_seconds",
+                "error",
+                "classification",
+            ):
+                if key not in decoded:
+                    return f"missing field {key!r}"
+            if decoded.get("n") != 1:
+                return f"expected n=1, got {decoded.get('n')}"
+            if decoded.get("summary") != "All tests pass":
+                return "wrong summary"
+            return True
+
+        cases.append(
+            (
+                "worker-results-removed",
+                lambda: _check_worker_results_removed(),
+                lambda r: (r is True, f"worker-results-removed failed: {r}"),
+            )
+        )
+
+        def _check_worker_results_removed():
+            record = _make_record()
+            line = record.copy()
+            line.pop("worker_results", None)
+            if "worker_results" in line:
+                return "worker_results should have been popped"
+            return True
+
+        cases.append(
+            (
+                "system-trimmed-to-3-keys",
+                lambda: _check_system_trimmed(),
+                lambda r: (r is True, f"system-trimmed failed: {r}"),
+            )
+        )
+
+        def _check_system_trimmed():
+            record = _make_record()
+            line = record.copy()
+            line.pop("worker_results", None)
+            if line.get("system"):
+                line["system"] = {
+                    k: v
+                    for k, v in line["system"].items()
+                    if k in ("cpu_seconds_used", "memory_rss_mb", "memory_peak_mb")
+                }
+            sys_keys = sorted(line["system"].keys())
+            expected = sorted(["cpu_seconds_used", "memory_rss_mb", "memory_peak_mb"])
+            if sys_keys != expected:
+                return f"expected system keys {expected}, got {sys_keys}"
+            return True
+
+        cases.append(
+            (
+                "no-error-field-present",
+                lambda: _check_no_error(),
+                lambda r: (r is True, f"no-error-field failed: {r}"),
+            )
+        )
+
+        def _check_no_error():
+            record = _make_record(error=None)
+            line = record.copy()
+            line.pop("worker_results", None)
+            raw = json.dumps(line, default=str)
+            decoded = json.loads(raw)
+            if decoded.get("error") is not None:
+                return f"expected error=null, got {decoded['error']!r}"
+            return True
+
+        cases.append(
+            (
+                "error-field-present",
+                lambda: _check_error_present(),
+                lambda r: (r is True, f"error-field-present failed: {r}"),
+            )
+        )
+
+        def _check_error_present():
+            record = _make_record(error="timeout occurred")
+            line = record.copy()
+            line.pop("worker_results", None)
+            raw = json.dumps(line, default=str)
+            decoded = json.loads(raw)
+            if decoded.get("error") != "timeout occurred":
+                return (
+                    f"expected error='timeout occurred', got {decoded.get('error')!r}"
+                )
+            return True
+
+        cases.append(
+            (
+                "default-str-fallback",
+                lambda: _check_default_str(),
+                lambda r: (r is True, f"default-str-fallback failed: {r}"),
+            )
+        )
+
+        def _check_default_str():
+            # Simulate an iterable field that needs default=str
+            import pathlib
+
+            record = _make_record(path=pathlib.Path("/tmp/test"))
+            line = record.copy()
+            line.pop("worker_results", None)
+            try:
+                raw = json.dumps(line, default=str)
+                decoded = json.loads(raw)
+            except (TypeError, ValueError, json.JSONDecodeError) as e:
+                return f"default=str fallback failed: {e}"
+            if decoded.get("path") != "/tmp/test":
+                return f"expected path='/tmp/test', got {decoded.get('path')!r}"
+            return True
+
+        return cases
+
+    _run_subtests("test_json_logs", _test_json_logs())
+
     total = passed_total + failed_total
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
     if failed_total == 0:

@@ -29,6 +29,7 @@ bool_flags=(
     '--ignore-rules[Start spawned sessions without loading AGENTS]'
     '--ignore-user-config[Pass --ignore-user-config to spawned sessions so they skip ~/]'
     '--init[Interactive setup wizard — walks you through the most common configuration options step by step and generates a]'
+    '--json-logs[Output each iteration result as a single JSON line to stdout]'
     '--no-auto-toolsets[Disable automatic toolset enrichment based on task type]'
     '--no-failure-learning[Disable injection of past failure context into spawned sessions]'
     '--notify-desktop[Send desktop notifications via notify-send on each iteration result (Linux only)]'

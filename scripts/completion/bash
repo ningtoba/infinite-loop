@@ -35,6 +35,7 @@ _hermes_loop_completions()
         --ignore-rules
         --ignore-user-config
         --init
+        --json-logs
         --no-auto-toolsets
         --no-failure-learning
         --notify-desktop

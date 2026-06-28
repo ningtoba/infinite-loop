@@ -169,6 +169,7 @@ fi
 [ -n "${INFINITE_LOOP_HEARTBEAT_TIMEOUT:-}" ] && DAEMON_ARGS+=("--heartbeat-timeout" "$INFINITE_LOOP_HEARTBEAT_TIMEOUT")
 [ -n "${INFINITE_LOOP_MAX_IDLE_ITERATIONS:-}" ] && DAEMON_ARGS+=("--max-idle-iterations" "$INFINITE_LOOP_MAX_IDLE_ITERATIONS")
 [ -n "${INFINITE_LOOP_SPAWN_SOURCE:-}" ]    && DAEMON_ARGS+=("--spawn-source" "$INFINITE_LOOP_SPAWN_SOURCE")
+[ "${INFINITE_LOOP_JSON_LOGS:-false}" == "true" ]          && DAEMON_ARGS+=("--json-logs")
 
 # Boolean flags (no value arg)
 [ "${INFINITE_LOOP_STOP_AT_GOALS_END:-false}" == "true" ]  && DAEMON_ARGS+=("--stop-at-goals-end")

@@ -444,3 +444,69 @@ class TestSuggestActionableFix:
         # With git_commit and force_reset already True, and git=False,
         # the only actionable suggestion is --git. That's not a no-op tip.
         assert result is not None
+
+    def test_no_error_and_unknown_classification_returns_tip(self):
+        """classification='something_else' with error_type=None returns None
+        (line 150 — no suggestion for non-actionable classifications)."""
+        result = _suggest_actionable_fix(
+            None,
+            "something_else",
+            "do stuff",
+            workers=1,
+            git=False,
+            force_reset=False,
+            git_commit=False,
+            use_library=False,
+        )
+        assert result is None
+
+    def test_regression_only_review_tip_returns_none(self):
+        """Regression with only a review tip (no actionable flags) returns None
+        (line 236 — only 'Suggestions:' header + review note, no actionable flag)."""
+        # git=True, force_reset=True, git_commit=True means only the review
+        # note gets added (no actionable flag changes to suggest).
+        result = _suggest_actionable_fix(
+            None,
+            "regression",
+            "fix something",
+            consecutive_errors=0,
+            workers=1,
+            git=True,
+            force_reset=True,
+            git_commit=True,
+            use_library=False,
+        )
+        assert result is None
+
+    def test_partial_with_unknown_error(self):
+        """Partial classification with an unknown error type returns the partial tip
+        (line 246).  error_type must be non-None and not match timeout/network/schema
+        to reach the partial branch."""
+        result = _suggest_actionable_fix(
+            "unknown",
+            "partial",
+            "do things",
+        )
+        assert result is not None
+        assert "Tip" in result
+        assert "remaining work" in result
+
+    def test_fallthrough_returns_none(self):
+        """Classification that doesn't match any branch returns None
+        (line 258)."""
+        result = _suggest_actionable_fix(
+            None,
+            "nonexistent_classification",
+            "do something",
+        )
+        assert result is None
+
+    def test_fallthrough_with_error_type_returns_none(self):
+        """Classification that doesn't match any branch, with an error_type
+        set, still returns None (line 258 — final fallthrough)."""
+        result = _suggest_actionable_fix(
+            "unknown",
+            "nonexistent_classification",
+            "do something",
+        )
+        assert result is None

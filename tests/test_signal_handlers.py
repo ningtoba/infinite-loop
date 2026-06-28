@@ -615,6 +615,121 @@ class TestHandleShutdownHardExit:
             mock_timer.assert_called_once()
 
 
+class TestHandleShutdownWriteLedgerError:
+    """Tests for the ``except Exception: pass`` path when os.replace fails."""
+
+    def test_os_replace_exception_caught_silently(self):
+        """Exception from os.replace is caught silently (lines 47-48)."""
+        state = {"status": "running", "iterations": []}
+
+        with (
+            patch("hermes_loop.signal_handlers._shutdown_requested", False),
+            patch("hermes_loop.signal_handlers._shutdown_state_ref", state),
+            patch("hermes_loop.signal_handlers._hermes_worker_ref", None),
+            patch("hermes_loop.signal_handlers.os.killpg"),
+            patch("hermes_loop.signal_handlers.os.getpgid", return_value=999),
+            patch("hermes_loop.signal_handlers._subprocess.run"),
+            patch("hermes_loop.signal_handlers.threading.Timer"),
+            patch("hermes_loop.signal_handlers._log"),
+            patch("hermes_loop.signal_handlers.time.sleep"),
+            patch(
+                "hermes_loop.signal_handlers.os.replace",
+                side_effect=PermissionError("no permission"),
+            ),
+        ):
+            # Should not raise -- the except Exception: pass catches it
+            _handle_shutdown(signal.SIGTERM, None)
+
+    def test_open_exception_caught_silently(self):
+        """Exception from open() for the temp file is caught silently."""
+        state = {"status": "running", "iterations": []}
+
+        mock_builtins_open = MagicMock()
+        mock_builtins_open.side_effect = OSError("disk full")
+
+        with (
+            patch("hermes_loop.signal_handlers._shutdown_requested", False),
+            patch("hermes_loop.signal_handlers._shutdown_state_ref", state),
+            patch("hermes_loop.signal_handlers._hermes_worker_ref", None),
+            patch("hermes_loop.signal_handlers.os.killpg"),
+            patch("hermes_loop.signal_handlers.os.getpgid", return_value=999),
+            patch("hermes_loop.signal_handlers._subprocess.run"),
+            patch("hermes_loop.signal_handlers.threading.Timer"),
+            patch("hermes_loop.signal_handlers._log"),
+            patch("hermes_loop.signal_handlers.time.sleep"),
+            patch("hermes_loop.signal_handlers.os.replace"),
+            patch("hermes_loop.signal_handlers.open", mock_builtins_open),
+        ):
+            # Should not raise -- the except Exception: pass catches it
+            _handle_shutdown(signal.SIGTERM, None)
+
+
+class TestHandleShutdownHardExitRealCallback:
+    """Tests that the _hard_exit inner function actually calls sys.exit."""
+
+    def test_hard_exit_raises_system_exit_sigterm(self):
+        """_hard_exit callback raises SystemExit(128 + SIGTERM) (lines 122-123)."""
+        callback = None
+
+        def capture_callback(*args, **kwargs):
+            nonlocal callback
+            callback = args[1] if len(args) > 1 else kwargs.get("function")
+            # Return a proper mock instance so timer.daemon = True works
+            return MagicMock()
+
+        with (
+            patch("hermes_loop.signal_handlers._shutdown_requested", False),
+            patch("hermes_loop.signal_handlers._shutdown_state_ref", None),
+            patch("hermes_loop.signal_handlers._hermes_worker_ref", None),
+            patch("hermes_loop.signal_handlers.os.killpg"),
+            patch("hermes_loop.signal_handlers.os.getpgid", return_value=999),
+            patch("hermes_loop.signal_handlers._subprocess.run"),
+            patch("hermes_loop.signal_handlers._log"),
+            patch("hermes_loop.signal_handlers.time.sleep"),
+            patch(
+                "hermes_loop.signal_handlers.threading.Timer",
+                side_effect=capture_callback,
+            ),
+        ):
+            _handle_shutdown(signal.SIGTERM, None)
+
+        assert callback is not None, "Timer callback was not captured"
+        with pytest.raises(SystemExit) as exc_info:
+            callback()
+        assert exc_info.value.code == 128 + signal.SIGTERM
+
+    def test_hard_exit_raises_system_exit_sigint(self):
+        """_hard_exit callback raises SystemExit(128 + SIGINT)."""
+        callback = None
+
+        def capture_callback(*args, **kwargs):
+            nonlocal callback
+            callback = args[1] if len(args) > 1 else kwargs.get("function")
+            # Return a proper mock instance so timer.daemon = True works
+            return MagicMock()
+
+        with (
+            patch("hermes_loop.signal_handlers._shutdown_requested", False),
+            patch("hermes_loop.signal_handlers._shutdown_state_ref", None),
+            patch("hermes_loop.signal_handlers._hermes_worker_ref", None),
+            patch("hermes_loop.signal_handlers.os.killpg"),
+            patch("hermes_loop.signal_handlers.os.getpgid", return_value=999),
+            patch("hermes_loop.signal_handlers._subprocess.run"),
+            patch("hermes_loop.signal_handlers._log"),
+            patch("hermes_loop.signal_handlers.time.sleep"),
+            patch(
+                "hermes_loop.signal_handlers.threading.Timer",
+                side_effect=capture_callback,
+            ),
+        ):
+            _handle_shutdown(signal.SIGINT, None)
+
+        assert callback is not None, "Timer callback was not captured"
+        with pytest.raises(SystemExit) as exc_info:
+            callback()
+        assert exc_info.value.code == 128 + signal.SIGINT
+
+
 # ===================================================================
 # _snapshot_file
 # ===================================================================

@@ -338,6 +338,7 @@ class LoopManager:
             "iters_per_goal": iters_per_goal_v,
             "metrics_summary": metrics_summary_v,
             "est_cost": ledger.get("est_cost"),
+            "remote_cleanup_totals": stats.get("remote_cleanup_totals", {}),
             "latest_iteration": latest,
             "live_iteration": self._live_iteration,
             "worker_logs": {w: logs[-100:] for w, logs in self._worker_logs.items()},

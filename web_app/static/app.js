@@ -168,6 +168,34 @@ function updateDashboard(data) {
   const eta = data.eta || {};
   setText('stat-eta', eta.remaining_formatted || 'N/A');
 
+  // Remote cleanup totals (aggregate summary stat card)
+  const rc = data.remote_cleanup_totals || {};
+  const rcDel = rc.remote_deleted || 0;
+  const rcMerged = rc.remote_merged || 0;
+  const rcStale = rc.stale_pruned || 0;
+  const rcFail = rc.remote_failed || 0;
+  const hasRC = (rcDel + rcMerged + rcStale + rcFail) > 0;
+  const rcEl = document.getElementById('stat-remote-cleanup');
+  if (rcEl) {
+    if (hasRC) {
+      const labelParts = [];
+      if (rcMerged > 0) labelParts.push(rcMerged + 'mg');
+      if (rcDel > 0) labelParts.push(rcDel + 'del');
+      if (rcStale > 0) labelParts.push(rcStale + 'stale');
+      if (rcFail > 0) labelParts.push(rcFail + 'fail');
+      rcEl.textContent = labelParts.join(' / ');
+      const tooltipParts = [];
+      if (rcMerged > 0) tooltipParts.push(rcMerged + ' merged');
+      if (rcDel > 0) tooltipParts.push(rcDel + ' deleted');
+      if (rcStale > 0) tooltipParts.push(rcStale + ' stale pruned');
+      if (rcFail > 0) tooltipParts.push(rcFail + ' failed');
+      rcEl.title = 'Cumulative remote cleanup: ' + tooltipParts.join(', ');
+    } else {
+      rcEl.textContent = '0';
+      rcEl.title = 'Cumulative remote cleanup across all iterations';
+    }
+  }
+
   const maxIt = led.max_iterations || 0, curIt = led.total_iterations || 0;
   const pct = maxIt > 0 ? Math.min(100 * curIt / maxIt, 100) : 0;
   document.getElementById('progress-fill').style.width = pct + '%';

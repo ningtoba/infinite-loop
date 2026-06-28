@@ -70,6 +70,7 @@ def _execute_task(
     last_error = None
     all_output = []
     final_text_parts: list[str] = []
+    _text_buf: list[str] = []
     proc = None
 
     def _term(line: str) -> None:
@@ -106,41 +107,82 @@ def _execute_task(
                 etype = event.get("type", "")
 
                 if etype == "message_update":
-                    msg = event.get("message", {})
-                    content = msg.get("content", [])
-                    # Concatenate text deltas into readable output
-                    text_parts = []
-                    for block in content:
-                        if isinstance(block, dict):
-                            bt = block.get("type", "")
-                            if bt == "text":
-                                text_parts.append(block.get("text", ""))
-                            elif bt == "tool_use":
-                                name = block.get("name", "tool")
-                                inp = block.get("input", {})
-                                inp_str = json.dumps(inp, default=str)[:120]
-                                text_parts.append(f"[Tool: {name}({inp_str})]")
-                            elif bt == "thinking":
-                                text_parts.append(
-                                    f"[Thinking: {block.get('thinking', '')[:60]}...]"
-                                )
-                            elif bt == "tool_result":
-                                content_block = block.get("content", "")
-                                if isinstance(content_block, list):
-                                    for cb in content_block:
-                                        if (
-                                            isinstance(cb, dict)
-                                            and cb.get("type") == "text"
-                                        ):
-                                            text_parts.append(
-                                                f"[Result: {cb.get('text', '')[:120]}]"
-                                            )
-                                elif isinstance(content_block, str):
-                                    text_parts.append(
-                                        f"[Result: {content_block[:120]}]"
-                                    )
-                    if text_parts:
-                        _term(" ".join(text_parts))
+                    ame = event.get("assistantMessageEvent", {})
+                    if not isinstance(ame, dict):
+                        continue
+                    ame_type = ame.get("type", "")
+
+                    # Skip noisy thinking deltas (token-by-token)
+                    if ame_type == "thinking_delta":
+                        continue
+
+                    # Tool result
+                    if ame_type == "content_block_stop":
+                        delta = ame.get("delta", {})
+                        if isinstance(delta, dict) and delta.get("type") == "tool_result":
+                            result_content = delta.get("content", "")
+                            if isinstance(result_content, list):
+                                for cb in result_content:
+                                    if isinstance(cb, dict) and cb.get("type") == "text":
+                                        _term(f"[Result: {cb.get('text', '')[:200]}]")
+                            elif isinstance(result_content, str):
+                                _term(f"[Result: {result_content[:200]}]")
+                        continue
+
+                    # Text output delta — accumulate chars, emit on line break
+                    if ame_type == "text_delta":
+                        _text_buf.append(ame.get("delta", ""))
+                        full = "".join(_text_buf)
+                        if "\n" in full:
+                            *done, rest = full.split("\n")
+                            for ln in done:
+                                if ln.strip():
+                                    _term(ln)
+                            _text_buf.clear()
+                            _text_buf.append(rest)
+                        continue
+
+                    # Tool call start
+                    if ame_type == "content_block_start":
+                        delta = ame.get("delta", {})
+                        if isinstance(delta, dict) and delta.get("type") == "tool_use":
+                            name = delta.get("name", "tool")
+                            inp = delta.get("input", {})
+                            inp_str = json.dumps(inp, default=str)[:120]
+                            _term(f"[Tool: {name}({inp_str})]")
+                        continue
+
+                    # Tool result
+                    if ame_type == "content_block_stop":
+                        delta = ame.get("delta", {})
+                        if isinstance(delta, dict) and delta.get("type") == "tool_result":
+                            result_content = delta.get("content", "")
+                            if isinstance(result_content, list):
+                                for cb in result_content:
+                                    if isinstance(cb, dict) and cb.get("type") == "text":
+                                        _term(f"[Result: {cb.get('text', '')[:200]}]")
+                            elif isinstance(result_content, str):
+                                _term(f"[Result: {result_content[:200]}]")
+                        continue
+
+                    # Usage info — show as summary line
+                    if ame_type == "usage":
+                        usage = ame.get("usage", {})
+                        if isinstance(usage, dict):
+                            tokens = usage.get("totalTokens", "")
+                            cost = usage.get("cost", {}).get("total", "")
+                            items = []
+                            if tokens:
+                                items.append(f"{tokens} tokens")
+                            if cost:
+                                items.append(f"${cost}")
+                            if items:
+                                _term(f"[Tokens: {", ".join(items)}]")
+                        continue
+
+                    # agent_start / turn_start — skip ceremony
+                    if ame_type in ("turn_start", "agent_start", "session"):
+                        continue
 
                 elif etype == "message_end":
                     msg = event.get("message", {})

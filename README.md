@@ -1,12 +1,8 @@
-<div align="center">
-
-# &#x3C0; pi-loop
+# π pi-loop
 
 **Autonomous task loop daemon — powered by the pi coding agent**
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
-![Python](https://img.shields.io/badge/python-≥3.10-blue)
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#license) ![Python](https://img.shields.io/badge/python-≥3.10-blue) [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 
 </div>
 

@@ -15,7 +15,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from pi_loop.config_file import CONFIG_PATH
+from pi_loop.config_file import CONFIG_PATH  # noqa: resolves at runtime
 from .config_manager import (
     CONFIG_GROUPS,
     get_config,

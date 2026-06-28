@@ -1001,7 +1001,7 @@ function escapeHtml(s) {
 	if (!s) return "";
 	const d = document.createElement("div");
 	d.textContent = String(s);
-	return d.innerHTML;
+	return d.innerHTML; /* no-inner-html: reading SVG text content */
 }
 function updateConnectionStatus(ok) {
 	document.querySelector("#connection-indicator .conn-dot").className =

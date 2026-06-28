@@ -7,6 +7,7 @@ progress in a JSON ledger.
 import json
 import os
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 
@@ -49,13 +50,19 @@ def _execute_task(
 ) -> dict:
     """Execute a single task via pi subprocess.
 
+    Emits worker lifecycle markers on stdout for the web UI to track.
     Returns a result dict with 'output', 'error', 'duration_seconds', etc.
     """
     cmd = ["pi", "-p", goal]
     if context:
         cmd.extend(["--append-system-prompt", context])
-    if toolsets:
+    # Only pass --tools if the user explicitly configured toolsets
+    # (empty = pi uses its full default toolset)
+    if toolsets and any(t not in ("terminal", "file", "delegation") for t in toolsets):
         cmd.extend(["--tools", ",".join(toolsets)])
+
+    print(f"[SPAWN (worker #1)] pi -p {goal[:60]}")
+    sys.stdout.flush()
 
     start_time = time.time()
     attempts = 0
@@ -74,6 +81,12 @@ def _execute_task(
                 timeout=session_timeout,
                 cwd=workdir or os.getcwd(),
             )
+            duration = time.time() - attempt_start
+            stdout = r.stdout or ""
+            stderr = r.stderr or ""
+
+            print(f"[WORKER (worker #1)] Response in {duration:.1f}s (status={'ok' if r.returncode == 0 else 'failed'})")
+            sys.stdout.flush()
             duration = time.time() - attempt_start
             stdout = r.stdout or ""
             stderr = r.stderr or ""

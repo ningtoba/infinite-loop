@@ -17,8 +17,7 @@ def _set_originals(
     session_timeout: int, cooldown: int, use_library: bool, workers: int
 ) -> None:
     """Set original baseline values from run_loop for mitigation comparisons."""
-    global _ORIGINAL_SESSION_TIMEOUT, _ORIGINAL_COOLDOWN
-    global _ORIGINAL_USE_LIBRARY, _ORIGINAL_WORKERS
+    global _ORIGINAL_SESSION_TIMEOUT, _ORIGINAL_COOLDOWN, _ORIGINAL_USE_LIBRARY, _ORIGINAL_WORKERS
     _ORIGINAL_SESSION_TIMEOUT = session_timeout
     _ORIGINAL_COOLDOWN = cooldown
     _ORIGINAL_USE_LIBRARY = use_library
@@ -43,8 +42,7 @@ def _adapt_to_error(
     log_fn: Callable | None = None,
 ) -> tuple:
     """Adapt runtime parameters based on error type and history."""
-    global _ORIGINAL_SESSION_TIMEOUT, _ORIGINAL_COOLDOWN
-    global _ORIGINAL_USE_LIBRARY, _ORIGINAL_WORKERS
+    global _ORIGINAL_SESSION_TIMEOUT, _ORIGINAL_COOLDOWN, _ORIGINAL_USE_LIBRARY, _ORIGINAL_WORKERS  # noqa: global-assigned-via-_set_originals
 
     if log_fn is None:
         log_fn = _log
@@ -64,7 +62,7 @@ def _adapt_to_error(
             if consecutive_successes == 1:
                 new_timeout = max(
                     _ORIGINAL_SESSION_TIMEOUT,
-                    int(session_timeout * 0.75),
+                    int(session_timeout or 0) * 75 // 100,
                 )
                 if cooldown_mode != "adaptive" and cooldown > _ORIGINAL_COOLDOWN:
                     new_cooldown = max(
@@ -122,7 +120,7 @@ def _adapt_to_error(
 
     if new_level >= 1 and level_before < 1:
         if error_type == "timeout":
-            new_timeout = min(600, int(session_timeout * 1.5))
+            new_timeout = min(600, int(session_timeout or 0) * 150 // 100)
             actions.append(
                 f"[MITIGATION] Timeout errors: increased timeout to {new_timeout}s"
             )

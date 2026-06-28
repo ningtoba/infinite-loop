@@ -10,7 +10,6 @@ Loading order (last wins):
 
 import difflib
 import os
-from pathlib import Path
 
 from .color_utils import colorizer
 from .file_utils import _log

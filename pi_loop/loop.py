@@ -7,7 +7,6 @@ progress in a JSON ledger.
 import json
 import os
 import subprocess
-import sys
 import time
 from datetime import datetime, timezone
 
@@ -18,7 +17,6 @@ from .error_utils import _suggest_actionable_fix
 from .functions import (
     _load_goals_file,
     _log_startup_banner,
-    _cycle_goal,
     _build_progressive_context,
     _handle_cooldown,
 )
@@ -259,7 +257,7 @@ def run_loop(
     force_reset: bool = False,
     json_logs: bool = False,
 ) -> None:
-    global _shutdown_requested
+    global _shutdown_requested  # noqa: used in while-loop body below
 
     _set_originals(session_timeout, cooldown, use_library, workers)
 
@@ -433,8 +431,6 @@ def run_loop(
 
         # Cycle goals
         if len(goals_list) > 1:
-            idx = goals_index % len(goals_list)
-            spec = goals_list[idx]
             goals_index += 1
             goal_text, exhausted = _cycle_goal_simple(
                 goals_list, goals_index - 1, stop_at_goals_end

@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timezone
 
 from .config import (
     LEDGER_PATH,
@@ -29,12 +28,9 @@ from .validation import load_json_schema
 from .state import load_or_create_ledger
 from .loop import run_loop
 from .heartbeat import _cleanup_stale_heartbeats
-from .functions import set_max_output_chars
 from .color_utils import colorizer, configure_color_mode
 from .env_utils import (
     check_env_file,
-    parse_env_vars_from_file,
-    validate_env_vars,
 )
 
 

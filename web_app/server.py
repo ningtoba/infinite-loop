@@ -15,9 +15,9 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
+from pi_loop.config_file import CONFIG_PATH
 from .config_manager import (
     CONFIG_GROUPS,
-    CONFIG_PATH,
     get_config,
     save_config,
     get_raw_config,

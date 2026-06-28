@@ -11,8 +11,8 @@ from .stats import _recalc_stats
 
 def _version_detail() -> str:
     return (
-        f"v{VERSION} -- Self-healing sessions, WebUI dashboard, SSE live updates, "
-        "smart worktree merging, goal tracking, error recovery, auto-completions, self-test mode."
+        f"v{VERSION} -- WebUI dashboard, SSE live updates, "
+        "iterative task execution, error recovery, goal tracking."
     )
 
 

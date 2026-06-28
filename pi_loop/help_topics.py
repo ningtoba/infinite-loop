@@ -4,6 +4,7 @@ Extracted from cli.py to keep the CLI module focused on argparse setup
 and the main() entry point.
 """
 
+import argparse
 import json
 import os
 import shutil
@@ -13,7 +14,7 @@ from datetime import datetime, timezone
 
 from .config import VERSION, LEDGER_PATH
 from .color_utils import colorizer
-from .file_utils import _log, extract_json_from_output, write_ledger, read_ledger
+from .file_utils import extract_json_from_output, write_ledger, read_ledger
 
 
 def _introspection_flags() -> dict[str, str]:
@@ -263,7 +264,7 @@ def _run_healthcheck() -> None:
     test_data = {"healthcheck": True, "timestamp": ts}
     write_ledger(test_data)
     ledger_read = read_ledger()
-    ledger_ok = ledger_read is not None and ledger_read.get("healthcheck") is True
+    ledger_ok = ledger_read is not None and ledger_read.get("healthcheck")
     checks.append(
         {
             "name": "ledger_io",
@@ -391,8 +392,6 @@ def _run_doctor() -> None:
 
     print(f"\n  {c.header('══════════════════════════════════════════════')}\n")
 
-
-import argparse
 
 
 def _explain_flag(flag_name: str, parser=None) -> None:

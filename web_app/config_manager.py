@@ -6,7 +6,7 @@ pi_loop.config_file (no .env file needed).
 
 from typing import Any
 
-from pi_loop.config_file import CONFIG_PATH, load_config, save_config as _save_config
+from pi_loop.config_file import load_config, save_config as _save_config
 
 
 # Default configuration values matching .env.example

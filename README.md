@@ -590,6 +590,14 @@ kill $LOOP_PID
 
 | Feature | Type | Files | Description |
 |---------|------|-------|-------------|
+| Version sync to 14.34.0 | Fix | `pyproject.toml`, `config.py`, `run.sh`, `CHANGELOG.md` | Fixed stale references still at v14.33.0 — pyproject.toml version, LAUNCH_LOOP_VERSION constant, run.sh banner/header/help text. Added missing CHANGELOG entry. |
+
+---
+
+## v14.33.0 Changelog
+
+| Feature | Type | Files | Description |
+|---------|------|-------|-------------|
 | Real-time stderr token/progress reader | Enhancement | `hermes_utils.py`, `loop.py`, `cli.py` | New `_read_stderr_real_time()` thread pipes Hermes's stderr progress lines in real-time with `[MODEL{worker_tag}]` prefix. |
 | Context-aware regression suggestions | Enhancement | `error_utils.py` | `_suggest_actionable_fix()` skips suggestions for flags the user already has enabled. |
 | `force_reset` parameter | Enhancement | `loop.py`, `cli.py` | Added to `run_loop()` and passed through from CLI. |

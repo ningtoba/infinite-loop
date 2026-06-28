@@ -4,6 +4,14 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.34.0] — 2026-06-28
+
+### Fixed
+- **Version sync**: `pyproject.toml`, `config.py` (`LAUNCH_LOOP_VERSION`), and `run.sh` updated
+  from 14.33.0 to 14.34.0 to match README, CONTRIBUTING, preflight docstring, and
+  `scripts/run-loop.sh` banner which were already at 14.34.0.
+- **CHANGELOG entry**: Added this missing v14.34.0 changelog section.
+
 ## [14.33.0] — 2026-06-28
 
 ### Added

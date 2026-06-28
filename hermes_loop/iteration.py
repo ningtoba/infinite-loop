@@ -540,7 +540,7 @@ def _compact_summaries(
     is_compacted = False
     if compact_every > 0 and iteration_count % compact_every == 0:
         is_compacted = True
-        keep_full = max(compact_every, 10)
+        keep_full = max(compact_every * 2, 20)
         condensed = 0
         new_summaries = []
         for i, s in enumerate(existing_summaries):

@@ -603,6 +603,7 @@ def _generate_status_html(state: dict, compact: bool = False) -> str:
         "running": "running",
         "paused": "paused",
         "reloading": "reloading",
+        "no_ledger": "no_ledger",
     }.get(status, "stopped")
     total = state.get("total_iterations", 0)
     goal = (state.get("initial_command") or "(none)")[:80]
@@ -771,10 +772,9 @@ def _build_sse_payload(state: dict) -> dict:
     latest = iterations[-1] if iterations else {}
     et = state.get("error_type_counts", {})
     base_mitigations = state.get("mitigations", {})
-    mitigations = {
-        **base_mitigations,
-        "consecutive_errors": stats.get("consecutive_errors", 0),
-    }
+    # Note: consecutive_errors is emitted at top-level and in stats,
+    # not inside mitigations, to avoid a confusing dual-source namespace
+    mitigations = dict(base_mitigations)
     goals_completed = state.get("goals_completed", {})
     goals_specs = state.get("goals_specs", [])
     goals_list = []

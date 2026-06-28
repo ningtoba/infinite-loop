@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — One-command entrypoint (v14.33.0) for the infinite-loop daemon
+# run.sh — One-command entrypoint (v14.34.0) for the infinite-loop daemon
 #
 # Reads everything from .env, so you just run:
 #   bash run.sh
@@ -25,7 +25,7 @@ if [[ "${1:-}" == "--version" ]]; then
   exec python3 "$SCRIPT_DIR/launch-loop.py" "--version"
 fi
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "━━━ Infinite Loop Daemon — run.sh (v14.33.0) ━━━"
+  echo "━━━ Infinite Loop Daemon — run.sh (v14.34.0) ━━━"
   echo ""
   echo "USAGE:  bash run.sh [OPTIONS]"
   echo ""
@@ -216,7 +216,7 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
   echo '╔══════════════════════════════════════════════╗'
-  echo '║  Infinite Loop Daemon v14.33.0               ║'
+  echo '║  Infinite Loop Daemon v14.34.0               ║'
   echo '║  run.sh — one command to start               ║'
   echo '║                                                ║'
   echo '║  What is new ⚡                              ║'

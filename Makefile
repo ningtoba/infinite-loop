@@ -1,4 +1,4 @@
-.PHONY: install lint format clean help
+.PHONY: install lint format clean help web web-dev
 
 PYTHON := python3
 
@@ -11,6 +11,8 @@ help:
 	@echo "  install      Install pi-loop as a system command via pip install -e ."
 	@echo "  lint         Run ruff check on pi_loop/"
 	@echo "  format       Run ruff format on pi_loop/"
+	@echo "  web          Start the web UI server (production mode)"
+	@echo "  web-dev      Start the web UI server with auto-reload"
 	@echo "  clean        Remove build artifacts, cache, and temp files"
 	@echo ""
 
@@ -22,6 +24,14 @@ lint:
 
 format:
 	ruff format pi_loop/
+
+web:
+	pip install -e .
+	pi-loop-web
+
+web-dev:
+	pip install -e .
+	pi-loop-web --reload
 
 clean:
 	rm -rf build/ dist/ *.egg-info __pycache__/ .ruff_cache/

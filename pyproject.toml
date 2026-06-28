@@ -9,9 +9,11 @@ version = "14.39.0"
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = ['fastapi>=0.100.0', 'uvicorn[standard]>=0.20.0']
 
 [project.scripts]
 pi-loop = "pi_loop.cli:main"
+pi-loop-web = "web_app.__main__:main"
 
 [tool.setuptools.packages.find]
-include = ["pi_loop*"]
+include = ["pi_loop*", "web_app*"]

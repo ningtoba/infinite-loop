@@ -11,7 +11,7 @@ import sys
 import time
 from datetime import datetime, timezone
 
-from .config import DEFAULT_CONVERGENCE_THRESHOLD, DEFAULT_CONVERGENCE_WINDOW
+from .config import VERSION, DEFAULT_CONVERGENCE_THRESHOLD, DEFAULT_CONVERGENCE_WINDOW
 from .file_utils import _log, write_ledger, write_status_file
 from .error_recovery import _adapt_to_error, _set_originals
 from .error_utils import _suggest_actionable_fix
@@ -26,6 +26,7 @@ from .git_utils import _capture_git_state, _git_auto_commit
 from .system_utils import get_system_usage, get_system_usage_diff
 from .color_utils import colorizer
 from .stats import _recalc_stats
+from .status import write_status as _write_status_file
 
 # Module-level shutdown flag
 _shutdown_requested = False
@@ -275,6 +276,9 @@ def run_loop(
     state["goals_specs"] = goals_tuples
 
     write_status_file(status_file, state, iteration_count, "running")
+    _write_status_file(
+        status_file, running=True, iteration_count=iteration_count, version=VERSION
+    )
 
     _log_startup_banner(
         task_type="generic",
@@ -321,6 +325,13 @@ def run_loop(
             state["last_updated"] = datetime.now(timezone.utc).isoformat()
             write_ledger(state)
             write_status_file(status_file, state, iteration_count, stop_reason)
+            _write_status_file(
+                status_file,
+                running=False,
+                iteration_count=iteration_count,
+                last_error=stop_reason,
+                version=VERSION,
+            )
             _print_shutdown_summary(
                 state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
             )
@@ -338,6 +349,13 @@ def run_loop(
                 state["last_updated"] = datetime.now(timezone.utc).isoformat()
                 write_ledger(state)
                 write_status_file(status_file, state, iteration_count, stop_reason)
+                _write_status_file(
+                    status_file,
+                    running=False,
+                    iteration_count=iteration_count,
+                    last_error=stop_reason,
+                    version=VERSION,
+                )
                 _print_shutdown_summary(
                     state,
                     iteration_count,
@@ -355,6 +373,12 @@ def run_loop(
             write_ledger(state)
             write_status_file(
                 status_file, state, iteration_count, "stopped: max_iterations"
+            )
+            _write_status_file(
+                status_file,
+                running=False,
+                iteration_count=iteration_count,
+                version=VERSION,
             )
             _print_shutdown_summary(
                 state,
@@ -377,6 +401,12 @@ def run_loop(
             state["last_updated"] = datetime.now(timezone.utc).isoformat()
             write_ledger(state)
             write_status_file(status_file, state, iteration_count, "stopped: idle")
+            _write_status_file(
+                status_file,
+                running=False,
+                iteration_count=iteration_count,
+                version=VERSION,
+            )
             _print_shutdown_summary(
                 state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
             )
@@ -531,6 +561,13 @@ def run_loop(
 
         write_ledger(state)
         write_status_file(status_file, state, iteration_count, "running")
+        _write_status_file(
+            status_file,
+            running=True,
+            iteration_count=iteration_count,
+            last_error=combined_error,
+            version=VERSION,
+        )
 
         status_icon = "✓" if combined_error is None else "✗"
         _log(
@@ -632,6 +669,13 @@ def run_loop(
                 state["last_updated"] = datetime.now(timezone.utc).isoformat()
                 write_ledger(state)
                 write_status_file(status_file, state, iteration_count, stop_reason)
+                _write_status_file(
+                    status_file,
+                    running=False,
+                    iteration_count=iteration_count,
+                    last_error=stop_reason,
+                    version=VERSION,
+                )
                 _print_shutdown_summary(
                     state,
                     iteration_count,

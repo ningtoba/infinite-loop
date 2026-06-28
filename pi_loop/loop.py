@@ -729,7 +729,9 @@ def _evolve_goal(output: str, state: dict, iteration: int) -> None:
         if line.strip().upper().startswith("NEXT_GOAL:"):
             next_goal = line.split(":", 1)[1].strip()
             if next_goal:
-                _log(f"[EVOLVE] Iteration {iteration} proposed next goal: {next_goal[:80]}")
+                _log(
+                    f"[EVOLVE] Iteration {iteration} proposed next goal: {next_goal[:80]}"
+                )
                 state["evolved_goal"] = next_goal
 
 

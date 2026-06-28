@@ -687,7 +687,6 @@ def main() -> None:
         run_loop(
             goal=args.goal,
             context=resolved_context,
-            toolsets=toolsets_list,
             workdir=args.workdir or None,
             sentinel_path=args.shutdown_sentinel,
             max_iterations=args.max_iterations,

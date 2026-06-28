@@ -497,7 +497,9 @@ def run_loop(
         # is NOT a real goal — sending it to a worker wastes an iteration.
         # The evolve guard (line ~774) prevents new pollution, but an already
         # polluted goal variable needs runtime detection.
-        if "need_reload" in goal.lower() or goal.strip().startswith("NEXT_ITERATION"):
+        if "need_reload" in goal.lower() or goal.strip().lower().startswith(
+            "next_iteration"
+        ):
             _log(
                 "[CONTROL-SIGNAL] Goal is a control signal, not a real task. "
                 "Replacing with a recovery goal to avoid wasted iteration."
@@ -513,7 +515,7 @@ def run_loop(
             # instead of the stale control signal.
             if state.get("current_goal") and (
                 "need_reload" in state["current_goal"].lower()
-                or state["current_goal"].strip().startswith("NEXT_ITERATION")
+                or state["current_goal"].strip().lower().startswith("next_iteration")
             ):
                 state["current_goal"] = goal
             state.pop("evolved_goal", None)

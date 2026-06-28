@@ -18,6 +18,8 @@ const ITERATIONS_PER_PAGE = 25;
 let lastLogIdx = -1;         // append-only log tracking
 let workerLogFilter = null;  // filter logs by worker ID
 let _lastSeenIterationCount = 0;  // only refetch iterations when count changes
+let _lastRecentFullRefresh = 0;   // timestamp of last full recent-iterations refresh
+const RECENT_FULL_REFRESH_MS = 30000;  // periodic full-refresh interval for recent table
 
 // ── Worktree merge + remote cleanup tooltip helpers ──────────────────────
 function _rcLabel(rc) {
@@ -109,6 +111,12 @@ function switchTab(tab) {
   document.getElementById(`tab-${tab}`).classList.add('active');
   if (tab === 'config' && !configData) loadConfig();
   if (tab === 'iterations') loadIterations();
+  // Switching to dashboard: force a full refresh of recent iterations
+  // so the user always sees the current state, even if the periodic
+  // timer hasn't fired yet or they were on another tab for a while.
+  if (tab === 'dashboard') {
+    _lastRecentFullRefresh = 0;  // triggers refresh on next SSE update
+  }
   if (tab === 'workers') { _lastWorkerLogCounts = {}; _activeWorkerLog = null; showWorkerCards(); fetchStatus(); }
 }
 
@@ -289,6 +297,17 @@ function updateRecentIterations(data) {
   const count = (data.ledger && data.ledger.total_iterations) || 0;
   const tbody = document.getElementById('recent-iterations-body');
 
+  // Periodic full-refresh: re-fetch from API to catch edge cases like
+  // tab switches, iteration removal without count decrease, or stale
+  // rows from a previous loop run persisting in the DOM.
+  const now = Date.now();
+  if (now - _lastRecentFullRefresh > RECENT_FULL_REFRESH_MS) {
+    _fullRefreshRecentIterations();
+    // Full refresh already updated _lastSeenIterationCount; bail out
+    // to avoid double-adding from the SSE payload.
+    return;
+  }
+
   // Reset scenario: count dropped below last seen — clear existing rows
   if (count < _lastSeenIterationCount) {
     tbody.innerHTML = '';
@@ -365,6 +384,27 @@ function updateRecentIterations(data) {
       }
     }).catch(() => {});
   }
+}
+
+// ── Periodic full-refresh for the recent iterations table ────────────
+// Handles edge cases: tab switches, iteration removal without count
+// decrease, stale rows persisting from old iterations.
+const RECENT_ITERS_LIMIT = 20;
+
+function _fullRefreshRecentIterations() {
+  _lastRecentFullRefresh = Date.now();
+  const tbody = document.getElementById('recent-iterations-body');
+  if (!tbody) return;
+  fetch(API.iterations + `?limit=${RECENT_ITERS_LIMIT}`).then(r => r.json()).then(result => {
+    const iters = result.iterations || [];
+    // Full rebuild: clear table body, then append all rows from API
+    tbody.innerHTML = '';
+    const seenNs = new Set();
+    _appendIterationRows(tbody, iters, seenNs);
+    if (result.total != null) {
+      _lastSeenIterationCount = result.total;
+    }
+  }).catch(() => {});
 }
 
 // ── Helper: fetch and append missing iterations from the API ────────────

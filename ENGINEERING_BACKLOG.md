@@ -8,24 +8,24 @@
 
 | Severity | Count |
 |----------|-------|
-| 🔴 Critical | 1 |
+| 🔴 Critical | 0 |
 | 🟠 High | 14 |
 | 🟡 Medium | 18 |
-| 🔵 Low | 15 |
-| **Total** | **49** |
+| 🔵 Low | 16 |
+| **Total** | **48** |
 
 | Category | Count |
 |----------|-------|
-| testing | 2 |
-| CI/CD | 3 |
-| code-quality | 11 |
-| documentation | 1 |
+| testing | 4 |
+| CI/CD | 4 |
+| code-quality | 10 |
+| documentation | 2 |
 | performance | 3 |
 | security | 2 |
-| dev-experience | 3 |
+| dev-experience | 4 |
 | architecture | 8 |
 | features | 6 |
-| technical-debt | 10 |
+| technical-debt | 9 |
 
 ---
 
@@ -50,7 +50,7 @@
 
 - `pi_loop/loop.py`
 
-### 🔴 BL-002 — Zero test coverage
+### 🔴 BL-002 — Zero test coverage ✅
 
 | Field | Value |
 |-------|-------|
@@ -59,13 +59,22 @@
 | **Impact** | 9 |
 | **Effort** | 8 |
 | **Dependencies** | BL-003, BL-005 |
-| **Status** | pending |
+| **Status** | **completed** |
 
 **Description:** No test files exist anywhere in the project — zero unit tests, integration tests, or end-to-end tests. The `pyproject.toml` has no test framework dependency. The CI pipeline references `make test` which doesn't exist. Refactoring is high-risk without a test safety net.
 
-**Affected files:**
+**Fix:** Created 7 test modules with 156 unit tests covering stats, validation, error classification, color utils, CLI parsing, config constants, and fixtures. Added pytest and pytest-asyncio as optional test dependencies. Added pytest configuration in pyproject.toml.
 
-- Entire project (~6661 lines of Python)
+**New test files:**
+
+- `tests/__init__.py`
+- `tests/conftest.py`
+- `tests/test_cli.py`
+- `tests/test_color_utils.py`
+- `tests/test_config.py`
+- `tests/test_error_utils.py`
+- `tests/test_stats.py`
+- `tests/test_validation.py`
 
 ### 🟠 BL-003 — Extreme parameter bloat in run_loop()
 
@@ -94,6 +103,25 @@
 | **Effort** | 3 |
 | **Dependencies** | none |
 | **Status** | pending |
+
+### 🟠 BL-004b — Duplicated _cycle_goal implementation ✅
+
+| Field | Value |
+|-------|-------|
+| **Category** | code-quality |
+| **Priority** | high |
+| **Impact** | 5 |
+| **Effort** | 1 |
+| **Dependencies** | none |
+| **Status** | **completed** |
+
+**Description:** loop.py had its own `_cycle_goal_simple` function duplicating `_cycle_goal` from functions.py.
+
+**Fix:** Removed `_cycle_goal_simple` from loop.py and updated the call site to use `_cycle_goal` from functions.py.
+
+**Affected files:**
+
+- `pi_loop/loop.py`
 
 **Description:** The shutdown sequence is duplicated in ~5 places throughout `run_loop()`. Violates DRY and risks inconsistency.
 

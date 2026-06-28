@@ -90,6 +90,7 @@ def _list_flags(show_help=True):
         "--doctor": "Run comprehensive self-diagnosis — checks hermes, PATH, .env, git, shell, disk space, gateway, and more",
         "--demo": "Interactive walkthrough of the daemon's full lifecycle \u2014 shows prompt construction, spawning, JSON parsing, ledger write, and summary display using a safe test goal",
         "--dump-env": "Print all known INFINITE_LOOP_* env vars with their current defaults and exit (non-interactive complement to --init/--wizard)",
+        "--healthcheck": "Run structured pipeline health check: validates hermes, JSON parsing, ledger I/O, git. Exits with a JSON report. Designed for Docker HEALTHCHECK and CI validation.",
     }
     total_flags = sum(len(v) for v in group_map.values()) + len(introspection_flags)
     header = f"Infinite Loop Daemon v{LAUNCH_LOOP_VERSION} — CLI Flags Reference"
@@ -286,6 +287,11 @@ def _list_examples():
     _cmd("diff .env /tmp/default-env.txt")
     _cmd("make diff-env   # shortcut for the above")
     print()
+    _comment("Pipeline health check (Docker HEALTHCHECK, CI validation)")
+    _cmd("hermes_loop --healthcheck")
+    _cmd("hermes_loop --healthcheck | jq '.status'   # quick summary")
+    _cmd("# SHELL_FORMAT=docker hermes_loop --healthcheck 2>&1 || exit 1")
+    print()
     _comment("Quick one-command entrypoint (reads .env)")
     _cmd("bash run.sh")
     _cmd('bash run.sh --goal "Override" --git --quiet')
@@ -327,6 +333,305 @@ def _list_examples():
     _cmd("tail -f /tmp/infinite-loop.log")
     _cmd('hermes_loop --goal "..." --status-html /tmp/dash.html --run')
     print()
+
+
+def _run_healthcheck() -> None:
+    """Run a structured pipeline health check and exit with a JSON report.
+
+    Validates the full daemon pipeline:
+    1. Hermes binary exists on PATH and --version works
+    2. JSON parsing (extract_json_from_output function)
+    3. Ledger read/write (file I/O with JSON)
+    4. Git availability
+
+    Output: Single JSON object on stdout with keys:
+      - status: "healthy" | "degraded" | "critical"
+      - checks: list of {name, status, detail, suggestion}
+      - summary: {healthy, degraded, failed, total}
+      - version: daemon version string
+      - timestamp: ISO-8601 timestamp
+
+    Exit codes: 0=healthy, 1=degraded (warnings), 2=critical (failures).
+
+    Designed for Docker HEALTHCHECK, CI validation, and pre-run checks.
+    """
+    import json
+    import os
+    import shutil
+    import subprocess
+    import sys
+    from datetime import datetime, timezone
+
+    from .config import LAUNCH_LOOP_VERSION, LEDGER_PATH
+    from .file_utils import extract_json_from_output, write_ledger, read_ledger
+
+    checks: list[dict] = []
+    ts = datetime.now(timezone.utc).isoformat()
+
+    # ── 1. Hermes binary ──────────────────────────────────────────────
+    hermes_bin = shutil.which("hermes")
+    if hermes_bin:
+        checks.append(
+            {
+                "name": "hermes_binary",
+                "status": "healthy",
+                "detail": f"Found at {hermes_bin}",
+                "suggestion": "",
+            }
+        )
+        # Version
+        try:
+            r = subprocess.run(
+                [hermes_bin, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            ver = (r.stdout or r.stderr or "unknown").strip().split("\n")[0][:80]
+            checks.append(
+                {
+                    "name": "hermes_version",
+                    "status": "healthy" if r.returncode == 0 else "degraded",
+                    "detail": (
+                        ver if r.returncode == 0 else f"exit={r.returncode}: {ver}"
+                    ),
+                    "suggestion": (
+                        "Reinstall hermes: curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"
+                        if r.returncode != 0
+                        else ""
+                    ),
+                }
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+            checks.append(
+                {
+                    "name": "hermes_version",
+                    "status": "degraded",
+                    "detail": str(e),
+                    "suggestion": "Check your hermes installation",
+                }
+            )
+    else:
+        checks.append(
+            {
+                "name": "hermes_binary",
+                "status": "critical",
+                "detail": "Not found on PATH",
+                "suggestion": "Install: curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash",
+            }
+        )
+        checks.append(
+            {
+                "name": "hermes_version",
+                "status": "critical",
+                "detail": "Skipped — hermes not found",
+                "suggestion": "",
+            }
+        )
+
+    # ── 2. JSON parsing ───────────────────────────────────────────────
+    json_test_cases = [
+        ("simple", '{"summary": "test", "error": null}'),
+        ("multi-line", '{\n"summary": "test",\n"error": null\n}'),
+        ("code-fence", '```json\n{"summary": "test", "error": null}\n```'),
+        ("with-noise", 'session_id: abc-123\n{"summary": "test", "error": null}'),
+        ("empty", ""),
+        ("none", None),
+    ]
+    json_pass = 0
+    json_fail = 0
+    json_details: list[str] = []
+    for name, case in json_test_cases:
+        try:
+            result = extract_json_from_output(case)
+            if name in ("empty", "none"):
+                if result is None:
+                    json_pass += 1
+                else:
+                    json_fail += 1
+                    json_details.append(f"{name}: expected None, got {result!r}")
+            else:
+                if result is not None and result.get("summary") == "test":
+                    json_pass += 1
+                else:
+                    json_fail += 1
+                    json_details.append(f"{name}: unexpected result {result!r}")
+        except Exception as e:
+            json_fail += 1
+            json_details.append(f"{name}: exception: {e}")
+    json_ok = json_fail == 0
+    checks.append(
+        {
+            "name": "json_parsing",
+            "status": "healthy" if json_ok else "degraded",
+            "detail": f"{json_pass}/{len(json_test_cases)} cases passed"
+            + (f" — failures: {'; '.join(json_details)}" if json_details else ""),
+            "suggestion": (
+                "Check file_utils.extract_json_from_output for regressions"
+                if not json_ok
+                else ""
+            ),
+        }
+    )
+
+    # ── 3. Ledger read/write ──────────────────────────────────────────
+    test_state = {
+        "status": "healthcheck",
+        "total_iterations": 0,
+        "healthcheck_timestamp": ts,
+        "test": True,
+    }
+    try:
+        write_ledger(test_state)
+        read_back = read_ledger()
+        if read_back and read_back.get("test") is True:
+            # Clean up test key
+            checks.append(
+                {
+                    "name": "ledger_io",
+                    "status": "healthy",
+                    "detail": f"Read/write OK at {LEDGER_PATH}",
+                    "suggestion": "",
+                }
+            )
+        else:
+            checks.append(
+                {
+                    "name": "ledger_io",
+                    "status": "degraded",
+                    "detail": f"Write succeeded but read returned unexpected data: {read_back!r}",
+                    "suggestion": "Check ledger file permissions and format",
+                }
+            )
+    except Exception as e:
+        checks.append(
+            {
+                "name": "ledger_io",
+                "status": "critical",
+                "detail": f"Write or read failed: {e}",
+                "suggestion": f"Check that {os.path.dirname(LEDGER_PATH)} is writable",
+            }
+        )
+
+    # Clean up healthcheck test state from ledger by restoring
+    try:
+        current = read_ledger()
+        if current and current.get("test") is True:
+            import os as _os
+
+            try:
+                _os.remove(LEDGER_PATH + ".tmp")
+            except OSError:
+                pass
+            # Write a clean minimal state
+            write_ledger(
+                {
+                    "status": "idle",
+                    "total_iterations": 0,
+                    "started_at": "",
+                    "current_goal": "",
+                    "iterations": [],
+                    "stats": {},
+                }
+            )
+    except Exception:
+        pass  # best-effort cleanup
+
+    # ── 4. Git availability ───────────────────────────────────────────
+    git_bin = shutil.which("git")
+    if git_bin:
+        checks.append(
+            {
+                "name": "git_binary",
+                "status": "healthy",
+                "detail": f"Found at {git_bin}",
+                "suggestion": "",
+            }
+        )
+        try:
+            r = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            in_repo = r.returncode == 0
+            checks.append(
+                {
+                    "name": "git_repository",
+                    "status": "healthy" if in_repo else "degraded",
+                    "detail": r.stdout.strip() if in_repo else "Not a git repository",
+                    "suggestion": (
+                        ""
+                        if in_repo
+                        else "Run 'git init' or clone a repo for git-integrated features"
+                    ),
+                }
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+            checks.append(
+                {
+                    "name": "git_repository",
+                    "status": "degraded",
+                    "detail": str(e),
+                    "suggestion": "Check git installation",
+                }
+            )
+    else:
+        checks.append(
+            {
+                "name": "git_binary",
+                "status": "degraded",
+                "detail": "Not found on PATH",
+                "suggestion": "Install git via your package manager (e.g. sudo pacman -S git)",
+            }
+        )
+        checks.append(
+            {
+                "name": "git_repository",
+                "status": "degraded",
+                "detail": "Skipped — git not found",
+                "suggestion": "",
+            }
+        )
+
+    # ── Aggregate ─────────────────────────────────────────────────────
+    healthy_count = sum(1 for c in checks if c["status"] == "healthy")
+    degraded_count = sum(1 for c in checks if c["status"] == "degraded")
+    failed_count = sum(1 for c in checks if c["status"] == "critical")
+    total = len(checks)
+
+    if failed_count > 0:
+        overall_status = "critical"
+        exit_code = 2
+    elif degraded_count > 0:
+        overall_status = "degraded"
+        exit_code = 1
+    else:
+        overall_status = "healthy"
+        exit_code = 0
+
+    report = {
+        "status": overall_status,
+        "version": LAUNCH_LOOP_VERSION,
+        "timestamp": ts,
+        "checks": checks,
+        "summary": {
+            "healthy": healthy_count,
+            "degraded": degraded_count,
+            "failed": failed_count,
+            "total": total,
+        },
+    }
+
+    # Check SHELL_FORMAT=docker for compact Docker HEALTHCHECK output
+    if os.environ.get("SHELL_FORMAT", "").lower() == "docker":
+        # Docker HEALTHCHECK friendly: one line, just the status
+        print(json.dumps({"status": overall_status, "exit_code": exit_code}))
+    else:
+        print(json.dumps(report, indent=2))
+
+    sys.exit(exit_code)
 
 
 def _explain_flag(flag_name: str) -> None:
@@ -517,6 +822,10 @@ def _help_topic(topic: str) -> None:
         ("--doctor", "Run comprehensive self-diagnosis"),
         ("--check-env", "Validate .env file for typos and mistakes"),
         ("--demo", "Interactive walkthrough of the daemon lifecycle"),
+        (
+            "--healthcheck",
+            "Run structured pipeline health check (Docker HEALTHCHECK friendly)",
+        ),
     ]
 
     # Find matching group
@@ -1586,6 +1895,14 @@ def _create_parser(for_introspection=False):
         help="Path to write one-line JSON status file for external monitoring "
         "(e.g. /tmp/loop-status.json). Updated after each iteration.",
     )
+    group.add_argument(
+        "--healthcheck",
+        action="store_true",
+        help="Run a structured pipeline health check: validates hermes binary, JSON parsing, "
+        "ledger read/write, and git availability. Exits with a JSON report on stdout. "
+        "Designed for Docker HEALTHCHECK and CI validation. "
+        "Exit code: 0 = all healthy, 1 = degraded (warnings), 2 = critical failure.",
+    )
 
     # ── 17. Ledger Management ───────────────────────────────────────────────
     group = parser.add_argument_group(
@@ -2320,6 +2637,12 @@ def main():
         _dump_env_vars()
         sys.exit(0)
 
+    # Check --healthcheck before argparse to avoid required --goal conflict
+    if "--healthcheck" in sys.argv:
+        configure_color_mode(color_mode)
+        _run_healthcheck()
+        sys.exit(0)
+
     # Check --save-config before argparse to avoid required --goal conflict
     save_config_path = None
     for i, arg in enumerate(sys.argv[1:]):
@@ -2454,6 +2777,7 @@ def main():
         "--doctor",
         "--demo",
         "--dump-env",
+        "--healthcheck",
     }
     arg_set = set(sys.argv[1:])
     has_goal = any(

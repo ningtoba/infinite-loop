@@ -33,6 +33,7 @@ _hermes_loop_completions()
         --force-reset
         --git
         --git-commit
+        --healthcheck
         --ignore-rules
         --ignore-user-config
         --init

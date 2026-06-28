@@ -27,6 +27,7 @@ bool_flags=(
     '--force-reset[Clear existing ledger and start fresh]'
     '--git[Capture git diff stats per iteration]'
     '--git-commit[Auto-commit changes per iteration (implies --git)]'
+    '--healthcheck[Run a structured pipeline health check: validates hermes binary, JSON parsing, ledger read/write, and git availability]'
     '--ignore-rules[Start spawned sessions without loading AGENTS]'
     '--ignore-user-config[Pass --ignore-user-config to spawned sessions so they skip ~/]'
     '--init[Interactive setup wizard — walks you through the most common configuration options step by step and generates a]'

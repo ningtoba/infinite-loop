@@ -101,6 +101,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   initSSE();
   fetchStatus();
+  // Bind scroll-shadow detection on the recent-iterations wrap
+  const wrap = document.getElementById('recent-iterations-wrap');
+  if (wrap) {
+    wrap.addEventListener('scroll', _updateScrollShadow, { passive: true });
+  }
 });
 
 function switchTab(tab) {
@@ -364,6 +369,7 @@ function updateRecentIterations(data) {
       const temp = document.createElement('tbody');
       temp.innerHTML = rowHtml;
       tbody.insertBefore(temp.firstChild, tbody.firstChild);
+      _updateScrollShadow();
     }
   } else {
     // Fallback: fetch full list if latest_iteration isn't available
@@ -404,7 +410,21 @@ function _fullRefreshRecentIterations() {
     if (result.total != null) {
       _lastSeenIterationCount = result.total;
     }
+    _updateScrollShadow();
   }).catch(() => {});
+}
+
+// ── Scroll-shadow gradient toggle ─────────────────────────────────────
+// Hides the bottom-fade gradient on the recent-iterations wrap when the
+// user has scrolled all the way to the bottom (content fully visible).
+function _updateScrollShadow() {
+  const wrap = document.getElementById('recent-iterations-wrap');
+  if (!wrap) return;
+  // Use a microtask to let DOM settle after row insertion
+  requestAnimationFrame(() => {
+    const atBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 8;
+    wrap.classList.toggle('scrolled-bottom', atBottom);
+  });
 }
 
 // ── Helper: fetch and append missing iterations from the API ────────────
@@ -451,6 +471,7 @@ function _appendIterationRows(tbody, iters, seenNs) {
     frag.appendChild(temp.firstChild);
   });
   tbody.insertBefore(frag, tbody.firstChild);
+  _updateScrollShadow();
 }
 
 function updateLiveIteration(live) {

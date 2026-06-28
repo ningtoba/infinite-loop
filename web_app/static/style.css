@@ -305,7 +305,29 @@ body {
 
 /* ── Tables ─────────────────────────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-#recent-iterations-wrap { max-height: 420px; overflow-y: auto; }
+#recent-iterations-wrap {
+  max-height: 420px;
+  overflow-y: auto;
+  position: relative;
+}
+/* Scroll-shadow gradient: a faint fade-to-bg at the bottom edge to hint
+   that more rows are available below the fold. Hidden when scrolled to
+   the very bottom (via JS toggle of .scrolled-bottom). */
+#recent-iterations-wrap::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, var(--bg-primary));
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+#recent-iterations-wrap.scrolled-bottom::after {
+  opacity: 0;
+}
 table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 thead th {
   text-align: left;

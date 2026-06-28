@@ -1,6 +1,8 @@
 """Iteration execution, merging, backoff, convergence, compacting, record building, notifications, and callbacks."""
 
 import concurrent.futures
+import hashlib
+import hmac
 import json
 import os
 import subprocess
@@ -695,14 +697,28 @@ def _handle_notifications(
 
 
 def _handle_callbacks(
-    http_callback: str,
-    record: dict,
-    notify_cmd: str | None,
-    on_error_cmd: str | None,
-    combined_error: str | None,
+    http_callback: str = "",
+    http_callback_secret: str = "",
+    record: dict | None = None,
+    notify_cmd: str | None = None,
+    on_error_cmd: str | None = None,
+    combined_error: str | None = None,
     state: dict | None = None,
 ) -> None:
-    """Dispatch HTTP callback, notify-cmd, and on-error-cmd for each iteration."""
+    """Dispatch HTTP callback (optionally HMAC-signed), notify-cmd, and on-error-cmd."""
+    if not record:
+        record = {}
+
+    # Build signing helper that returns None when no secret is configured
+    def _maybe_sign(data: bytes) -> str | None:
+        if not http_callback_secret:
+            return None
+        return hmac.new(
+            http_callback_secret.encode("utf-8"),
+            data,
+            hashlib.sha256,
+        ).hexdigest()
+
     if http_callback and state:
         payload = {
             "iteration": record,
@@ -740,10 +756,14 @@ def _handle_callbacks(
         try:
 
             notify_data = json.dumps(payload, default=str).encode("utf-8")
+            headers = {"Content-Type": "application/json"}
+            signature = _maybe_sign(notify_data)
+            if signature:
+                headers["X-Signature-256"] = signature
             req = urllib.request.Request(
                 http_callback,
                 data=notify_data,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 method="POST",
             )
             urllib.request.urlopen(req, timeout=15)

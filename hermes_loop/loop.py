@@ -161,6 +161,7 @@ def run_loop(
     model: str = "",
     provider: str = "",
     http_callback: str = "",
+    http_callback_secret: str = "",
     keep_iterations: int = 0,
     archive_dir: str = "",
     archive_retention: int = 30,
@@ -934,6 +935,7 @@ def run_loop(
 
         _handle_callbacks(
             http_callback=http_callback,
+            http_callback_secret=http_callback_secret,
             record=record,
             notify_cmd=notify_cmd,
             on_error_cmd=on_error_cmd,

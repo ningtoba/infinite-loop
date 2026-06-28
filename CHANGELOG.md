@@ -4,7 +4,10 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
-## [14.38.2] — 2026-06-28
+## [14.39.0] — 2026-06-28
+
+### Added
+- **`--http-callback-secret` and HMAC-SHA256 webhook signing**: New `--http-callback-secret` CLI flag adds HMAC-SHA256 payload signing to HTTP callbacks. When set, every POST to `--http-callback` includes an `X-Signature-256` header containing the hex-encoded HMAC-SHA256 digest of the JSON body, keyed by the shared secret. The receiver verifies authenticity by re-computing the signature with the same secret. No behaviour change when the flag is absent — existing callers are unaffected.
 
 ### Added
 - **`IMPROVEMENT_PLAN.md` — Improvement plan scan pass**: Created the improvement plan with comprehensive codebase scan findings. READ 20+ source files across all modules, checked lint (clean), self-tests (12/12 pass), and grep for TODOs/FIXMEs (none found). Populated backlog with 9 findings across 🐛 Bugs (2), 🔧 Refactor (2), ✨ Features (1), 🧹 Hygiene (3), and 🏗️ Infra/CI (4). This iteration was scan-only; next iteration will act on the highest-priority backlog item.

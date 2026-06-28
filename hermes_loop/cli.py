@@ -1477,6 +1477,15 @@ def _create_parser(for_introspection=False):
         default="",
         help="HTTP POST URL for iteration JSON (like --notify-cmd but via HTTP)",
     )
+    group.add_argument(
+        "--http-callback-secret",
+        default="",
+        help="HMAC-SHA256 signing key for HTTP callback payloads. "
+        "When set, every POST to --http-callback includes an "
+        "'X-Signature-256' header: HMAC-SHA256(body, secret). "
+        "The receiver verifies authenticity by re-computing the "
+        "signature with the shared secret.",
+    )
 
     # ── 14. Notifications ───────────────────────────────────────────────────
     group = parser.add_argument_group(
@@ -2320,6 +2329,8 @@ def main():
         _log(f"  Model:          {args.model or '(default)'}")
         _log(f"  Provider:       {args.provider or '(default)'}")
         _log(f"  HTTP callback:  {args.http_callback or 'none'}")
+        secret_status = "signed" if args.http_callback_secret else "unsigned"
+        _log(f"  Callback sig:   {secret_status}")
         _log(
             f"  Keep iterations:{args.keep_iterations if args.keep_iterations > 0 else 'all'}"
         )
@@ -2460,6 +2471,7 @@ def main():
     state["model"] = args.model
     state["provider"] = args.provider
     state["http_callback"] = args.http_callback
+    state["http_callback_secret"] = args.http_callback_secret
     state["keep_iterations"] = args.keep_iterations
     state["tag"] = args.tag
     state["prompt_suffix"] = args.prompt_suffix
@@ -2561,6 +2573,7 @@ def main():
             model=args.model,
             provider=args.provider,
             http_callback=args.http_callback,
+            http_callback_secret=args.http_callback_secret,
             keep_iterations=args.keep_iterations,
             archive_dir=args.archive_dir,
             archive_retention=args.archive_retention,

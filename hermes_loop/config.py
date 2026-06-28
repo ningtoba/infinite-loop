@@ -1,4 +1,4 @@
-"""Constants, paths, and defaults for the hermes_loop package (v14.38.0)."""
+"""Constants, paths, and defaults for the hermes_loop package (v14.39.0)."""
 
 # Paths
 LEDGER_PATH = "/tmp/infinite-loop-state.json"
@@ -262,4 +262,4 @@ HEARTBEAT_POLL_INTERVAL = 5  # daemon polling interval (seconds)
 HEARTBEAT_KILL_GRACE = 5  # seconds between SIGTERM and SIGKILL
 
 # Version
-LAUNCH_LOOP_VERSION = "14.38.2"
+LAUNCH_LOOP_VERSION = "14.39.0"

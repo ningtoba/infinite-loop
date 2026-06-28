@@ -171,6 +171,7 @@ _SSE_DASHBOARD_HTML_TPL = """<!DOCTYPE html>
   .err-timeout { border-left: 3px solid #d29922; }
   .err-network { border-left: 3px solid #da3633; }
   .err-schema { border-left: 3px solid #a371f7; }
+  .err-heartbeat { border-left: 3px solid #bc8cff; }
   .err-unknown { border-left: 3px solid var(--dim); }
   .mitigation-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem; background: #1a3a1a; color: #3fb950; margin: 2px; }
   .mitigation-active { background: #3a1a1a; color: #f85149; }
@@ -211,6 +212,7 @@ _SSE_DASHBOARD_HTML_TPL = """<!DOCTYPE html>
   <div class="err-card err-timeout"><span class="num" id="err-timeout">0</span>timeout</div>
   <div class="err-card err-network"><span class="num" id="err-network">0</span>network</div>
   <div class="err-card err-schema"><span class="num" id="err-schema">0</span>schema</div>
+  <div class="err-card err-heartbeat"><span class="num" id="err-heartbeat">0</span>heartbeat</div>
   <div class="err-card err-unknown"><span class="num" id="err-unknown">0</span>unknown</div>
   <div id="mitigations-container" style="margin-left:8px;"></div>
 </div>
@@ -263,7 +265,8 @@ function updateErrorPanel(data) {
     document.getElementById('err-network').textContent = e.network || 0;
     document.getElementById('err-schema').textContent = e.schema || 0;
     document.getElementById('err-unknown').textContent = e.unknown || 0;
-    var total = (e.timeout||0)+(e.network||0)+(e.schema||0)+(e.unknown||0);
+    document.getElementById('err-heartbeat').textContent = e.heartbeat || 0;
+    var total = (e.timeout||0)+(e.network||0)+(e.schema||0)+(e.heartbeat||0)+(e.unknown||0);
     document.getElementById('error-summary').textContent = '(' + total + ' total errors)';
     var mc = document.getElementById('mitigations-container');
     mc.innerHTML = '';
@@ -537,8 +540,38 @@ fetch('/api/status')
 var evtSource = new EventSource('/live');
 evtSource.addEventListener('init', function (event) {
     try {
-        var data = JSON.parse(event.data);
-        if (data && data.data) renderDashboard(data.data);
+        var d = JSON.parse(event.data);
+        // d.data is _wrap_sse_payload's data dict: {loop_status, ledger{}, latest_iteration, stats{}, ...}
+        // Unwrap into flat renderDashboard() shape same as the update handler below
+        if (d && d.data) {
+            var s = d.data.stats || {};
+            var led = d.data.ledger || {};
+            var latest = d.data.latest_iteration || {};
+            var et = d.data.error_counts || {};
+            renderDashboard({
+                iteration: latest,
+                status: d.data.loop_status || 'unknown',
+                total_iterations: led.total_iterations || 0,
+                max_iterations: led.max_iterations || 0,
+                goal: led.goal || '-',
+                evolved_goal: led.evolved_goal || '',
+                started_at: led.started_at || '',
+                last_updated: led.last_updated || '',
+                stats: { success_count: s.success_count, error_count: s.error_count, total_duration_seconds: s.total_duration_seconds, avg_duration_seconds: s.avg_duration_seconds },
+                consecutive_errors: s.consecutive_errors || 0,
+                consecutive_successes: s.consecutive_successes || 0,
+                cooldown: led.cooldown || 0,
+                eta: d.data.eta || {},
+                error_counts: et,
+                mitigations: d.data.mitigations || {},
+                goals: d.data.goals || [],
+                avg_chars_per_iter: d.data.avg_chars_per_iter,
+                avg_throughput: d.data.avg_throughput,
+                est_cost: d.data.est_cost,
+                iters_per_goal: d.data.iters_per_goal,
+                metrics_summary: d.data.metrics_summary || '',
+            });
+        }
     } catch (e) {
         console.error('SSE parse error:', e);
     }
@@ -786,7 +819,6 @@ def _wrap_sse_payload(raw: dict) -> dict:
             "consecutive_errors": raw.get("consecutive_errors", 0),
             "consecutive_successes": raw.get("consecutive_successes", 0),
             "cooldown": raw.get("cooldown", 0),
-            "iteration": raw.get("iteration", {}),
         },
     }
 

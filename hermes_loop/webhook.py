@@ -166,7 +166,6 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
                         "consecutive_errors": stats.get("consecutive_errors", 0),
                         "consecutive_successes": stats.get("consecutive_successes", 0),
                         "cooldown": state.get("cooldown", 0),
-                        "iteration": latest,
                     },
                 )
             else:

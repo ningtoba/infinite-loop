@@ -24,7 +24,7 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Hermes loop runtime artifacts (user-specific)
+# pi-loop runtime artifacts (user-specific)
 /tmp/infinite-loop-state.json
 /tmp/infinite-loop-stop
 /tmp/infinite-loop-*.log

@@ -3,43 +3,15 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hermes-loop"
-description = "Autonomous loop daemon that spawns Hermes sessions with real tools and delegation"
-version = "14.38.2"
+name = "pi-loop"
+description = "Autonomous task automation daemon — watches files, runs tasks, tracks progress in a JSON ledger"
+version = "14.39.0"
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"
 
 [project.scripts]
-hermes_loop = "hermes_loop.cli:main"
-hermes_loop_web = "web_app.server:main"
-
-[project.optional-dependencies]
-web = ["fastapi>=0.100.0", "uvicorn>=0.23.0", "python-dotenv>=1.0.0"]
+pi-loop = "pi_loop.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["hermes_loop*", "web_app*"]
-
-[tool.coverage.run]
-source = ["hermes_loop", "web_app"]
-omit = ["*/tests/*"]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-]
-
-# ── Hermes Loop Project Metadata ──────────────────────────────────────────────
-# These settings are consumed by Makefile targets and the pre-commit hook.
-# pip-level tools and post-install scripts can read this section to auto-configure
-# the git hooks path without duplicating the Makefile's shell logic.
-
-[tool.hermes_loop]
-# Recommended hooks installation method: "core.hooksPath" or "cp"
-hooks_method = "core.hooksPath"
-# Path (relative to repo root) used by core.hooksPath
-hooks_path = ".githooks"
-# Target path for cp-based installation (relative to repo root)
-hooks_cp_target = ".git/hooks/pre-commit"
+include = ["pi_loop*"]

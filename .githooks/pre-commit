@@ -37,11 +37,11 @@ fi
 
 # ---- Step 2: Regenerate ---------------------------------------------------
 
-python3 -m hermes_loop --completion-script bash > "$BASH_FILE" 2>/dev/null || {
-    echo "  [pre-commit] ⚠ Could not regenerate bash completion (python3 -m hermes_loop not available?)" >&2
+python3 -m pi_loop --completion-script bash > "$BASH_FILE" 2>/dev/null || {
+    echo "  [pre-commit] ⚠ Could not regenerate bash completion (python3 -m pi_loop not available?)" >&2
     exit 0  # Non-fatal — don't block commits
 }
-python3 -m hermes_loop --completion-script zsh > "$ZSH_FILE" 2>/dev/null || {
+python3 -m pi_loop --completion-script zsh > "$ZSH_FILE" 2>/dev/null || {
     echo "  [pre-commit] ⚠ Could not regenerate zsh completion" >&2
     exit 0
 }

@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# pre-commit — auto-regenerate shell completion scripts when CLI flags change
+#
+# Regenerates scripts/completion/{bash,zsh} from the live argparse parser
+# whenever any file that could introduce new CLI flags has changed (or always,
+# since regeneration is ~0.1s and guarantees freshness).
+#
+# Install:
+#   git config core.hooksPath .githooks
+#   # or: find .githooks -type f -exec chmod +x {} \;
+#   #     cp -a .githooks/* .git/hooks/
+#
+# ==============================================================================
+
+set -euo pipefail
+
+# Paths — use git rev-parse to reliably find the repo root regardless of how
+# the hook was installed (copied to .git/hooks/ or via core.hooksPath)
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+    echo "  [pre-commit] ⚠ Not a git repository — skipping completion regeneration" >&2
+    exit 0
+}
+COMPLETION_DIR="$REPO_ROOT/scripts/completion"
+BASH_FILE="$COMPLETION_DIR/bash"
+ZSH_FILE="$COMPLETION_DIR/zsh"
+
+# ---- Step 1: Save the current (pre-regeneration) hashes --------------------
+
+OLD_BASH_HASH=""
+OLD_ZSH_HASH=""
+if [[ -f "$BASH_FILE" ]]; then
+    OLD_BASH_HASH=$(md5sum "$BASH_FILE" | cut -d' ' -f1)
+fi
+if [[ -f "$ZSH_FILE" ]]; then
+    OLD_ZSH_HASH=$(md5sum "$ZSH_FILE" | cut -d' ' -f1)
+fi
+
+# ---- Step 2: Regenerate ---------------------------------------------------
+
+python3 -m hermes_loop --completion-script bash > "$BASH_FILE" 2>/dev/null || {
+    echo "  [pre-commit] ⚠ Could not regenerate bash completion (python3 -m hermes_loop not available?)" >&2
+    exit 0  # Non-fatal — don't block commits
+}
+python3 -m hermes_loop --completion-script zsh > "$ZSH_FILE" 2>/dev/null || {
+    echo "  [pre-commit] ⚠ Could not regenerate zsh completion" >&2
+    exit 0
+}
+
+# ---- Step 3: Stage if files changed ---------------------------------------
+
+NEW_BASH_HASH=$(md5sum "$BASH_FILE" | cut -d' ' -f1)
+NEW_ZSH_HASH=$(md5sum "$ZSH_FILE" | cut -d' ' -f1)
+
+STAGED_ANY=0
+
+if [[ "$NEW_BASH_HASH" != "$OLD_BASH_HASH" ]]; then
+    git add "$BASH_FILE"
+    echo "  [pre-commit] ✓ Regenerated scripts/completion/bash (flags changed)" >&2
+    STAGED_ANY=1
+fi
+
+if [[ "$NEW_ZSH_HASH" != "$OLD_ZSH_HASH" ]]; then
+    git add "$ZSH_FILE"
+    echo "  [pre-commit] ✓ Regenerated scripts/completion/zsh (flags changed)" >&2
+    STAGED_ANY=1
+fi
+
+if [[ "$STAGED_ANY" -eq 0 ]]; then
+    echo "  [pre-commit] ✓ Completion scripts already up-to-date" >&2
+fi
+
+exit 0

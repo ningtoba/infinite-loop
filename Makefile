@@ -65,6 +65,7 @@ help:
 	@echo "    lint             Run Python syntax checks on all .py files"
 	@echo "    completion       Install shell tab-completion (bash/zsh)"
 	@echo "    update-completions  Regenerate completion scripts from argparse"
+	@echo "    install-hooks    Install pre-commit hook from .githooks/"
 	@echo "    archive          Archive old iterations from ledger"
 	@echo ""
 	@echo "EXAMPLES:"
@@ -243,6 +244,31 @@ pause:
 resume:
 	@echo "resume" > $(SENTINEL)
 	@echo "Sent 'resume' to $(SENTINEL)"
+
+# ── Git Hooks ──────────────────────────────────────────────────────────────────
+
+.PHONY: install-hooks
+install-hooks:
+	@echo "━━━ Installing git hooks from .githooks/ ━━━"
+	@echo ""
+	@cp .githooks/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "  ✓ Copied .githooks/pre-commit → .git/hooks/pre-commit"
+	@echo ""
+	@echo "  Alternatively, use core.hooksPath to avoid copying:"
+	@echo "    git config core.hooksPath .githooks"
+	@echo ""
+	@echo "  Active hook: $(shell ls -la .git/hooks/pre-commit 2>/dev/null | awk '{print $$1, $$NF}')"
+	@echo ""
+
+.PHONY: install-hooks-path
+install-hooks-path:
+	@echo "━━━ Configuring git core.hooksPath = .githooks ━━━"
+	@echo ""
+	@git config core.hooksPath .githooks
+	@echo "  ✓ core.hooksPath = .githooks"
+	@echo "  Verify: git config --get core.hooksPath"
+	@echo ""
 
 # ── Pre-Commit / CI ────────────────────────────────────────────────────────────
 

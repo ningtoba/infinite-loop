@@ -456,6 +456,7 @@ git push origin feature/your-feature
 - [ ] `run.sh` forwarding updated (if new CLI flags were added)
 - [ ] `SKILL.md` metadata updated (if relevant)
 - [ ] Shell scripts pass `bash -n` syntax check
+- [ ] Completion scripts up-to-date (run `make install-hooks` to auto-regenerate on commit)
 - [ ] No external dependencies introduced
 - [ ] Commit messages follow conventions
 

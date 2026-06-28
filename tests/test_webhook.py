@@ -5,9 +5,10 @@ from __future__ import annotations
 import io
 import json
 import queue
-from unittest.mock import MagicMock, patch, call
-
-import pytest
+import http.server
+import socketserver
+from unittest import mock as _mock
+from unittest.mock import MagicMock, patch
 
 from hermes_loop.webhook import (
     WebhookHandler,
@@ -665,9 +666,3 @@ class TestStartWebhookServer:
             with patch("threading.Thread"):
                 _start_webhook_server(port=9999, trigger_fn=mock_fn)
         assert WebhookHandler._shutdown_sentinel == ""
-
-
-# Need imports for class hierarchy test
-import http.server
-import socketserver
-from unittest import mock as _mock

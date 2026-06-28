@@ -18,10 +18,6 @@ from hermes_loop.hermes_utils import (
     _run_hermes_with_pty,
 )
 
-import select
-import os as _os
-import time as _time
-
 # ===================================================================
 # ANSI regex
 # ===================================================================
@@ -583,8 +579,6 @@ class TestReadStderrRealTime:
         proc = MagicMock()
         proc.stderr.readline.side_effect = ["line1\n", "line2\n", ""]
 
-        from hermes_loop.hermes_utils import _read_stderr_real_time
-
         with patch("hermes_loop.hermes_utils._log") as mock_log:
             _read_stderr_real_time(proc, worker_tag="")
 
@@ -597,8 +591,6 @@ class TestReadStderrRealTime:
         proc = MagicMock()
         proc.stderr.readline.side_effect = ["output\n", ""]
 
-        from hermes_loop.hermes_utils import _read_stderr_real_time
-
         with patch("hermes_loop.hermes_utils._log") as mock_log:
             _read_stderr_real_time(proc, worker_tag="#1")
 
@@ -609,8 +601,6 @@ class TestReadStderrRealTime:
         proc = MagicMock()
         proc.stderr.readline.side_effect = ["hello\r\n", ""]
 
-        from hermes_loop.hermes_utils import _read_stderr_real_time
-
         with patch("hermes_loop.hermes_utils._log") as mock_log:
             _read_stderr_real_time(proc, worker_tag="")
 
@@ -620,8 +610,6 @@ class TestReadStderrRealTime:
         """Empty lines are skipped without logging."""
         proc = MagicMock()
         proc.stderr.readline.side_effect = ["\n", "content\n", ""]
-
-        from hermes_loop.hermes_utils import _read_stderr_real_time
 
         with patch("hermes_loop.hermes_utils._log") as mock_log:
             _read_stderr_real_time(proc, worker_tag="")
@@ -635,8 +623,6 @@ class TestReadStderrRealTime:
         long_line = "x" * 600 + "\n"
         proc.stderr.readline.side_effect = [long_line, ""]
 
-        from hermes_loop.hermes_utils import _read_stderr_real_time
-
         with patch("hermes_loop.hermes_utils._log") as mock_log:
             _read_stderr_real_time(proc, worker_tag="")
 
@@ -648,8 +634,6 @@ class TestReadStderrRealTime:
         proc = MagicMock()
         proc.stderr.readline.side_effect = ValueError("I/O operation on closed file")
 
-        from hermes_loop.hermes_utils import _read_stderr_real_time
-
         with patch("hermes_loop.hermes_utils._log") as mock_log:
             # Should not raise
             _read_stderr_real_time(proc, worker_tag="")
@@ -659,8 +643,6 @@ class TestReadStderrRealTime:
         """OSError from readline is caught silently."""
         proc = MagicMock()
         proc.stderr.readline.side_effect = OSError("pipe closed")
-
-        from hermes_loop.hermes_utils import _read_stderr_real_time
 
         with patch("hermes_loop.hermes_utils._log") as mock_log:
             _read_stderr_real_time(proc, worker_tag="")
@@ -672,8 +654,6 @@ class TestReadStderrRealTime:
         proc.stderr.readline.side_effect = AttributeError(
             "'NoneType' object has no attribute 'readline'"
         )
-
-        from hermes_loop.hermes_utils import _read_stderr_real_time
 
         with patch("hermes_loop.hermes_utils._log") as mock_log:
             # Should not raise
@@ -697,8 +677,6 @@ class TestReadStdoutLive:
         proc.returncode = 0
         proc.args = ["hermes", "chat", "-q"]
 
-        from hermes_loop.hermes_utils import _read_stdout_live
-
         with patch("hermes_loop.hermes_utils._log"):
             stdout, code = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
 
@@ -713,8 +691,6 @@ class TestReadStdoutLive:
         proc.wait.return_value = 0
         proc.returncode = 0
         proc.args = ["hermes"]
-
-        from hermes_loop.hermes_utils import _read_stdout_live
 
         with patch("hermes_loop.hermes_utils._log") as mock_log:
             _read_stdout_live(proc, worker_tag="#1", timeout_seconds=0)
@@ -731,8 +707,6 @@ class TestReadStdoutLive:
         proc.returncode = 0
         proc.args = ["hermes"]
 
-        from hermes_loop.hermes_utils import _read_stdout_live
-
         with patch("hermes_loop.hermes_utils._log"):
             stdout, _ = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
 
@@ -744,8 +718,6 @@ class TestReadStdoutLive:
         # Simulate slow output that keeps returning data so iter() doesn't stop
         proc.stdout.readline.side_effect = ["line1\n"] + ["data\n"] * 100
         proc.args = ["hermes", "chat", "-q"]
-
-        from hermes_loop.hermes_utils import _read_stdout_live
 
         with patch("hermes_loop.hermes_utils._log"):
             with patch("hermes_loop.hermes_utils.time.time") as mock_time:
@@ -763,8 +735,6 @@ class TestReadStdoutLive:
         proc.returncode = 0
         proc.args = ["hermes"]
 
-        from hermes_loop.hermes_utils import _read_stdout_live
-
         with patch("hermes_loop.hermes_utils._log"):
             stdout, code = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
 
@@ -778,8 +748,6 @@ class TestReadStdoutLive:
         proc.wait.return_value = 0
         proc.returncode = 0
         proc.args = ["hermes"]
-
-        from hermes_loop.hermes_utils import _read_stdout_live
 
         with patch("hermes_loop.hermes_utils._log"):
             stdout, code = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
@@ -795,8 +763,6 @@ class TestReadStdoutLive:
         proc.returncode = 0
         proc.args = ["hermes"]
 
-        from hermes_loop.hermes_utils import _read_stdout_live
-
         with patch("hermes_loop.hermes_utils._log"):
             stdout, code = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
 
@@ -810,8 +776,6 @@ class TestReadStdoutLive:
         proc.wait.return_value = 0
         proc.returncode = 0
         proc.args = ["hermes"]
-
-        from hermes_loop.hermes_utils import _read_stdout_live
 
         with patch("hermes_loop.hermes_utils._log"):
             stdout, code = _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
@@ -827,8 +791,6 @@ class TestReadStdoutLive:
         proc.returncode = 0
         proc.args = ["hermes"]
 
-        from hermes_loop.hermes_utils import _read_stdout_live
-
         with patch("hermes_loop.hermes_utils._log") as mock_log:
             _read_stdout_live(proc, worker_tag="#2", timeout_seconds=0)
 
@@ -842,8 +804,6 @@ class TestReadStdoutLive:
         proc.returncode = 0
         proc.args = ["hermes"]
 
-        from hermes_loop.hermes_utils import _read_stdout_live
-
         with patch("hermes_loop.hermes_utils._log"):
             _read_stdout_live(proc, worker_tag="", timeout_seconds=0)
 
@@ -856,7 +816,7 @@ class TestRunHermesWithPty:
 
     def test_raises_timeout_when_exceeded(self):
         """Raises subprocess.TimeoutExpired when timeout exceeded."""
-        with patch("pty.openpty", return_value=(5, 6)) as mock_pty:
+        with patch("pty.openpty", return_value=(5, 6)):
             with patch("subprocess.Popen") as mock_popen:
                 with patch("select.select", return_value=([], [], [])):
                     with patch("os.set_blocking"):

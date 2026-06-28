@@ -17,8 +17,8 @@ from .config import (
 )
 from .file_utils import _log
 
-# Module-level shutdown flag — set by signal handler or loop controller
-_shutdown_requested = False
+# Module-level shutdown flag — threading.Event for safe cross-thread/cross-signal access
+_shutdown_requested = threading.Event()
 
 
 def _heartbeat_path(identifier: str) -> str:
@@ -80,7 +80,7 @@ def _monitor_heartbeat(
     _cached_mtime: float | None = None
     _cached_data: dict | None = None
 
-    while not _shutdown_requested:
+    while not _shutdown_requested.is_set():
         if proc is not None and proc.poll() is not None:
             return {
                 "status": "completed",
@@ -113,9 +113,7 @@ def _monitor_heartbeat(
                 }
         elif age > timeout:
             if age > timeout + grace_period:
-                _log(
-                    f"[HEARTBEAT] DEAD — last heartbeat {age:.0f}s ago (> {timeout + grace_period}s)"
-                )
+                _log(f"[HEARTBEAT] DEAD — last heartbeat {age:.0f}s ago (> {timeout + grace_period}s)")
                 return {
                     "status": "expired",
                     "age_seconds": age,
@@ -150,17 +148,11 @@ def _run_heartbeat_monitor(
     result_container: dict = {}
 
     def _monitor_wrapper():
-        result_container["result"] = _monitor_heartbeat(
-            heartbeat_file, timeout, session_start, proc
-        )
+        result_container["result"] = _monitor_heartbeat(heartbeat_file, timeout, session_start, proc)
 
     t = threading.Thread(target=_monitor_wrapper, daemon=True)
     t.start()
-    max_wait = (
-        timeout_seconds + int(timeout * HEARTBEAT_GRACE_FACTOR) + 60
-        if timeout > 0
-        else timeout_seconds
-    )
+    max_wait = timeout_seconds + int(timeout * HEARTBEAT_GRACE_FACTOR) + 60 if timeout > 0 else timeout_seconds
     t.join(timeout=max_wait + 60)
     if t.is_alive():
         _log("[HEARTBEAT] Monitor thread timed out — forcibly stopping")
@@ -168,9 +160,7 @@ def _run_heartbeat_monitor(
             _kill_session(proc, str(proc.pid) if proc.pid else "unknown")
         return {"status": "alive", "age_seconds": 0, "last_heartbeat_data": None}
 
-    result = result_container.get(
-        "result", {"status": "alive", "age_seconds": 0, "last_heartbeat_data": None}
-    )
+    result = result_container.get("result", {"status": "alive", "age_seconds": 0, "last_heartbeat_data": None})
 
     # Kill the process when heartbeat is lost or expired.
     # The main thread is blocked on stdout.readline() and can't act,
@@ -178,10 +168,7 @@ def _run_heartbeat_monitor(
     status = result.get("status", "alive")
     if status in ("lost", "expired"):
         pid_str = str(proc.pid) if (proc and proc.pid) else "unknown"
-        _log(
-            f"[HEARTBEAT] Session {status} — killing process {pid_str} "
-            f"(age={result.get('age_seconds', 0):.0f}s)"
-        )
+        _log(f"[HEARTBEAT] Session {status} — killing process {pid_str} (age={result.get('age_seconds', 0):.0f}s)")
         if proc is not None and proc.poll() is None:
             _kill_session(proc, pid_str)
 
@@ -220,7 +207,7 @@ def _cleanup_stale_heartbeats() -> None:
 def _request_shutdown() -> None:
     """Set the shutdown flag, used by signal handling."""
     global _shutdown_requested
-    _shutdown_requested = True
+    _shutdown_requested.set()
 
 
 def _cleanup_heartbeat_file(heartbeat_file: str | None) -> None:

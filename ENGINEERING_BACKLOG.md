@@ -9,21 +9,21 @@
 
 | Severity | Count |
 |----------|-------|
-| 🔴 **Critical** | 3 |
-| 🟠 **High** | 18 |
-| 🟡 **Medium** | 22 |
-| 🔵 **Low** | 18 |
-| ✅ **Completed** | 10 |
-| **Total Active** | **61** |
+| 🔴 **Critical** | 2 |
+| 🟠 **High** | 13 |
+| 🟡 **Medium** | 20 |
+| 🔵 **Low** | 16 |
+| ✅ **Completed** | 20 |
+| **Total Active** | **51** |
 
 | Category | Count |
 |----------|-------|
-| Bugs | 5 |
-| Technical Debt | 12 |
-| Refactoring Opportunities | 3 |
-| Performance Improvements | 5 |
-| Security Improvements | 3 |
-| Missing Tests | 2 |
+| Bugs | 0 |
+| Technical Debt | 10 |
+| Refactoring Opportunities | 2 |
+| Performance Improvements | 2 |
+| Security Improvements | 2 |
+| Missing Tests | 1 |
 | Missing Documentation | 2 |
 | CI/CD Improvements | 7 |
 | Developer Experience (DX) | 5 |
@@ -69,7 +69,7 @@
 
 - `pi_loop/loop.py`
 
-### BUG-002 — Race condition in loop_manager.stop() concurrent with_monitor_process
+### BUG-002 — Race condition in loop_manager.stop() concurrent with_monitor_process ✅
 
 | Field | Value |
 |-------|-------|
@@ -78,15 +78,17 @@
 | **Impact** | Can cause AttributeError crash during shutdown |
 | **Effort** | Medium |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
 **Reasoning:** Both `stop()` and `_monitor_process()` write `self._process = None` with no coordination — can cause `AttributeError` when one reads `self._process` after the other sets it to `None`. A lock or atomic check-then-set pattern is needed.
 
+**Fix applied:** Added `self._lock` and wrapped `self._process = None` writes in both `stop()` and `_monitor_process()` with the lock. Completed 2026-06-29.
+
 **Affected files:**
 
-- `web_app/loop_manager.py` (lines 141–172, 262–275)
+- `web_app/loop_manager.py`
 
-### BUG-003 — TOCTOU race in loop_manager.stop()
+### BUG-003 — TOCTOU race in loop_manager.stop() ✅
 
 | Field | Value |
 |-------|-------|
@@ -95,15 +97,17 @@
 | **Impact** | Can crash or send SIGTERM/SIGKILL to wrong process group |
 | **Effort** | Medium |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
 **Reasoning:** `os.getpgid(pid)` can raise `ProcessLookupError` if the process exits between the check and the read. The PGID could also be reassigned to another process between `getpgid` and `killpg`. Need to wrap with proper error handling and validate PID/PGID ownership.
 
+**Fix applied:** Added `os.kill(pid, 0)` ownership check before `getpgid()` + `killpg()`, wrapped in try/except with `ProcessLookupError` handling. Completed 2026-06-29.
+
 **Affected files:**
 
-- `web_app/loop_manager.py` (lines 148–172)
+- `web_app/loop_manager.py`
 
-### BUG-004 — Race: status='running' set before stream readers/monitor created
+### BUG-004 — Race: status='running' set before stream readers/monitor created ✅
 
 | Field | Value |
 |-------|-------|
@@ -112,15 +116,17 @@
 | **Impact** | Orphaned subprocess if daemon crashes in ~1ms window |
 | **Effort** | Medium |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
 **Reasoning:** The status is set to `"running"` before `_read_stream` and `_monitor_process` coroutines are created. If the daemon crashes in this window, the manager believes it's running but no monitors are attached. Should set status after monitors are confirmed active.
 
+**Fix applied:** Moved `self._status = "running"` after `asyncio.create_task(...)` calls. Completed 2026-06-29.
+
 **Affected files:**
 
-- `web_app/loop_manager.py` (lines 96–117)
+- `web_app/loop_manager.py`
 
-### BUG-005 — Race: _read_stream can AttributeError on self._process
+### BUG-005 — Race: _read_stream can AttributeError on self._process ✅
 
 | Field | Value |
 |-------|-------|
@@ -129,9 +135,11 @@
 | **Impact** | Stream reader crashes mid-read, losing log output |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
 **Reasoning:** Stale `self._process` reference used in `_read_stream` while-loop condition — concurrent `stop()` can set it to `None` mid-iteration. Should capture process reference locally.
+
+**Fix applied:** Captured `local_proc = self._process` at `_read_stream` start and used `local_proc` in while-loop condition. Completed 2026-06-29.
 
 **Affected files:**
 
@@ -195,7 +203,7 @@
 - `pi_loop/validation.py`
 - `web_app/config_manager.py`
 
-### TECHDEBT-004 — Silent exception swallowing (bare except: pass)
+### TECHDEBT-004 — Silent exception swallowing (bare except: pass) ✅
 
 | Field | Value |
 |-------|-------|
@@ -204,14 +212,16 @@
 | **Impact** | Bugs silently masked; debugging impossible |
 | **Effort** | Medium |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
 **Reasoning:** Multiple bare `except Exception: pass` clauses throughout `loop.py` (line ~340 and several others). These swallow all exceptions silently, making debugging near-impossible when something goes wrong. Each should at minimum log the exception.
 
+**Fix applied:** Replaced `with suppress(Exception):` with typed `try/except` blocks that log specific failures in loop.py (HTML dashboard, HTTP callbacks, on-error commands, desktop notifications). Fixed server.py `_status_poller` bare `except: pass` to log via `manager._add_log`. Completed 2026-06-29.
+
 **Affected files:**
 
-- `pi_loop/loop.py` (line ~340 and several other locations)
-- `web_app/server.py` (SSE poller exception handler)
+- `pi_loop/loop.py`
+- `web_app/server.py`
 
 ### TECHDEBT-005 — config_file.py and env_utils.py overlap
 
@@ -319,7 +329,7 @@
 - `pi_loop/config_file.py`
 - `web_app/config_manager.py`
 
-### TECHDEBT-011 — Retry loop output capture is lossy
+### TECHDEBT-011 — Retry loop output capture is lossy ✅
 
 | Field | Value |
 |-------|-------|
@@ -328,13 +338,15 @@
 | **Impact** | Lost progress data on retry; unreliable error reporting |
 | **Effort** | Small |
 | **Dependencies** | BUG-001 |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
 **Reasoning:** Retry mechanism only captures output on final retry; stale data from previous attempts persists and may contaminate the final state. Should accumulate output across retries or use a fresh capture on each attempt.
 
+**Fix applied:** Added per-attempt buffers (`attempt_final_text_parts`, `attempt_text_buf`, `attempt_raw_lines`) reset each retry. Accumulated all failure outputs in `all_attempts_output` across attempts. Completed 2026-06-29.
+
 **Affected files:**
 
-- `pi_loop/loop.py` (lines ~56–80)
+- `pi_loop/loop.py`
 
 ### TECHDEBT-012 — SSE fixed 5s reconnect interval
 
@@ -413,7 +425,7 @@
 
 ## Performance Improvements
 
-### PERF-001 — Blocking synchronous I/O in async endpoints
+### PERF-001 — Blocking synchronous I/O in async endpoints ✅
 
 | Field | Value |
 |-------|-------|
@@ -422,15 +434,17 @@
 | **Impact** | Blocks the entire async event loop; degrades all connections |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
 **Reasoning:** Blocking `open()`/`read()` in async `index()` endpoint blocks the entire async event loop. Should use `aiofiles` or `asyncio.to_thread()` for file I/O.
 
+**Fix applied:** Replaced blocking `open(index_path).read()` with `asyncio.to_thread()`. Completed 2026-06-29.
+
 **Affected files:**
 
-- `web_app/server.py` (lines 49–53)
+- `web_app/server.py`
 
-### PERF-002 — Unbounded limit/offset parameters
+### PERF-002 — Unbounded limit/offset parameters ✅
 
 | Field | Value |
 |-------|-------|
@@ -439,15 +453,17 @@
 | **Impact** | Can return huge payloads; potential OOM on large ledgers |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
 **Reasoning:** `/api/iterations` accepts unbounded `limit` and `offset` parameters. A malicious or misconfigured client could request 10M iterations and cause OOM.
 
+**Fix applied:** Capped `limit` to [1, 500] and clamped `offset` to non-negative. Completed 2026-06-29.
+
 **Affected files:**
 
-- `web_app/server.py` (lines 134–152)
+- `web_app/server.py`
 
-### PERF-003 — SSE _status_poller runs with zero clients
+### PERF-003 — SSE _status_poller runs with zero clients ✅
 
 | Field | Value |
 |-------|-------|
@@ -456,13 +472,15 @@
 | **Impact** | Wastes CPU with polling work when no one is watching |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
 **Reasoning:** The `_status_poller()` runs every 2s regardless of whether any SSE clients are connected. Should early-return when `_sse_clients` is empty.
 
+**Fix applied:** Added `asyncio.sleep(1)` and tracking state reset when `_sse_clients` is empty. Completed 2026-06-29.
+
 **Affected files:**
 
-- `web_app/server.py` (lines 278–308)
+- `web_app/server.py`
 
 ### PERF-004 — SSE redundant re-fetches on every update
 
@@ -502,7 +520,7 @@
 
 ## Security Improvements
 
-### SECURITY-001 — No schema validation on save_config_api
+### SECURITY-001 — No schema validation on save_config_api ✅
 
 | Field | Value |
 |-------|-------|
@@ -511,13 +529,15 @@
 | **Impact** | Arbitrary JSON accepted without validation; can corrupt config |
 | **Effort** | Medium |
 | **Dependencies** | TECHDEBT-003 |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
 **Reasoning:** `save_config_api()` accepts any JSON dict without validation. `validate_config()` exists but is never called (dead code). A malformed request can write corrupt data to the config file, causing crashes on next `load_config()`.
 
+**Fix applied:** Imported and called `validate_config()` in `save_config_api()` before persisting. Returns HTTP 422 on validation failure. Resolves TECHDEBT-003 for `validate_config()`. Completed 2026-06-29.
+
 **Affected files:**
 
-- `web_app/server.py` (lines 85–90)
+- `web_app/server.py`
 - `web_app/config_manager.py`
 
 ### SECURITY-002 — Missing request timeouts, rate limiting, and auth

@@ -10,13 +10,10 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-from .config_manager import build_cli_args, get_raw_config
+from pi_loop.config import DEFAULT_LOG_FILE, LEDGER_PATH
+from pi_loop.config import SENTINEL_PATH_DEFAULT as SENTINEL_PATH
 
-# Paths — configurable via env vars
-LEDGER_PATH = os.environ.get("PI_LOOP_LEDGER_PATH", "/tmp/infinite-loop-state.json")
-SENTINEL_PATH = os.environ.get("PI_LOOP_SENTINEL_PATH", "/tmp/infinite-loop-stop")
-STATUS_FILE = os.environ.get("PI_LOOP_STATUS_FILE", "/tmp/loop-status.json")
-DEFAULT_LOG_FILE = os.environ.get("PI_LOOP_WEB_LOG", "/tmp/infinite-loop-web.log")
+from .config_manager import build_cli_args, get_raw_config
 
 
 class LoopManager:
@@ -31,6 +28,8 @@ class LoopManager:
         self._sentinel_path = SENTINEL_PATH
         self._log_file = DEFAULT_LOG_FILE
         self._log_fp = None
+        # Lock for coordinated start/stop/monitor to prevent race conditions
+        self._lock = asyncio.Lock()
         # Live iteration state parsed from daemon stdout
         self._live_iteration: dict[str, Any] = {}
         self._worker_states: dict[str, dict[str, Any]] = {}
@@ -147,7 +146,6 @@ class LoopManager:
                     "error": f"Process exited immediately with code {self._process.returncode}",
                 }
 
-            self._status = "running"
             self._add_log("info", f"Daemon started (PID: {self._process.pid})")
 
             # Start log readers
@@ -156,6 +154,9 @@ class LoopManager:
 
             # Start process monitor
             asyncio.create_task(self._monitor_process())
+
+            # Set status AFTER monitors are created — BUG-004 fix
+            self._status = "running"
 
             return {"success": True, "pid": self._process.pid}
         except asyncio.TimeoutError:
@@ -172,10 +173,13 @@ class LoopManager:
     async def stop(self) -> dict[str, Any]:
         """Stop the loop daemon — writes sentinel + immediately kills the
         process group (including any running pi chat session)."""
-        if not self.is_running and self._status != "paused":
-            return {"success": False, "error": "Loop is not running"}
+        async with self._lock:
+            proc = self._process
+            if not self.is_running and self._status != "paused":
+                return {"success": False, "error": "Loop is not running"}
 
-        self._add_log("info", "Stopping daemon...")
+            self._status = "stopped"
+            self._add_log("info", "Stopping daemon...")
 
         # Write sentinel so the daemon knows it was a controlled stop
         try:
@@ -187,25 +191,37 @@ class LoopManager:
         # Immediately kill the process group — the daemon only checks the
         # sentinel between iterations, so we need SIGTERM to stop a running
         # pi chat session mid-iteration.
-        if self._process:
-            pgid = None
+        # Capture PID locally to avoid TOCTOU race (BUG-003).
+        if proc is not None:
             try:
-                pgid = os.getpgid(self._process.pid)
-                os.killpg(pgid, signal.SIGTERM)
-                await asyncio.wait_for(self._process.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                self._add_log("warn", "Force killing...")
+                pid = proc.pid
+            except (AttributeError, ProcessLookupError):
+                pid = None
+            pgid = None
+            if pid is not None:
                 try:
-                    if pgid is not None:
+                    # Validate PID/PGID ownership before sending signals
+                    os.kill(pid, 0)  # Check process still exists
+                    pgid = os.getpgid(pid)
+                except (ProcessLookupError, PermissionError, OSError):
+                    pgid = None
+            if pgid is not None:
+                try:
+                    os.killpg(pgid, signal.SIGTERM)
+                    await asyncio.wait_for(proc.wait(), timeout=5)
+                except asyncio.TimeoutError:
+                    self._add_log("warn", "Force killing...")
+                    try:
                         os.killpg(pgid, signal.SIGKILL)
-                    await asyncio.wait_for(self._process.wait(), timeout=5)
-                except (asyncio.TimeoutError, OSError):
+                        await asyncio.wait_for(proc.wait(), timeout=5)
+                    except (asyncio.TimeoutError, OSError):
+                        pass
+                except (ProcessLookupError, OSError):
                     pass
-            except (ProcessLookupError, OSError):
-                pass
 
-        self._status = "stopped"
-        self._process = None
+        async with self._lock:
+            self._process = None
+
         self._add_log("info", "Daemon stopped")
 
         # Close log file handle
@@ -296,8 +312,11 @@ class LoopManager:
         }
 
     async def _read_stream(self, stream, name: str) -> None:
-        """Read lines from a subprocess stream, log them, and parse worker events."""
-        while self._process and stream:
+        """Read lines from a subprocess stream, log them, and parse worker events.
+        Captures process reference locally to avoid BUG-005 race with stop().
+        """
+        local_proc = self._process  # BUG-005: capture locally
+        while local_proc and stream:
             try:
                 line = await stream.readline()
                 if not line:
@@ -418,7 +437,10 @@ class LoopManager:
         self._live_iteration["workers"] = list(self._worker_states.values())
 
     async def _monitor_process(self) -> None:
-        """Monitor the process and handle unexpected exits."""
+        """Monitor the process and handle unexpected exits.
+        Uses _lock when setting self._process = None to prevent concurrent
+        stop() from writing None mid-read (BUG-002).
+        """
         if not self._process:
             return
         try:
@@ -429,7 +451,8 @@ class LoopManager:
             )
             if self._status in ("running", "paused"):
                 self._status = "stopped"
-            self._process = None
+            async with self._lock:
+                self._process = None
         except Exception as e:
             self._add_log("error", f"Process monitor error: {e}")
 

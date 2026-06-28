@@ -88,8 +88,8 @@ def test_base_toolsets():
 
 
 def test_heartbeat_dir():
-    """HEARTBEAT_DIR is /tmp."""
-    assert config.HEARTBEAT_DIR == "/tmp"
+    """HEARTBEAT_DIR defaults to _get_data_dir()."""
+    assert config._get_data_dir() == config.HEARTBEAT_DIR
 
 
 def test_heartbeat_interval():

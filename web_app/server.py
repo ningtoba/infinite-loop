@@ -16,6 +16,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
+from pi_loop.config import LEDGER_PATH, LOCK_PATH
 from pi_loop.config_file import CONFIG_PATH
 
 from .config_manager import (
@@ -24,17 +25,12 @@ from .config_manager import (
     get_config,
     get_raw_config,
     save_config,
+    validate_config,
 )
 from .loop_manager import get_loop_manager
 
 # Determine static directory
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-
-# Configurable data directory (used for LEDGER_PATH, sentinel, log file)
-DATA_DIR = os.environ.get("PI_LOOP_DATA_DIR", "/tmp")
-LEDGER_PATH = os.path.join(DATA_DIR, "infinite-loop-state.json")
-LOCK_PATH = os.path.join(DATA_DIR, "infinite-loop-state.lock")
-SENTINEL_PATH = os.path.join(DATA_DIR, "infinite-loop-stop")
 
 # SSE client tracking
 _sse_clients: list[asyncio.Queue] = []
@@ -61,11 +57,17 @@ if os.path.isdir(STATIC_DIR):
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    """Serve the main web UI."""
+    """Serve the main web UI (PERF-001: use asyncio.to_thread for blocking I/O)."""
     index_path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_path):
-        with open(index_path) as f:
-            return HTMLResponse(f.read())
+    exists = await asyncio.to_thread(os.path.exists, index_path)
+    if exists:
+
+        def _read_index():
+            with open(index_path) as f:
+                return f.read()
+
+        content = await asyncio.to_thread(_read_index)
+        return HTMLResponse(content)
     return HTMLResponse("<h1>pi-loop Web UI</h1><p>Static files not found.</p>")
 
 
@@ -97,11 +99,21 @@ async def get_raw_config_api():
 
 @app.post("/api/config")
 async def save_config_api(request: Request):
-    """Save configuration values to JSON config file."""
+    """Save configuration values to JSON config file.
+    Validates the config before persisting (SECURITY-001).
+    """
     try:
         data = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body") from None
+
+    # Validate config before saving
+    result = validate_config(data)
+    if not result["valid"]:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "Configuration validation failed", "errors": result["errors"]},
+        )
 
     save_config(data)
     return {"success": True, "message": "Configuration saved", "path": CONFIG_PATH}
@@ -191,7 +203,12 @@ async def get_ledger():
 
 @app.get("/api/iterations")
 async def get_iterations(limit: int = 50, offset: int = 0):
-    """Get iteration history."""
+    """Get iteration history (PERF-002: capped at 500 max limit)."""
+    # Cap limit to prevent OOM on large ledgers
+    limit = min(max(limit, 1), 500)
+    if offset < 0:
+        offset = 0
+
     manager = get_loop_manager()
     ledger = manager.get_ledger()
     iterations = ledger.get("iterations", [])
@@ -265,9 +282,7 @@ def _get_cpu_percent():
 def _get_memory_info():
     """Get memory info from /proc/meminfo."""
     try:
-        with (
-            open(os.path.join(DATA_DIR, "..", "proc", "meminfo")) if DATA_DIR != "/tmp" else open("/proc/meminfo") as f
-        ):
+        with open("/proc/meminfo") as f:
             meminfo = {}
             for line in f:
                 parts = line.split(":")
@@ -393,7 +408,9 @@ async def sse_stream_legacy(request: Request):
 
 
 async def _status_poller():
-    """Poll the ledger and broadcast changes + new log entries to SSE clients."""
+    """Poll the ledger and broadcast changes + new log entries to SSE clients.
+    Early-returns if no SSE clients are connected (PERF-003).
+    """
     manager = get_loop_manager()
     last_log_count = 0
     last_status_hash = ""
@@ -401,12 +418,17 @@ async def _status_poller():
     while True:
         await asyncio.sleep(2)
         if not _sse_clients:
-            idle_ticks = 0
+            last_log_count = 0
+            last_status_hash = ""
+            await asyncio.sleep(1)  # Quick retry when idle
             continue
         try:
             status = manager.get_status()
             live = status.get("live_iteration", {})
-
+        except Exception:
+            await asyncio.sleep(5)
+            continue
+        try:
             # Build a richer hash covering iteration number, worker statuses,
             # error_counts, mitigations, log count, terminal lines, and
             # latest iteration details (worktree merge, summary changes).
@@ -455,8 +477,8 @@ async def _status_poller():
             for i in range(last_log_count, len(logs)):
                 await _broadcast_sse({"type": "log_entry", "entry": logs[i]})
             last_log_count = len(logs)
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError, KeyError) as e:
+            manager._add_log("warn", f"Status poller error: {e}")
 
 
 @app.on_event("startup")

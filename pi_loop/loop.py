@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from contextlib import suppress
 from datetime import datetime, timezone
@@ -29,14 +30,14 @@ from .stats import _recalc_stats
 from .status import write_status as _write_status_file
 from .system_utils import get_system_usage, get_system_usage_diff
 
-# Module-level shutdown flag
-_shutdown_requested = False
+# Module-level shutdown flag (threading.Event for safe signal-handler access)
+_shutdown_requested = threading.Event()
 
 
 def _request_shutdown() -> None:
     """Set the shutdown flag — called by signal handler."""
     global _shutdown_requested
-    _shutdown_requested = True
+    _shutdown_requested.set()
 
 
 def _execute_task(
@@ -68,9 +69,7 @@ def _execute_task(
     attempts = 0
     max_attempts = max(1, max_retries + 1)
     last_error = None
-    all_output = []
-    final_text_parts: list[str] = []
-    _text_buf: list[str] = []
+    all_attempts_output: list[str] = []
     proc = None
 
     def _term(line: str) -> None:
@@ -80,6 +79,10 @@ def _execute_task(
     while attempts < max_attempts:
         attempts += 1
         attempt_start = time.time()
+        # Reset per-attempt buffers to prevent stale data leak (TECHDEBT-011)
+        attempt_final_text_parts: list[str] = []
+        attempt_text_buf: list[str] = []
+        attempt_raw_lines: list[str] = []
         try:
             proc = subprocess.Popen(
                 cmd,
@@ -88,14 +91,13 @@ def _execute_task(
                 text=True,
                 cwd=workdir or os.getcwd(),
             )
-            raw_lines: list[str] = []
 
             if proc.stdout is None:
                 raise RuntimeError("pi subprocess has no stdout pipe")
 
             for raw_line in proc.stdout:
                 line = raw_line.rstrip("\n").rstrip("\r")
-                raw_lines.append(line)
+                attempt_raw_lines.append(line)
                 if not line:
                     continue
                 try:
@@ -131,15 +133,15 @@ def _execute_task(
 
                     # Text output delta — accumulate chars, emit on line break
                     if ame_type == "text_delta":
-                        _text_buf.append(ame.get("delta", ""))
-                        full = "".join(_text_buf)
+                        attempt_text_buf.append(ame.get("delta", ""))
+                        full = "".join(attempt_text_buf)
                         if "\n" in full:
                             *done, rest = full.split("\n")
                             for ln in done:
                                 if ln.strip():
                                     _term(ln)
-                            _text_buf.clear()
-                            _text_buf.append(rest)
+                            attempt_text_buf.clear()
+                            attempt_text_buf.append(rest)
                         continue
 
                     # Tool call start
@@ -188,11 +190,11 @@ def _execute_task(
                     msg = event.get("message", {})
                     for block in msg.get("content", []):
                         if isinstance(block, dict) and block.get("type") == "text":
-                            final_text_parts.append(block.get("text", ""))
+                            attempt_final_text_parts.append(block.get("text", ""))
 
             proc.wait(timeout=session_timeout)
             duration = time.time() - attempt_start
-            stdout_text = "\n".join(raw_lines)
+            stdout_text = "\n".join(attempt_raw_lines)
 
             stderr_text = ""
             if proc.stderr:
@@ -204,7 +206,7 @@ def _execute_task(
             sys.stdout.flush()
 
             if proc.returncode == 0:
-                final_output = "\n".join(final_text_parts) if final_text_parts else stdout_text
+                final_output = "\n".join(attempt_final_text_parts) if attempt_final_text_parts else stdout_text
                 return {
                     "output": final_output[:max_output_chars] if max_output_chars else final_output,
                     "error": None,
@@ -213,22 +215,22 @@ def _execute_task(
                 }
             else:
                 last_error = f"exit code {proc.returncode}: {stderr_text[:500] or stdout_text[:500]}"
+                all_attempts_output.append(f"[Attempt {attempts}] {last_error}")
                 if attempts < max_attempts:
                     _log(f"[RETRY] Attempt {attempts}/{max_attempts} failed: {last_error[:120]}")
                     time.sleep(retry_delay)
-                else:
-                    all_output.append(stdout_text)
 
         except subprocess.TimeoutExpired:
             duration = time.time() - attempt_start
             last_error = f"timeout after {session_timeout}s"
+            all_attempts_output.append(f"[Attempt {attempts}] {last_error}")
+            _log(f"[RETRY] Attempt {attempts}/{max_attempts} timed out ({session_timeout}s)")
             # Kill the orphaned process to prevent zombie accumulation
             if proc is not None:
                 with suppress(Exception):
                     proc.kill()
                     proc.wait(timeout=5)
             if attempts < max_attempts:
-                _log(f"[RETRY] Attempt {attempts}/{max_attempts} timed out ({session_timeout}s)")
                 time.sleep(retry_delay)
 
         except FileNotFoundError:
@@ -241,6 +243,7 @@ def _execute_task(
         except Exception as e:
             duration = time.time() - attempt_start
             last_error = str(e)
+            all_attempts_output.append(f"[Attempt {attempts}] {e}")
             # Kill any orphaned subprocess on unexpected errors
             if proc is not None:
                 with suppress(Exception):
@@ -249,8 +252,9 @@ def _execute_task(
             if attempts < max_attempts:
                 time.sleep(retry_delay)
 
+    combined_output = "\n".join(all_attempts_output) if all_attempts_output else ""
     return {
-        "output": "\n".join(all_output)[:max_output_chars] if max_output_chars else "\n".join(all_output),
+        "output": combined_output[:max_output_chars] if max_output_chars else combined_output,
         "error": last_error,
         "duration_seconds": round(time.time() - start_time, 1),
         "returncode": -1,
@@ -413,6 +417,8 @@ def run_loop(
 ) -> None:
     global _shutdown_requested
 
+    _shutdown_requested.clear()
+
     _set_originals(session_timeout, cooldown, use_library, workers)
 
     iteration_count = state["total_iterations"]
@@ -468,7 +474,7 @@ def run_loop(
         time.sleep(startup_delay)
 
     while True:
-        if _shutdown_requested:
+        if _shutdown_requested.is_set():
             _log("[STOP] Shutdown signal received. Stopping.")
             _shutdown(
                 state,
@@ -674,7 +680,7 @@ def run_loop(
 
         # Notifications
         if notify_desktop:
-            with suppress(Exception):
+            try:
                 subprocess.run(
                     [
                         "notify-send",
@@ -683,15 +689,19 @@ def run_loop(
                     ],
                     timeout=5,
                 )
+            except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+                _log(f"[NOTIFY] Desktop notification failed: {e}")
 
         if html_dashboard:
-            with suppress(Exception):
+            try:
                 html = _build_dashboard_html(state)
                 with open(html_dashboard, "w") as f:
                     f.write(html)
+            except (OSError, KeyError, TypeError) as e:
+                _log(f"[DASHBOARD] Failed to write HTML dashboard: {e}")
 
         if http_callback:
-            with suppress(Exception):
+            try:
                 import urllib.request
 
                 data = json.dumps(record).encode()
@@ -703,11 +713,15 @@ def run_loop(
                 if http_callback_secret:
                     req.add_header("Authorization", http_callback_secret)
                 urllib.request.urlopen(req, timeout=10)
+            except (ImportError, OSError, ValueError, json.JSONDecodeError) as e:
+                _log(f"[HTTP-CALLBACK] Failed: {e}")
 
         # On-error command
         if combined_error and on_error_cmd:
-            with suppress(Exception):
+            try:
                 subprocess.run(on_error_cmd, shell=True, timeout=30)
+            except (OSError, subprocess.TimeoutExpired) as e:
+                _log(f"[ERROR-CMD] Failed: {e}")
 
         # Cooldown
         _handle_cooldown(cooldown, cooldown_mode, None, "generic")

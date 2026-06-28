@@ -215,13 +215,21 @@ async def health():
 
 
 async def _broadcast_sse(data: dict[str, Any]) -> None:
-    """Broadcast an event to all connected SSE clients."""
+    """Broadcast an event to all connected SSE clients.
+
+    Uses a bounded-queue approach: consumers that fall behind (QueueFull)
+    are detected and dropped, preventing unbounded memory growth from
+    slow or disconnected clients.
+    """
     payload = json.dumps(data, default=str)
     async with _sse_clients_lock:
         stale = []
         for q in _sse_clients:
             try:
                 q.put_nowait(payload)
+            except asyncio.QueueFull:
+                # Consumer is too slow — drop and remove it
+                stale.append(q)
             except Exception:
                 stale.append(q)
         for q in stale:
@@ -234,15 +242,17 @@ async def _broadcast_sse(data: dict[str, Any]) -> None:
 @app.get("/live")
 async def sse_stream(request: Request):
     """SSE endpoint for live updates."""
-    q: asyncio.Queue = (
-        asyncio.Queue()
-    )  # unbounded — prevents QueueFull errors during burst updates
+    q: asyncio.Queue = asyncio.Queue(
+        maxsize=128
+    )  # bounded — prevents unbounded memory growth from slow clients
     async with _sse_clients_lock:
         _sse_clients.append(q)
 
     async def event_generator():
         try:
-            # Send initial status
+            # Send initial status — check disconnect before blocking
+            if await request.is_disconnected():
+                return
             manager = get_loop_manager()
             initial = {
                 "type": "init",
@@ -257,6 +267,9 @@ async def sse_stream(request: Request):
                     data = await asyncio.wait_for(q.get(), timeout=15)
                     yield f"event: update\ndata: {data}\n\n"
                 except asyncio.TimeoutError:
+                    # Check disconnect before sending heartbeat too
+                    if await request.is_disconnected():
+                        break
                     # Send heartbeat
                     yield f"event: heartbeat\ndata: {json.dumps({'type': 'heartbeat', 'time': datetime.now(timezone.utc).isoformat()})}\n\n"
         except asyncio.CancelledError:

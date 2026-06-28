@@ -65,7 +65,8 @@ help:
 	@echo "    lint             Run Python syntax checks on all .py files"
 	@echo "    completion       Install shell tab-completion (bash/zsh)"
 	@echo "    update-completions  Regenerate completion scripts from argparse"
-	@echo "    install-hooks    Install pre-commit hook from .githooks/"
+	@echo "    install-hooks        Install pre-commit hook from .githooks/ (cp-based)"
+	@echo "    install-hooks-path   Configure git core.hooksPath = .githooks (recommended — no sync problem)"
 	@echo "    archive          Archive old iterations from ledger"
 	@echo ""
 	@echo "EXAMPLES:"
@@ -96,6 +97,12 @@ install:
 	@echo "  ✓ hermes_loop is now on your PATH."
 	@echo "  Try: hermes_loop --help"
 	@echo ""
+	@echo "  ── Git Hooks ──────────────────────────────────"
+	@echo "  You can enable the pre-commit hook either way:"
+	@echo "    make install-hooks-path   (recommended — no sync problem)"
+	@echo "    make install-hooks        (cp-based, auto-run below)"
+	@echo "  ────────────────────────────────────────────────"
+	@echo ""
 	@$(MAKE) install-hooks 2>&1
 	@echo ""
 
@@ -106,6 +113,12 @@ install-dev:
 	@echo ""
 	@echo "  ✓ Editable install complete. Changes to source are live."
 	@echo "  Run: hermes_loop --self-test"
+	@echo ""
+	@echo "  ── Git Hooks ──────────────────────────────────"
+	@echo "  You can enable the pre-commit hook either way:"
+	@echo "    make install-hooks-path   (recommended — no sync problem)"
+	@echo "    make install-hooks        (cp-based, auto-run below)"
+	@echo "  ────────────────────────────────────────────────"
 	@echo ""
 	@$(MAKE) install-hooks 2>&1
 
@@ -281,6 +294,7 @@ check:
 	@echo "━━━ make check — full pre-commit gate ━━━"
 	@echo ""
 	@echo "  Step 0/5 — Install git hooks (idempotent)..."
+	@echo "  (Uses cp-based install-hooks; prefer 'make install-hooks-path' for no-sync-problem setup)"
 	@$(MAKE) install-hooks 2>&1 || true
 	@echo ""
 	@echo "  Step 1/5 — Python + shell syntax check..."

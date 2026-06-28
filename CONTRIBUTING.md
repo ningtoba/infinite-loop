@@ -109,25 +109,37 @@ make install
 #    entry point. After this, you can use `hermes_loop` directly instead of
 #    `python3 -m hermes_loop` or `python3 launch-loop.py`.
 
-# 3. Copy the environment template
+# 3. (Recommended) Point git at `.githooks/` for the pre-commit hook
+#    This avoids copying files and stays in sync automatically:
+git config core.hooksPath .githooks
+#    Or use the Makefile shortcut:
+#    make install-hooks-path
+
+# 4. Copy the environment template
 cp .env.example .env
 
-# 4. Set your goal (minimal config)
+# 5. Set your goal (minimal config)
 #    Edit .env and set at minimum INFINITE_LOOP_GOAL
 
-# 5. Verify the daemon can parse its config
+# 6. Verify the daemon can parse its config
 hermes_loop --dry-run
 
-# 6. Run the self-tests
+# 7. Run the self-tests
 hermes_loop --self-test
 
-# 7. (Optional) Create a Python virtual environment
+# 8. (Optional) Create a Python virtual environment
 #    Not required — the daemon is stdlib-only — but useful for
 #    development tooling like linters.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
+
+> **Tip**: `git config core.hooksPath .githooks` is the cleanest way to enable the
+> pre-commit hook. Unlike `cp`-based installation (which `make install-hooks` does),
+> this approach has **no sync problem** — the hook always reads from the repo tree,
+> so `git pull` updates, branch switches, and rebases all keep the hook current
+> automatically. Run `make install-hooks-path` to set it in one command.
 
 > **No external dependencies** — the daemon uses only Python 3 standard library
 > modules (`argparse`, `json`, `subprocess`, etc.). The `pip install -e .` only
@@ -269,6 +281,31 @@ Make your changes. A few guidelines:
   If you need a utility, implement it with stdlib.
 - **Signal safety** — file writes should use temp-file + atomic rename
   patterns (see existing code in `_save_state()`).
+
+### Setting Up Git Hooks
+
+The repo ships a pre-commit hook at `.githooks/pre-commit` that auto-regenerates
+shell completion scripts whenever CLI flags change. Two ways to enable it:
+
+| Method | Command | Pro | Con |
+|--------|---------|-----|-----|
+| **`core.hooksPath` (recommended)** | `git config core.hooksPath .githooks` | No sync problem — always uses repo version; survives pulls, branches, rebases | Requires explicit `git config` |
+| **`cp`-based** | `make install-hooks` | Auto-run by `make install` / `make install-dev` | Stale copy if `.githooks/` updates — must re-run |
+
+**Recommendation:** Run `make install-hooks-path` once to use the `core.hooksPath`
+approach. It's cleaner and eliminates the stale-copy problem entirely.
+
+If you already ran `make install` (which triggers `make install-hooks`), you can
+switch at any time:
+
+```bash
+make install-hooks-path
+# Or manually:
+git config core.hooksPath .githooks
+```
+
+The old copied hook in `.git/hooks/pre-commit` becomes inactive immediately —
+git ignores `.git/hooks/` when `core.hooksPath` is set.
 
 ### 3. Test
 
@@ -456,7 +493,8 @@ git push origin feature/your-feature
 - [ ] `run.sh` forwarding updated (if new CLI flags were added)
 - [ ] `SKILL.md` metadata updated (if relevant)
 - [ ] Shell scripts pass `bash -n` syntax check
-- [ ] Completion scripts up-to-date (run `make install-hooks` to auto-regenerate on commit)
+- [ ] Completion scripts up-to-date (hooks active? run `make install-hooks-path` or `make install-hooks`)
+- [ ] Hooks installed via `core.hooksPath` (recommended: `make install-hooks-path`)
 - [ ] No external dependencies introduced
 - [ ] Commit messages follow conventions
 
@@ -582,6 +620,7 @@ hermes-loop/
 
 > **Tip**: Use `make help` to see all available convenience targets (run,
 > dry-run, self-test, lint, status, stop, clean, archive, log, version).
+> Use `make install-hooks-path` to enable git hooks without the sync problem.
 
 ---
 

@@ -92,6 +92,81 @@ def _detect_worktree_branches(workdir: str | None) -> list[dict]:
     return branches
 
 
+def _detect_remote_worktree_branches(
+    workdir: str | None, remote: str = "origin"
+) -> list[dict]:
+    """Find remote worktree branches (*hermes/*, *worktree/*) on the remote.
+
+    Refreshes the remote tracking refs first via ``git fetch``.
+    Excludes the main/master branch.
+
+    Returns a list of dicts with ``ref`` (full remote ref like
+    ``origin/hermes/abc``) and ``name`` (bare branch name like
+    ``hermes/abc``).
+    """
+    cwd = workdir or os.getcwd()
+    if not os.path.isdir(os.path.join(cwd, ".git")):
+        return []
+
+    # Fetch from remote to ensure we have the latest refs
+    try:
+        subprocess.run(
+            ["git", "fetch", remote],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=30,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    main_branch = _get_main_branch(cwd)
+    branches: list[dict] = []
+
+    try:
+        r = subprocess.run(
+            ["git", "branch", "-r", "--list", f"{remote}/hermes/*"],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=10,
+        )
+        if r.returncode == 0:
+            _parse_remote_branches(r.stdout, remote, main_branch, branches)
+
+        r = subprocess.run(
+            ["git", "branch", "-r", "--list", f"{remote}/worktree/*"],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=10,
+        )
+        if r.returncode == 0:
+            _parse_remote_branches(r.stdout, remote, main_branch, branches)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    return branches
+
+
+def _parse_remote_branches(
+    stdout: str, remote: str, main_branch: str, branches: list[dict]
+) -> None:
+    """Parse ``git branch -r`` output, appending matching entries to *branches*.
+
+    Each entry has ``ref`` (e.g. ``origin/hermes/abc``) and ``name``
+    (e.g. ``hermes/abc`` — the bare branch name).
+    """
+    for line in stdout.strip().splitlines():
+        name = line.strip()
+        if not name:
+            continue
+        bare = name.removeprefix(f"{remote}/")
+        if bare and bare != main_branch:
+            if not any(b["ref"] == name for b in branches):
+                branches.append({"ref": name, "name": bare})
+
+
 def _get_current_branch(workdir: str | None) -> str | None:
     """Return the current git branch name, or None if unavailable."""
     cwd = workdir or os.getcwd()
@@ -294,6 +369,7 @@ def _branch_exists(workdir: str | None, branch: str) -> bool:
 def _delete_worktree_branch(workdir: str | None, branch: str) -> bool:
     """Delete a worktree branch (local) after successful merge.
 
+    Also attempts to delete the remote tracking branch if it exists.
     Returns True if the branch was deleted or didn't exist.
     """
     if not branch:
@@ -319,6 +395,50 @@ def _delete_worktree_branch(workdir: str | None, branch: str) -> bool:
             timeout=10,
         )
         return r.returncode == 0
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
+def _delete_remote_worktree_branch(
+    workdir: str | None, branch: str, remote: str = "origin"
+) -> bool:
+    """Delete a remote worktree branch via push --delete.
+
+    Also cleans up the local remote-tracking ref (e.g. origin/hermes/xyz).
+
+    Returns True if the remote branch was deleted or never existed.
+    """
+    if not branch:
+        return True
+    cwd = workdir or os.getcwd()
+    # Use the bare branch name (without origin/ prefix) for push --delete
+    bare_branch = (
+        branch.replace(f"{remote}/", "", 1)
+        if branch.startswith(f"{remote}/")
+        else branch
+    )
+    try:
+        r = subprocess.run(
+            ["git", "push", remote, "--delete", bare_branch],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=15,
+        )
+        if r.returncode == 0:
+            _log(f"[WORKTREE-CLEANUP] ✓ Deleted remote '{remote}/{bare_branch}'")
+            # Prune the local remote-tracking ref
+            subprocess.run(
+                ["git", "remote", "prune", remote],
+                capture_output=True,
+                cwd=cwd,
+                timeout=10,
+            )
+            return True
+        # "could not delete" / "no such ref" are non-fatal (branch already gone)
+        if "does not exist" in r.stderr.lower() or "no such" in r.stderr.lower():
+            return True
+        return False
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
 
@@ -470,16 +590,7 @@ def cleanup_stale_worktrees(workdir: str | None) -> dict:
     if result["pruned"] > 0:
         # Delete remote tracking refs for branches that were actually pruned
         for branch in pruned_branches:
-            try:
-                subprocess.run(
-                    ["git", "push", "origin", "--delete", branch],
-                    capture_output=True,
-                    text=True,
-                    cwd=cwd,
-                    timeout=15,
-                )
-            except (subprocess.TimeoutExpired, FileNotFoundError):
-                pass
+            _delete_remote_worktree_branch(cwd, branch)
         # Push main
         try:
             subprocess.run(
@@ -509,6 +620,261 @@ def cleanup_stale_worktrees(workdir: str | None) -> dict:
             pass
 
     _log(f"[WORKTREE-CLEANUP] Done — {result['pruned']} branch(es) cleaned up")
+    return result
+
+
+def _sweep_remaining_remote_branches(
+    workdir: str | None, main_branch: str | None = None, remote: str = "origin"
+) -> int:
+    """Final sweep: delete any remaining hermes/* or worktree/* branches on remote.
+
+    This is called after merges to ensure no worker branches pile up on GitHub.
+    Returns the number of branches deleted in the sweep.
+    """
+    cwd = workdir or os.getcwd()
+    if not os.path.isdir(os.path.join(cwd, ".git")):
+        return 0
+
+    remaining = _detect_remote_worktree_branches(cwd, remote)
+    if not remaining:
+        return 0
+
+    _log(
+        f"[WORKTREE-SWEEP] Found {len(remaining)} remaining remote "
+        f"worktree branch(es) — deleting..."
+    )
+    deleted = 0
+    for rb in remaining:
+        if _delete_remote_worktree_branch(cwd, rb["name"], remote):
+            deleted += 1
+    # Prune stale remote-tracking refs
+    try:
+        subprocess.run(
+            ["git", "remote", "prune", remote],
+            capture_output=True,
+            cwd=cwd,
+            timeout=10,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    _log(f"[WORKTREE-SWEEP] Deleted {deleted} remaining remote branch(es)")
+    return deleted
+
+
+def _cleanup_stale_remote_branches(workdir: str | None, remote: str = "origin") -> dict:
+    """Comprehensive cleanup of stale remote worktree branches.
+
+    This is called BEFORE each iteration (in addition to the local
+    cleanup_stale_worktrees). It:
+
+    1. Fetches remote refs and detects all ``hermes/*`` and ``worktree/*``
+       branches on the remote.
+    2. Creates local tracking branches for any remote branches that don't
+       exist locally.
+    3. Tries to merge each branch into the main branch (FF first, then
+       recursive).
+    4. After merging, deletes both the local and remote branches.
+    5. Pushes only the main branch to remote.
+    6. Does a final sweep to ensure no hermes/* or worktree/* branches
+       remain on the remote.
+
+    This prevents the accumulation of stale worker branches on GitHub
+    when workers fail or the job is interrupted.
+
+    Returns a dict with cleanup stats:
+    ``{"merged": int, "deleted": int, "failed": int, "details": list[dict]}``.
+    """
+    cwd = workdir or os.getcwd()
+    result: dict = {"merged": 0, "deleted": 0, "failed": 0, "details": []}
+
+    if not os.path.isdir(os.path.join(cwd, ".git")):
+        return result
+
+    # 1. Detect remote worktree branches
+    remote_branches = _detect_remote_worktree_branches(cwd, remote)
+    if not remote_branches:
+        _log("[WORKTREE-REMOTE] No remote worktree branches found — remote is clean")
+        return result
+
+    _log(
+        f"[WORKTREE-REMOTE] Found {len(remote_branches)} remote worktree branch(es): "
+        f"{', '.join(b['name'] for b in remote_branches)}"
+    )
+
+    main_branch = _get_main_branch(cwd)
+    original_branch = _get_current_branch(cwd)
+    _abort_merge(cwd)
+
+    # 2. Switch to main branch
+    try:
+        r = subprocess.run(
+            ["git", "checkout", main_branch],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=15,
+        )
+        if r.returncode != 0:
+            _log(
+                f"[WORKTREE-REMOTE] Cannot checkout '{main_branch}': "
+                f"{r.stderr.strip()[:120]}"
+            )
+            return result
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        _log(f"[WORKTREE-REMOTE] Git checkout failed: {e}")
+        return result
+
+    # Pull latest main from remote for up-to-date base
+    _pull_main_branch(cwd, main_branch)
+
+    # 3. Process each remote worktree branch
+    for branch_info in remote_branches:
+        branch = branch_info["name"]  # bare name like hermes/xyz
+        full_remote_ref = branch_info["ref"]  # full ref like origin/hermes/xyz
+        _log(f"[WORKTREE-REMOTE] Processing remote '{full_remote_ref}'...")
+
+        # Create a local tracking branch for the remote branch
+        try:
+            r = subprocess.run(
+                ["git", "checkout", "-b", branch, full_remote_ref],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=15,
+            )
+            if r.returncode != 0:
+                # Branch may already exist locally — checkout what we have
+                subprocess.run(
+                    ["git", "checkout", branch],
+                    capture_output=True,
+                    text=True,
+                    cwd=cwd,
+                    timeout=15,
+                )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+        # Switch back to main for the merge
+        try:
+            subprocess.run(
+                ["git", "checkout", main_branch],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=15,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+        # Try fast-forward merge
+        merged = _try_fast_forward_merge(cwd, branch, main_branch)
+        if merged:
+            _log(f"[WORKTREE-REMOTE] ✓ Merged '{branch}' into {main_branch}")
+            result["merged"] += 1
+            result["details"].append(
+                {"branch": branch, "status": "merged", "via": "ff"}
+            )
+        else:
+            _abort_merge(cwd)
+            # Try recursive merge with conflict tracking
+            merge_result = _merge_with_conflict_tracking(cwd, branch, 0, 0)
+            if merge_result.get("success"):
+                _log(f"[WORKTREE-REMOTE] ✓ Merged '{branch}' via recursive merge")
+                result["merged"] += 1
+                result["details"].append(
+                    {
+                        "branch": branch,
+                        "status": "merged",
+                        "via": "recursive",
+                        "conflict_files": merge_result.get("conflict_files", []),
+                    }
+                )
+            else:
+                _abort_merge(cwd)
+                _log(
+                    f"[WORKTREE-REMOTE] ✗ Could not merge '{branch}' — "
+                    "force-deleting local copy"
+                )
+                result["failed"] += 1
+                result["details"].append(
+                    {"branch": branch, "status": "failed", "reason": "merge failed"}
+                )
+                # Force-delete the local branch since we can't merge
+                try:
+                    subprocess.run(
+                        ["git", "branch", "-D", branch],
+                        capture_output=True,
+                        cwd=cwd,
+                        timeout=10,
+                    )
+                except (subprocess.TimeoutExpired, FileNotFoundError):
+                    pass
+
+        # 4. Delete the local branch (if it still exists after merge)
+        _delete_worktree_branch(cwd, branch)
+        # 5. Delete the remote branch
+        remote_ok = _delete_remote_worktree_branch(cwd, branch, remote)
+        if remote_ok:
+            _log(f"[WORKTREE-REMOTE] ✓ Cleaned up '{branch}' locally and remotely")
+            result["deleted"] += 1
+        else:
+            _log(f"[WORKTREE-REMOTE] ⚠ Could not delete remote '{branch}'")
+
+    # 6. Push merged main to remote
+    if result["merged"] > 0:
+        try:
+            r = subprocess.run(
+                ["git", "push", "origin", main_branch],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=30,
+            )
+            if r.returncode == 0:
+                _log("[WORKTREE-REMOTE] ✓ Pushed merged changes to origin")
+            else:
+                _log(f"[WORKTREE-REMOTE] Push skipped: {r.stderr.strip()[:120]}")
+        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+            _log(f"[WORKTREE-REMOTE] Push skipped: {e}")
+
+    # 7. Final sweep: ensure no hermes/* or worktree/* remain on remote
+    sweep_count = _sweep_remaining_remote_branches(cwd, main_branch, remote)
+    if sweep_count > 0:
+        # Push main again in case sweep removed remaining refs
+        try:
+            subprocess.run(
+                ["git", "push", "origin", main_branch],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=30,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+    else:
+        _log("[WORKTREE-REMOTE] Sweep: no remaining hermes/* branches on remote")
+
+    # 8. Return to original branch
+    if (
+        original_branch
+        and original_branch != main_branch
+        and _branch_exists(cwd, original_branch)
+    ):
+        try:
+            subprocess.run(
+                ["git", "checkout", original_branch],
+                capture_output=True,
+                cwd=cwd,
+                timeout=15,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+    _log(
+        f"[WORKTREE-REMOTE] Done — {result['merged']} merged, "
+        f"{result['deleted']} deleted, {result['failed']} failed"
+    )
     return result
 
 
@@ -724,6 +1090,8 @@ def _merge_worktree_branches(
         # Successful merge — delete branch and remove worktree
         _delete_worktree_branch(cwd, branch)
         _remove_worktree_directory(cwd, branch, branch_info.get("worktree_path"))
+        # Also delete the remote tracking branch to prevent pile-up on GitHub
+        _delete_remote_worktree_branch(cwd, branch)
         result["merged"] += 1
         detail_entry = {
             "branch": branch,
@@ -803,6 +1171,8 @@ def _merge_worktree_branches(
                 _remove_worktree_directory(
                     cwd, branch, branch_info.get("worktree_path")
                 )
+                # Also delete the remote tracking branch
+                _delete_remote_worktree_branch(cwd, branch)
                 result["merged"] += 1
                 result["failed"] -= 1
                 failed_detail["status"] = "merged"
@@ -831,6 +1201,10 @@ def _merge_worktree_branches(
                 )
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
+
+    # 7b. Final sweep: delete any remaining remote hermes/* branches
+    #     (catches branches that were pushed but never merged)
+    _sweep_remaining_remote_branches(cwd, main_branch)
 
     # 8. Return to original branch if it still exists
     if original_branch and original_branch != main_branch:

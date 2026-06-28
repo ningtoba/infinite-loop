@@ -48,7 +48,11 @@ from .iteration import (
     _handle_callbacks,
     _sleep_with_shutdown_check,
 )
-from .worktree_merger import _merge_worktree_branches, cleanup_stale_worktrees
+from .worktree_merger import (
+    _merge_worktree_branches,
+    cleanup_stale_worktrees,
+    _cleanup_stale_remote_branches,
+)
 from .stats import _recalc_stats
 
 
@@ -529,6 +533,11 @@ def run_loop(
         if worktree and workdir:
             cleanup_stale_worktrees(workdir)
 
+        # Also clean stale remote worktree branches before spawning (prevents
+        # worker branch pile-up on GitHub from failed/interrupted jobs)
+        if worktree and workdir:
+            _cleanup_stale_remote_branches(workdir)
+
         all_results, spawn_goal, use_library = _execute_iteration(
             state=state,
             iteration_count=iteration_count,
@@ -732,7 +741,12 @@ def run_loop(
         if next_context:
             progressive_context = f"[Context from previous iteration]: {next_context}"
 
-        if not combined_error and next_goal and "need_reload" in next_goal:
+        if (
+            not combined_error
+            and next_goal
+            and "need_reload" in next_goal
+            and not os.environ.get("HERMES_LOOP_NO_AUTO_RELOAD")
+        ):
             _log("[RELOAD] Spawned session signaled need_reload. Restarting daemon...")
             state["status"] = "reloading"
             state["last_updated"] = datetime.now(timezone.utc).isoformat()
@@ -897,7 +911,10 @@ def run_loop(
 
         _broadcast_to_sse_clients(state)
 
-        _check_auto_reload(workdir, state, worker_manager, status_file, iteration_count)
+        if not os.environ.get("HERMES_LOOP_NO_AUTO_RELOAD"):
+            _check_auto_reload(
+                workdir, state, worker_manager, status_file, iteration_count
+            )
 
         if (
             keep_iterations > 0

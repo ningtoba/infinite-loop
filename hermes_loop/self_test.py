@@ -1470,6 +1470,545 @@ def _run_self_test() -> dict:
             )
         )
 
+        # ── Ledger I/O failure (write_ledger raises) ─────────────────────
+        def _check_ledger_io_critical():
+            """Mock write_ledger to raise an exception — should produce critical."""  # noqa: E501
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+
+            def _fake_which(cmd):
+                if cmd in ("hermes", "git"):
+                    return f"/usr/bin/{cmd}"
+                return None
+
+            class _FakeResult:
+                returncode = 0
+                stdout = "hermes 1.0.0"
+                stderr = ""
+
+            captured_exit = [None]
+
+            def _raise_io(*a, **kw):
+                raise PermissionError("/tmp/ledger.json: Permission denied")
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp("subprocess.run", return_value=_FakeResult()),
+                _mp("os.environ", {"SHELL_FORMAT": ""}),
+                _mp("os.remove", side_effect=lambda p: None),
+                _mp(
+                    "hermes_loop.file_utils.write_ledger",
+                    side_effect=_raise_io,
+                ),
+                _mp(
+                    "hermes_loop.file_utils.read_ledger",
+                    return_value=None,
+                ),
+            ):
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit as _e:
+                    captured_exit[0] = _e.code if _e.code is not None else 0
+                finally:
+                    _sys.stdout = _old_stdout
+
+            return captured_exit[0] == 2  # critical because ledger check failed
+
+        cases.append(
+            (
+                "ledger-io-critical",
+                lambda: _check_ledger_io_critical(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"ledger IO critical flow test failed: {r}",
+                ),
+            )
+        )
+
+        # ── Git repo check timeout ─────────────────────────────────────
+        def _check_git_repo_timeout():
+            """Mock subprocess.run on git to raise TimeoutExpired."""
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+            import subprocess as _sp
+
+            def _fake_which(cmd):
+                if cmd in ("hermes", "git"):
+                    return f"/usr/bin/{cmd}"
+                return None
+
+            class _FakeResult:
+                returncode = 0
+                stdout = "hermes 1.0.0"
+                stderr = ""
+
+            def _git_side_effect(*a, **kw):
+                cmd = a[0] if a else kw.get("args", [])
+                if isinstance(cmd, list) and "hermes" in cmd[0]:
+                    return _FakeResult()
+                raise _sp.TimeoutExpired(cmd=cmd, timeout=5)
+
+            captured_exit = [None]
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp(
+                    "subprocess.run",
+                    side_effect=_git_side_effect,
+                ),
+                _mp("os.environ", {"SHELL_FORMAT": ""}),
+                _mp("os.remove", side_effect=lambda p: None),
+                _mp(
+                    "hermes_loop.file_utils.write_ledger",
+                    side_effect=lambda s: None,
+                ),
+                _mp(
+                    "hermes_loop.file_utils.read_ledger",
+                    return_value={"test": True},
+                ),
+            ):
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit as _e:
+                    captured_exit[0] = _e.code if _e.code is not None else 0
+                finally:
+                    _sys.stdout = _old_stdout
+
+            return captured_exit[0] == 1  # degraded (git repo timed out)
+
+        cases.append(
+            (
+                "git-repo-timeout-degraded",
+                lambda: _check_git_repo_timeout(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"git repo timeout degraded flow test failed: {r}",
+                ),
+            )
+        )
+
+        # ── Hermes version timeout ──────────────────────────────────────
+        def _check_hermes_version_timeout():
+            """Mock subprocess.run on hermes --version to raise TimeoutExpired."""
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+            import subprocess as _sp
+
+            def _fake_which(cmd):
+                if cmd in ("hermes", "git"):
+                    return f"/usr/bin/{cmd}"
+                return None
+
+            def _hermes_side_effect(*a, **kw):
+                cmd = a[0] if a else kw.get("args", [])
+                if isinstance(cmd, list) and "git" in cmd[0]:
+                    # Return a fake git result
+                    class _FakeGitResult:
+                        returncode = 0
+                        stdout = ".git"
+                        stderr = ""
+
+                    return _FakeGitResult()
+                # For hermes --version, raise timeout
+                raise _sp.TimeoutExpired(cmd=cmd, timeout=10)
+
+            captured_exit = [None]
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp(
+                    "subprocess.run",
+                    side_effect=_hermes_side_effect,
+                ),
+                _mp("os.environ", {"SHELL_FORMAT": ""}),
+                _mp("os.remove", side_effect=lambda p: None),
+                _mp(
+                    "hermes_loop.file_utils.write_ledger",
+                    side_effect=lambda s: None,
+                ),
+                _mp(
+                    "hermes_loop.file_utils.read_ledger",
+                    return_value={"test": True},
+                ),
+            ):
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit as _e:
+                    captured_exit[0] = _e.code if _e.code is not None else 0
+                finally:
+                    _sys.stdout = _old_stdout
+
+            return captured_exit[0] == 1  # degraded (hermes version timed out)
+
+        cases.append(
+            (
+                "hermes-version-timeout-degraded",
+                lambda: _check_hermes_version_timeout(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"hermes version timeout degraded flow test failed: {r}",
+                ),
+            )
+        )
+
+        # ── JSON parsing degraded (extract_json returns wrong data) ─────
+        def _check_json_parsing_degraded():
+            """Mock extract_json_from_output to return None for non-empty cases."""
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+
+            def _fake_which(cmd):
+                if cmd in ("hermes", "git"):
+                    return f"/usr/bin/{cmd}"
+                return None
+
+            class _FakeResult:
+                returncode = 0
+                stdout = "hermes 1.0.0"
+                stderr = ""
+
+            captured_exit = [None]
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp("subprocess.run", return_value=_FakeResult()),
+                _mp("os.environ", {"SHELL_FORMAT": ""}),
+                _mp("os.remove", side_effect=lambda p: None),
+                _mp(
+                    "hermes_loop.file_utils.write_ledger",
+                    side_effect=lambda s: None,
+                ),
+                _mp(
+                    "hermes_loop.file_utils.read_ledger",
+                    return_value={"test": True},
+                ),
+                # Return None for all json parsing → all non-empty cases fail
+                _mp(
+                    "hermes_loop.file_utils.extract_json_from_output",
+                    return_value=None,
+                ),
+            ):
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit as _e:
+                    captured_exit[0] = _e.code if _e.code is not None else 0
+                finally:
+                    _sys.stdout = _old_stdout
+
+            return captured_exit[0] == 1  # degraded because json parsing had failures
+
+        cases.append(
+            (
+                "json-parsing-degraded",
+                lambda: _check_json_parsing_degraded(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"json parsing degraded flow test failed: {r}",
+                ),
+            )
+        )
+
+        # ── JSON parsing exception handler ──────────────────────────────
+        def _check_json_parsing_exception():
+            """Mock extract_json_from_output to raise on non-empty cases → degraded."""
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+
+            def _fake_which(cmd):
+                if cmd in ("hermes", "git"):
+                    return f"/usr/bin/{cmd}"
+                return None
+
+            class _FakeResult:
+                returncode = 0
+                stdout = "hermes 1.0.0"
+                stderr = ""
+
+            _call_count = [0]
+
+            def _raise_on_second_call(*a, **kw):
+                _call_count[0] += 1
+                if _call_count[0] == 2:  # raise on the "simple" case
+                    raise ValueError("mock parse error")
+                if _call_count[0] == 1:  # also raise on first to get more coverage
+                    raise RuntimeError("first call exception")
+                return None
+
+            captured_exit = [None]
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp("subprocess.run", return_value=_FakeResult()),
+                _mp("os.environ", {"SHELL_FORMAT": ""}),
+                _mp("os.remove", side_effect=lambda p: None),
+                _mp(
+                    "hermes_loop.file_utils.write_ledger",
+                    side_effect=lambda s: None,
+                ),
+                _mp(
+                    "hermes_loop.file_utils.read_ledger",
+                    return_value={"test": True},
+                ),
+                _mp(
+                    "hermes_loop.file_utils.extract_json_from_output",
+                    side_effect=_raise_on_second_call,
+                ),
+            ):
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit as _e:
+                    captured_exit[0] = _e.code if _e.code is not None else 0
+                finally:
+                    _sys.stdout = _old_stdout
+
+            return captured_exit[0] == 1  # degraded due to json exceptions
+
+        cases.append(
+            (
+                "json-parsing-exception",
+                lambda: _check_json_parsing_exception(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"json parsing exception handler test failed: {r}",
+                ),
+            )
+        )
+
+        # ── Ledger cleanup OSError ──────────────────────────────────────
+        def _check_ledger_cleanup_oserror():
+            """Mock os.remove on .tmp file to raise OSError — should still exit 0."""
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+
+            def _fake_which(cmd):
+                if cmd in ("hermes", "git"):
+                    return f"/usr/bin/{cmd}"
+                return None
+
+            class _FakeResult:
+                returncode = 0
+                stdout = "hermes 1.0.0"
+                stderr = ""
+
+            _tmp_removed = [False]
+
+            def _remove_side_effect(p):
+                if p.endswith(".tmp"):
+                    _tmp_removed[0] = True
+                    raise OSError("[Errno 13] Permission denied")
+                # for non-.tmp, succeed
+
+            captured_exit = [None]
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp("subprocess.run", return_value=_FakeResult()),
+                _mp("os.environ", {"SHELL_FORMAT": ""}),
+                _mp(
+                    "os.remove",
+                    side_effect=_remove_side_effect,
+                ),
+                _mp(
+                    "hermes_loop.file_utils.write_ledger",
+                    side_effect=lambda s: None,
+                ),
+                _mp(
+                    "hermes_loop.file_utils.read_ledger",
+                    return_value={"test": True},
+                ),
+            ):
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit as _e:
+                    captured_exit[0] = _e.code if _e.code is not None else 0
+                finally:
+                    _sys.stdout = _old_stdout
+
+            return captured_exit[0] == 0  # healthy — OSError caught silently
+
+        cases.append(
+            (
+                "ledger-cleanup-oserror",
+                lambda: _check_ledger_cleanup_oserror(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"ledger cleanup OSError test failed: {r}",
+                ),
+            )
+        )
+
+        # ── Ledger cleanup general exception (read_ledger at cleanup raises) ──
+        def _check_ledger_cleanup_exception():
+            """Mock read_ledger at cleanup to raise Exception — best-effort pass."""
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+
+            def _fake_which(cmd):
+                if cmd in ("hermes", "git"):
+                    return f"/usr/bin/{cmd}"
+                return None
+
+            class _FakeResult:
+                returncode = 0
+                stdout = "hermes 1.0.0"
+                stderr = ""
+
+            _reads = [0]
+
+            def _read_with_exception():
+                _reads[0] += 1
+                if _reads[0] == 2:
+                    raise IOError("Corrupt ledger file")
+                return {"test": True}
+
+            captured_exit = [None]
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp("subprocess.run", return_value=_FakeResult()),
+                _mp("os.environ", {"SHELL_FORMAT": ""}),
+                _mp("os.remove", side_effect=lambda p: None),
+                _mp(
+                    "hermes_loop.file_utils.write_ledger",
+                    side_effect=lambda s: None,
+                ),
+                _mp(
+                    "hermes_loop.file_utils.read_ledger",
+                    side_effect=_read_with_exception,
+                ),
+            ):
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit as _e:
+                    captured_exit[0] = _e.code if _e.code is not None else 0
+                finally:
+                    _sys.stdout = _old_stdout
+
+            # First read returns {"test": True} → ledger check healthy
+            # Second read raises → except Exception: pass (best-effort cleanup)
+            return captured_exit[0] == 0  # healthy overall
+
+        cases.append(
+            (
+                "ledger-cleanup-exception",
+                lambda: _check_ledger_cleanup_exception(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"ledger cleanup exception test failed: {r}",
+                ),
+            )
+        )
+
+        # ── JSON empty/none result not None (defensive else branch) ────
+        def _check_json_empty_returns_data():
+            """Mock extract_json_from_output to return data even for empty/None input.
+
+            This exercises the defensive 'else' branch in the JSON parse loop where
+            empty/none test cases return non-None results.
+            """
+            from unittest.mock import patch as _mp
+            import sys as _sys
+            import io as _io
+
+            def _fake_which(cmd):
+                if cmd in ("hermes", "git"):
+                    return f"/usr/bin/{cmd}"
+                return None
+
+            class _FakeResult:
+                returncode = 0
+                stdout = "hermes 1.0.0"
+                stderr = ""
+
+            _call_count = [0]
+
+            def _mock_extract(*a, **kw):
+                _call_count[0] += 1
+                # Return data for every input, including empty/none
+                return {"summary": "test", "error": None}
+
+            captured_exit = [None]
+
+            with (
+                _mp("shutil.which", side_effect=_fake_which),
+                _mp("subprocess.run", return_value=_FakeResult()),
+                _mp("os.environ", {"SHELL_FORMAT": ""}),
+                _mp("os.remove", side_effect=lambda p: None),
+                _mp(
+                    "hermes_loop.file_utils.write_ledger",
+                    side_effect=lambda s: None,
+                ),
+                _mp(
+                    "hermes_loop.file_utils.read_ledger",
+                    return_value={"test": True},
+                ),
+                _mp(
+                    "hermes_loop.file_utils.extract_json_from_output",
+                    side_effect=_mock_extract,
+                ),
+            ):
+                from . import cli as _cli
+
+                _old_stdout = _sys.stdout
+                _sys.stdout = _io.StringIO()
+                try:
+                    _cli._run_healthcheck()
+                except SystemExit as _e:
+                    captured_exit[0] = _e.code if _e.code is not None else 0
+                finally:
+                    _sys.stdout = _old_stdout
+
+            # The empty/none cases will hit the else branch (json_fail += 1)
+            # but the non-empty cases will pass, so json_fail should be exactly 2
+            # (empty + none). Overall still degraded because 2/6 failed.
+            return captured_exit[0] == 1
+
+        cases.append(
+            (
+                "json-empty-returns-data-defensive",
+                lambda: _check_json_empty_returns_data(),
+                lambda r: (
+                    isinstance(r, bool) and r,
+                    f"json empty returns data defensive test failed: {r}",
+                ),
+            )
+        )
+
         return cases
 
     _run_subtests("test_healthcheck", _test_healthcheck())

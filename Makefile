@@ -96,6 +96,8 @@ install:
 	@echo "  ✓ hermes_loop is now on your PATH."
 	@echo "  Try: hermes_loop --help"
 	@echo ""
+	@$(MAKE) install-hooks 2>&1
+	@echo ""
 
 .PHONY: install-dev
 install-dev:
@@ -104,6 +106,8 @@ install-dev:
 	@echo ""
 	@echo "  ✓ Editable install complete. Changes to source are live."
 	@echo "  Run: hermes_loop --self-test"
+	@echo ""
+	@$(MAKE) install-hooks 2>&1
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -276,16 +280,19 @@ install-hooks-path:
 check:
 	@echo "━━━ make check — full pre-commit gate ━━━"
 	@echo ""
-	@echo "  Step 1/4 — Python + shell syntax check..."
+	@echo "  Step 0/5 — Install git hooks (idempotent)..."
+	@$(MAKE) install-hooks 2>&1 || true
+	@echo ""
+	@echo "  Step 1/5 — Python + shell syntax check..."
 	@$(MAKE) lint || exit 1
 	@echo ""
-	@echo "  Step 2/4 — self-tests..."
+	@echo "  Step 2/5 — self-tests..."
 	@$(MAKE) self-test 2>&1 || exit 1
 	@echo ""
-	@echo "  Step 3/4 — .env validation..."
+	@echo "  Step 3/5 — .env validation..."
 	@$(MAKE) check-env 2>&1 || true
 	@echo ""
-	@echo "  Step 4/4 — Regenerate completion scripts from argparse..."
+	@echo "  Step 4/5 — Regenerate completion scripts from argparse..."
 	@$(MAKE) update-completions 2>&1 || true
 	@echo ""
 	@echo "  ═══════════════════════════════════════════════════════════════════"

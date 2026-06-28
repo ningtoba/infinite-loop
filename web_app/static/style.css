@@ -221,6 +221,8 @@ body {
 .tag-warn { background: var(--warning-bg); color: var(--warning); }
 .tag-info { background: var(--info-bg); color: var(--info); }
 .tag-wt { background: #2a2a4a; color: #9a9aff; font-size: 0.72rem; }
+.tag-wt-ok { background: #1a3a2a; color: var(--success); font-size: 0.72rem; }
+.tag-wt-warn { background: #3a2a1a; color: var(--warning); font-size: 0.72rem; }
 
 /* ── Progress ───────────────────────────────────────────────────────────── */
 .progress-section { margin-bottom: 20px; }

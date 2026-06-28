@@ -28,6 +28,9 @@ function _rcLabel(rc) {
   if (rc.stale_pruned > 0) parts.push('s' + rc.stale_pruned);
   return parts.length ? 'clean:' + parts.join('/') : '';
 }
+function _rcTagCls(rc) {
+  return (rc && rc.remote_failed > 0) ? 'tag-wt-warn' : 'tag-wt-ok';
+}
 function _rcTooltip(rc) {
   if (!rc) return '';
   const d = rc.remote_deleted || 0;
@@ -271,8 +274,8 @@ function updateLatestIteration(latest) {
     const wt = latest.worktree_merge;
     const rc = latest.remote_cleanup;
     const wtText = (wt && (wt.merged > 0 || wt.failed > 0))
-      ? `<div class="lit-wt-merge"><span class="tag tag-wt" title="${escapeHtml(_wtTooltip(wt, rc))}">wt:${wt.merged}✓ ${wt.failed}✗${wt.skipped ? ' ' + wt.skipped + '–' : ''}${wt.conflicts > 0 ? ' ' + wt.conflicts + '⚡' : ''}${rc ? ' ' + _rcLabel(rc) : ''}</span></div>`
-      : (rc ? `<div class="lit-wt-merge"><span class="tag tag-wt" title="${escapeHtml(_rcTooltip(rc))}">${_rcLabel(rc)}</span></div>` : '');
+      ? `<div class="lit-wt-merge"><span class="tag tag-wt ${_rcTagCls(rc)}" title="${escapeHtml(_wtTooltip(wt, rc))}">wt:${wt.merged}✓ ${wt.failed}✗${wt.skipped ? ' ' + wt.skipped + '–' : ''}${wt.conflicts > 0 ? ' ' + wt.conflicts + '⚡' : ''}${rc ? ' ' + _rcLabel(rc) : ''}</span></div>`
+      : (rc ? `<div class="lit-wt-merge"><span class="tag tag-wt ${_rcTagCls(rc)}" title="${escapeHtml(_rcTooltip(rc))}">${_rcLabel(rc)}</span></div>` : '');
     div.innerHTML = `<div class="lit-header">...
       <strong>#${latest.n}</strong> <span class="tag ${tagCls}">${escapeHtml(latest.classification || latest.task_type || 'unknown')}</span>
       <span style="color:var(--fg-muted)">${latest.duration_seconds || 0}s</span>
@@ -327,9 +330,9 @@ function updateRecentIterations(data) {
         let wtLabel = `wt:${wt.merged}✓ ${wt.failed}✗`;
         if (wt.conflicts > 0) wtLabel += ` ${wt.conflicts}⚡`;
         if (rc) wtLabel += ` ${_rcLabel(rc)}`;
-        wtHtml = `<span class="tag tag-wt" title="${wtTitle}">${wtLabel}</span>`;
+        wtHtml = `<span class="tag tag-wt ${_rcTagCls(rc)}" title="${wtTitle}">${wtLabel}</span>`;
       } else if (rc) {
-        wtHtml = `<span class="tag tag-wt" title="${escapeHtml(_rcTooltip(rc))}">${_rcLabel(rc)}</span>`;
+        wtHtml = `<span class="tag tag-wt ${_rcTagCls(rc)}" title="${escapeHtml(_rcTooltip(rc))}">${_rcLabel(rc)}</span>`;
       }
       const rowHtml = `<tr class="${cls}">
         <td>${latest.n}</td><td><span class="tag tag-info">${escapeHtml(latest.task_type || '')}</span></td>
@@ -392,9 +395,9 @@ function _appendIterationRows(tbody, iters, seenNs) {
       let wtLabel = `wt:${wt.merged}✓ ${wt.failed}✗`;
       if (wt.conflicts > 0) wtLabel += ` ${wt.conflicts}⚡`;
       if (rc) wtLabel += ` ${_rcLabel(rc)}`;
-      wtHtml = `<span class="tag tag-wt" title="${wtTitle}">${wtLabel}</span>`;
+      wtHtml = `<span class="tag tag-wt ${_rcTagCls(rc)}" title="${wtTitle}">${wtLabel}</span>`;
     } else if (rc) {
-      wtHtml = `<span class="tag tag-wt" title="${escapeHtml(_rcTooltip(rc))}">${_rcLabel(rc)}</span>`;
+      wtHtml = `<span class="tag tag-wt ${_rcTagCls(rc)}" title="${escapeHtml(_rcTooltip(rc))}">${_rcLabel(rc)}</span>`;
     }
     const temp = document.createElement('tbody');
     temp.innerHTML = `<tr class="${cls}">
@@ -617,8 +620,8 @@ async function loadIterations(page = 0) {
       const rc = it.remote_cleanup;
       const wtTitle = _wtTooltip(wt, rc);
       const wtHtml = (wt && (wt.merged > 0 || wt.failed > 0))
-        ? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗${wt.conflicts > 0 ? ' ' + wt.conflicts + '⚡' : ''}${rc ? ' ' + _rcLabel(rc) : ''}</span>`
-        : (rc ? `<span class="tag tag-wt" title="${escapeHtml(_rcTooltip(rc))}">${_rcLabel(rc)}</span>` : '');
+        ? `<span class="tag tag-wt ${_rcTagCls(rc)}" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗${wt.conflicts > 0 ? ' ' + wt.conflicts + '⚡' : ''}${rc ? ' ' + _rcLabel(rc) : ''}</span>`
+        : (rc ? `<span class="tag tag-wt ${_rcTagCls(rc)}" title="${escapeHtml(_rcTooltip(rc))}">${_rcLabel(rc)}</span>` : '');
       return `<tr class="${cls}"><td>${it.n}</td><td style="white-space:nowrap;font-size:0.78rem;color:var(--fg-muted)">${formatTs(it.started_at)}</td><td>${it.duration_seconds||0}s</td><td><span class="tag tag-info">${escapeHtml(it.task_type||'')}</span></td><td><span class="tag ${tagCls}">${it.error?'ERR':(it.classification||'OK')}</span></td><td class="summary-col" title="${escapeHtml(it.summary||'')}">${escapeHtml((it.summary||'').substring(0,100))}</td><td style="color:var(--danger);font-size:0.78rem">${it.error?escapeHtml(String(it.error).substring(0,60)):''}</td><td style="font-size:0.78rem">${wtHtml}</td></tr>`;
     }).join('');
     const tp = Math.ceil((data.total||0)/ITERATIONS_PER_PAGE);

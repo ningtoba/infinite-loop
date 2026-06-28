@@ -23,11 +23,11 @@ _HERMES_VERSION_CACHE: tuple[int, int] | None = None
 # Key: the flag name as passed on the CLI (e.g. "--session-timeout").
 # Value: (major, minor) minimum version tuple.
 _HERMES_FLAG_MIN_VERSIONS: dict[str, tuple[int, int]] = {
-    # --session-timeout was removed from hermes chat in v0.17.0 (it's now
-    # controlled internally by the daemon via subprocess timeout_seconds).
-    # Define the minimum version here for forward compatibility — if a future
-    # Hermes re-adds it, bump the tuple to whatever that minimum is.
-    # "--session-timeout": (0, 17),
+    # --session-timeout was removed from hermes chat in v0.17.0 (the loop
+    # now handles timeout externally via subprocess timeout_seconds / PTY
+    # idle timeout).  The (99, 0) sentinel ensures hermes_flag_supported()
+    # always returns False so we never pass this flag.
+    "--session-timeout": (99, 0),
 }
 
 # Regex to extract (major, minor) from "Hermes Agent v<major>.<minor>.<patch>"

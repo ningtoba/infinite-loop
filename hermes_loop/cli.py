@@ -1535,7 +1535,7 @@ def _create_parser(for_introspection=False):
 
     # ── 15. Logging ─────────────────────────────────────────────────────────
     group = parser.add_argument_group(
-        "Logging", "Daemon log file with automatic rotation"
+        "Logging", "Daemon log file with automatic rotation and structured JSON output"
     )
     group.add_argument(
         "--log-file",
@@ -1547,6 +1547,15 @@ def _create_parser(for_introspection=False):
         type=int,
         default=10,
         help="Max log file size in MB before rotation (default: 10). Only used with --log-file.",
+    )
+    group.add_argument(
+        "--json-logs",
+        action="store_true",
+        help="Output each iteration result as a single JSON line to stdout. "
+        "Each line is a complete iteration record with all fields "
+        "(n, task_type, goal, summary, duration_seconds, error, classification, system, etc.). "
+        "Useful for programmatic consumption, grep, jq, or piping to external tools. "
+        "JSON lines are printed after each iteration completes, independently of --log-file.",
     )
 
     # ── 16. Status / Dashboard ──────────────────────────────────────────────
@@ -2281,7 +2290,7 @@ def main():
             f"            {colorizer.dim('desktop/Pushbullet/ntfy | library mode | yolo | safe-mode')}"
         )
         _log(
-            f"            {colorizer.dim('self-test | status-html | checkpoint | resume | archiving')}"
+            f"            {colorizer.dim('self-test | status-html | checkpoint | resume | archiving | json-logs')}"
         )
         _log(
             f"            {colorizer.tag_summary()} {colorizer.dim('summary')} | {colorizer.tag_suggest()} {colorizer.dim('smart fixes')} | {colorizer.flag('--examples')} | {colorizer.flag('--quiet')}"
@@ -2631,6 +2640,7 @@ def main():
             heartbeat_timeout=args.heartbeat_timeout,
             quiet=args.quiet,
             force_reset=args.force_reset,
+            json_logs=args.json_logs,
         )
 
     if args.notify_on_completion or args.notify_pushbullet or args.notify_ntfy:

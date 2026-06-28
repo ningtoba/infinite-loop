@@ -1,6 +1,7 @@
 """Main loop logic — run_loop function."""
 
 import atexit
+import json
 import os
 import subprocess
 import sys
@@ -212,6 +213,7 @@ def run_loop(
     heartbeat_timeout: int = 0,
     quiet: bool = False,
     force_reset: bool = False,
+    json_logs: bool = False,
 ) -> None:
     global _shutdown_requested
 
@@ -748,6 +750,19 @@ def run_loop(
         state["total_iterations"] = iteration_count
         state["last_updated"] = datetime.now(timezone.utc).isoformat()
         state["status"] = "running"
+
+        # ── JSON Logs: output structured iteration record as a single JSON line ──
+        if json_logs:
+            json_line = record.copy()
+            # Omit large fields that bloat programmatic output
+            json_line.pop("worker_results", None)
+            if json_line.get("system"):
+                json_line["system"] = {
+                    k: v
+                    for k, v in json_line["system"].items()
+                    if k in ("cpu_seconds_used", "memory_rss_mb", "memory_peak_mb")
+                }
+            print(json.dumps(json_line, default=str), flush=True)
 
         if evolve and next_goal and len(goals_list) <= 1:
             state["current_goal"] = next_goal

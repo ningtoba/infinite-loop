@@ -884,12 +884,16 @@ function createWorkerTerminal(wid) {
 function renderWorkers(data) {
 	_allWorkerData = data;
 	const container = document.getElementById("worker-cards");
-	const live = data.live_iteration;
+	const live = data.live_iteration || {};
 	const workerLogs = data.worker_logs || {};
-	const allWorkers = live && live.workers ? [...live.workers] : [];
+	const workerTerm = data.worker_term || {};
+	const allWorkers = live.workers ? [...live.workers] : [];
 	const seenIds = new Set(allWorkers.map((w) => w.id));
 	Object.keys(workerLogs).forEach((wid) => {
-		if (!seenIds.has(wid)) allWorkers.push({ id: wid, status: "running" });
+		if (!seenIds.has(wid)) allWorkers.push({ id: wid, status: "done" });
+	});
+	Object.keys(workerTerm).forEach((wid) => {
+		if (!seenIds.has(wid)) allWorkers.push({ id: wid, status: "done" });
 	});
 
 	if (!allWorkers.length) {
@@ -913,13 +917,13 @@ function renderWorkers(data) {
 		allWorkers
 			.map((w) => {
 				const cls =
-					w.status === "ok" ? "ok" : w.status === "error" ? "error" : "running";
+					w.status === "ok" || w.status === "done" ? "ok" : w.status === "error" ? "error" : "running";
 				const dur = w.duration_seconds
 					? w.duration_seconds.toFixed(0) + "s"
 					: "";
 				const termLines = (data.worker_term || {})[w.id] || [];
 				const label =
-					w.status === "ok"
+					w.status === "ok" || w.status === "done"
 						? "Done"
 						: w.status === "error"
 							? "Error"

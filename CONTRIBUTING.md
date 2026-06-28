@@ -65,6 +65,9 @@ in `hermes_loop/config.py`. The project follows
 git clone <repo-url>
 cd hermes-loop
 
+# Enable the pre-commit hook via core.hooksPath (no sync problem)
+make install-hooks-path
+
 # Copy and configure environment
 make env
 # Or: cp .env.example .env
@@ -290,6 +293,7 @@ shell completion scripts whenever CLI flags change. Two ways to enable it:
 | Method | Command | Pro | Con |
 |--------|---------|-----|-----|
 | **`core.hooksPath` (recommended)** | `git config core.hooksPath .githooks` | No sync problem — always uses repo version; survives pulls, branches, rebases | Requires explicit `git config` |
+| **`make install-hooks-path`** | `make install-hooks-path` | One command wrapping `git config core.hooksPath .githooks`; project metadata in `[tool.hermes_loop]` (`pyproject.toml`) documents settings for pip-level tools | Same — delegates to the git config approach |
 | **`cp`-based** | `make install-hooks` | Auto-run by `make install` / `make install-dev` | Stale copy if `.githooks/` updates — must re-run |
 
 **Recommendation:** Run `make install-hooks-path` once to use the `core.hooksPath`

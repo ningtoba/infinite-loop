@@ -13,6 +13,7 @@ from .dashboard import (
     _sse_clients,
     _sse_clients_lock,
     _build_sse_payload,
+    _wrap_sse_payload,
     _SSE_DASHBOARD_HTML_TPL,
 )
 from .goal_utils import _goal_hash
@@ -265,39 +266,7 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
             state = read_ledger()
             if state:
                 init_raw = _build_sse_payload(state)
-                init_wrapped = {
-                    "type": "status_update",
-                    "data": {
-                        "loop_status": init_raw.get("status", "unknown"),
-                        "ledger": {
-                            "status": init_raw.get("status", "unknown"),
-                            "total_iterations": init_raw.get("total_iterations", 0),
-                            "max_iterations": init_raw.get("max_iterations", 0),
-                            "goal": init_raw.get("goal", ""),
-                            "evolved_goal": init_raw.get("evolved_goal", ""),
-                            "started_at": init_raw.get("started_at", ""),
-                            "last_updated": init_raw.get("last_updated", ""),
-                            "cooldown": init_raw.get("cooldown", 0),
-                        },
-                        "latest_iteration": init_raw.get("iteration", {}),
-                        "stats": init_raw.get("stats", {}),
-                        "error_counts": init_raw.get("error_counts", {}),
-                        "mitigations": init_raw.get("mitigations", {}),
-                        "eta": init_raw.get("eta", {}),
-                        "goals": init_raw.get("goals", []),
-                        "avg_chars_per_iter": init_raw.get("avg_chars_per_iter"),
-                        "avg_throughput": init_raw.get("avg_throughput"),
-                        "est_cost": init_raw.get("est_cost"),
-                        "iters_per_goal": init_raw.get("iters_per_goal"),
-                        "metrics_summary": init_raw.get("metrics_summary", ""),
-                        "consecutive_errors": init_raw.get("consecutive_errors", 0),
-                        "consecutive_successes": init_raw.get(
-                            "consecutive_successes", 0
-                        ),
-                        "cooldown": init_raw.get("cooldown", 0),
-                        "iteration": init_raw.get("iteration", {}),
-                    },
-                }
+                init_wrapped = _wrap_sse_payload(init_raw)
                 self.wfile.write(
                     f"event: init\ndata: {json.dumps(init_wrapped, default=str)}\n\n".encode(
                         "utf-8"
@@ -317,41 +286,7 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     data = q.get(timeout=30)
                     raw = json.loads(data) if isinstance(data, str) else data
-                    # Build a status dict matching the web_app format the SSE dashboard JS expects
-                    # (the JS references loop_status, latest_iteration, and ledger sub-keys)
-                    wrapped = {
-                        "type": "status_update",
-                        "data": {
-                            "loop_status": raw.get("status", "unknown"),
-                            "ledger": {
-                                "status": raw.get("status", "unknown"),
-                                "total_iterations": raw.get("total_iterations", 0),
-                                "max_iterations": raw.get("max_iterations", 0),
-                                "goal": raw.get("goal", ""),
-                                "evolved_goal": raw.get("evolved_goal", ""),
-                                "started_at": raw.get("started_at", ""),
-                                "last_updated": raw.get("last_updated", ""),
-                                "cooldown": raw.get("cooldown", 0),
-                            },
-                            "latest_iteration": raw.get("iteration", {}),
-                            "stats": raw.get("stats", {}),
-                            "error_counts": raw.get("error_counts", {}),
-                            "mitigations": raw.get("mitigations", {}),
-                            "eta": raw.get("eta", {}),
-                            "goals": raw.get("goals", []),
-                            "avg_chars_per_iter": raw.get("avg_chars_per_iter"),
-                            "avg_throughput": raw.get("avg_throughput"),
-                            "est_cost": raw.get("est_cost"),
-                            "iters_per_goal": raw.get("iters_per_goal"),
-                            "metrics_summary": raw.get("metrics_summary", ""),
-                            "consecutive_errors": raw.get("consecutive_errors", 0),
-                            "consecutive_successes": raw.get(
-                                "consecutive_successes", 0
-                            ),
-                            "cooldown": raw.get("cooldown", 0),
-                            "iteration": raw.get("iteration", {}),
-                        },
-                    }
+                    wrapped = _wrap_sse_payload(raw)
                     self.wfile.write(
                         f"event: update\ndata: {json.dumps(wrapped, default=str)}\n\n".encode(
                             "utf-8"
@@ -384,14 +319,21 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         """Handle GET /api/iterations — return recent iteration records."""
         state = read_ledger()
         iterations = state.get("iterations", []) if state else []
+        # Parse optional limit from query string
+        parsed_path = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed_path.query)
+        try:
+            limit = max(1, min(int(qs.get("limit", ["50"])[0]), 500))
+        except (ValueError, IndexError):
+            limit = 50
         # Return most recent first
         reversed_iters = list(reversed(iterations))
         self._send_json(
             200,
             {
-                "iterations": reversed_iters[:50],
+                "iterations": reversed_iters[:limit],
                 "total": len(iterations),
-                "limit": 50,
+                "limit": limit,
                 "offset": 0,
             },
         )

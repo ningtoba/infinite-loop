@@ -123,7 +123,7 @@ def _print_shutdown_summary(
     _slog("")
 
 
-# Import archiving (delayed to avoid circular imports in `loop` module)
+# Archiving utilities
 from .archiving import (  # noqa: E402
     _archive_iterations,
     _cleanup_old_archives,

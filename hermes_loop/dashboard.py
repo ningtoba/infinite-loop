@@ -749,6 +749,48 @@ def _write_status_html(html_path: str, state: dict):
         _log(f"[HTML-DASH] Failed to write status page {html_path}: {e}")
 
 
+def _wrap_sse_payload(raw: dict) -> dict:
+    """Build the SSE transport envelope from a _build_sse_payload() dict.
+
+    Returns a ``{"type": "status_update", "data": {...}}`` dict whose
+    ``data`` sub-dict mirrors the shape consumed by the SSE dashboard JS
+    (``renderDashboard()``).  This is the single canonical wrapping point;
+    callers (``webhook._handle_sse``, ``_broadcast_to_sse_clients``, …)
+    should use this instead of re-building the envelope by hand.
+    """
+    return {
+        "type": "status_update",
+        "data": {
+            "loop_status": raw.get("status", "unknown"),
+            "ledger": {
+                "status": raw.get("status", "unknown"),
+                "total_iterations": raw.get("total_iterations", 0),
+                "max_iterations": raw.get("max_iterations", 0),
+                "goal": raw.get("goal", ""),
+                "evolved_goal": raw.get("evolved_goal", ""),
+                "started_at": raw.get("started_at", ""),
+                "last_updated": raw.get("last_updated", ""),
+                "cooldown": raw.get("cooldown", 0),
+            },
+            "latest_iteration": raw.get("iteration", {}),
+            "stats": raw.get("stats", {}),
+            "error_counts": raw.get("error_counts", {}),
+            "mitigations": raw.get("mitigations", {}),
+            "eta": raw.get("eta", {}),
+            "goals": raw.get("goals", []),
+            "avg_chars_per_iter": raw.get("avg_chars_per_iter"),
+            "avg_throughput": raw.get("avg_throughput"),
+            "est_cost": raw.get("est_cost"),
+            "iters_per_goal": raw.get("iters_per_goal"),
+            "metrics_summary": raw.get("metrics_summary", ""),
+            "consecutive_errors": raw.get("consecutive_errors", 0),
+            "consecutive_successes": raw.get("consecutive_successes", 0),
+            "cooldown": raw.get("cooldown", 0),
+            "iteration": raw.get("iteration", {}),
+        },
+    }
+
+
 def _broadcast_to_sse_clients(state: dict) -> None:
     """Push the latest iteration state as an SSE event to all connected clients."""
     global _sse_clients

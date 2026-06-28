@@ -1,5 +1,6 @@
 """Library worker — multiprocessing workers for --use-library."""
 
+import logging as _logging
 import sys
 import time
 import concurrent.futures as _cf
@@ -12,7 +13,6 @@ from .validation import validate_json_output
 
 def _setup_worker_logging(prefix: str = "") -> None:
     """Configure per-worker logging in child process."""
-    import logging as _logging
 
     root = _logging.getLogger()
     for h in list(root.handlers):

@@ -4,6 +4,11 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 
 ---
 
+## [14.39.1] — 2026-06-28
+
+### Fixed
+- **`hermes_loop/library_worker.py` — Moved inline `import logging as _logging` to module top level**: Removed the per-function `import logging as _logging` inside `_setup_worker_logging()` and hoisted it to module scope, consistent with the existing `import concurrent.futures as _cf` pattern. No behaviour change — the `_logging` alias is only used inside the same function body.
+
 ## [14.39.0] — 2026-06-28
 
 ### Added

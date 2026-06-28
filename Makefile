@@ -136,7 +136,7 @@ dry-run:
 .PHONY: test
 test:
 	@echo "━━━ Running pytest test suite ━━━"
-	@$(PYTHON) -m pytest tests/ -v --tb=short
+	@$(PYTHON) -m pytest tests/ -v --tb=short --cov=hermes_loop --cov=web_app --cov-report=term-missing
 
 .PHONY: self-test
 self-test:

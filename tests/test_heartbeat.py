@@ -235,15 +235,18 @@ class TestRunHeartbeatMonitor:
         with open(hb_file, "w") as f:
             f.write("{}\n")
 
+        # With a non-existent heartbeat file (age=None), the monitor checks
+        # elapsed vs timeout. Use a very old session_start so it returns
+        # quickly with status="lost".
         result = _run_heartbeat_monitor(
-            heartbeat_file=hb_file,
-            timeout=30,
-            session_start=time.time(),
+            heartbeat_file=hb_file + ".nonexistent",
+            timeout=2,
+            session_start=time.time() - 300,
             proc=None,
             timeout_seconds=2,
         )
         assert isinstance(result, dict)
-        assert "status" in result
+        assert result.get("status") == "lost"
 
 
 # ===================================================================

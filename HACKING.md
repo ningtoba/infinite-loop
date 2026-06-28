@@ -48,7 +48,7 @@ If you are new to the project, start with
 - [HTTP Callback Payload](#http-callback-payload)
 - [Sentinel File Protocol](#sentinel-file-protocol)
 - [Module Map](#module-map)
-- [Web Stack Architecture](#web-stack-architecture)
+- [Web Stack Architecture](#web-stack-architecture)  (→ [ARCHITECTURE.md](./ARCHITECTURE.md))
   - [Static HTML Dashboard (`dashboard.py`)](#static-html-dashboard-dashboardpy)
   - [SSE Live Dashboard (`dashboard.py`)](#sse-live-dashboard-dashboardpy)
   - [FastAPI SPA (`web_app/`)](#fastapi-spa-web_app)
@@ -729,11 +729,18 @@ Source file → primary responsibility:
 | `similarity.py` | Text similarity / convergence detection |
 | `library_worker.py` | In-process AIAgent runner (`--use-library`) |
 | `env_utils.py` | `.env` file parsing and validation |
-|| `web_app/` | FastAPI-based web UI (requires `pip install web` extras) |
+|| `web_app/` | FastAPI-based web UI (requires `pip install web` extras) — see [ARCHITECTURE.md](./ARCHITECTURE.md) |
 |
 |---
 
 ## Web Stack Architecture
+
+> **Quick reference**: For a standalone deep-dive focused only on the web
+> components — component diagrams, REST API reference, SSE protocol details,
+> Docker deployment, config schema, and development setup — see
+> [ARCHITECTURE.md](./ARCHITECTURE.md). That file is designed as a faster entry
+> point for web/UI contributors who don't need the spawned-session protocol or
+> ledger schema documented here.
 
 The project ships three distinct web-facing components, each serving a different
 audience:

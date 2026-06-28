@@ -55,6 +55,10 @@ is met.
   Documents the spawned-session protocol, iteration record schema, JSON ledger
   format, error taxonomy, and module map. Start here if you want to build tools
   that read or write the ledger.
+- **`ARCHITECTURE.md`** — Standalone reference for the three web components
+  (Static HTML Dashboard, SSE Live Dashboard, FastAPI SPA). Includes REST API
+  endpoints, SSE protocol, Docker deployment, config schema, and development
+  setup. A quicker entry point for web/UI contributors.
 
 **Version**: The current version is defined as `LAUNCH_LOOP_VERSION = "14.38.0"`
 in `hermes_loop/config.py`. The project follows

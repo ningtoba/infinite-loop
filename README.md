@@ -20,6 +20,11 @@ skill for independent use, development, and documentation.
 
 ---
 
+> **Web architecture**: For a standalone reference focused on the three web
+> components (Static HTML Dashboard, SSE Live Dashboard, FastAPI SPA) — REST
+> API, SSE protocol, Docker deployment, config schema, and development setup —
+> see [ARCHITECTURE.md](./ARCHITECTURE.md).
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)

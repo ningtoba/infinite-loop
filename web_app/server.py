@@ -286,7 +286,8 @@ async def sse_stream(request: Request):
 async def _status_poller():
     """Poll the ledger and broadcast changes + new log entries to SSE clients."""
     manager = get_loop_manager()
-    last_log_count = 0
+    _seen_log_keys: set[str] = set()
+    _MAX_SEEN_LOG_KEYS = 5000
     last_status_hash = ""
     idle_ticks = 0
     while True:
@@ -344,11 +345,16 @@ async def _status_poller():
                 await _broadcast_sse({"type": "status_update", "data": status})
             else:
                 idle_ticks += 1
-            # Push new log entries individually
+            # Push new log entries individually (dedup by timestamp|message key)
             logs = status.get("recent_logs", [])
-            for i in range(last_log_count, len(logs)):
-                await _broadcast_sse({"type": "log_entry", "entry": logs[i]})
-            last_log_count = len(logs)
+            for entry in logs:
+                key = f"{entry['timestamp']}|{entry['message']}"
+                if key not in _seen_log_keys:
+                    _seen_log_keys.add(key)
+                    await _broadcast_sse({"type": "log_entry", "entry": entry})
+            # Trim seen set to prevent unbounded growth
+            if len(_seen_log_keys) > _MAX_SEEN_LOG_KEYS:
+                _seen_log_keys.clear()
         except Exception:
             pass
 

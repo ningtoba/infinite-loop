@@ -15,7 +15,8 @@ let loopStatus = 'stopped';
 let sseSource = null;
 let iterationsPage = 0;
 const ITERATIONS_PER_PAGE = 25;
-let lastLogIdx = -1;         // append-only log tracking
+let _seenLogKeys = new Set();   // dedup log entries by timestamp|message
+const MAX_SEEN_LOG_KEYS = 2000; // prevent unbounded Set growth
 let workerLogFilter = null;  // filter logs by worker ID
 let _lastSeenIterationCount = 0;  // only refetch iterations when count changes
 let _lastRecentFullRefresh = 0;   // timestamp of last full recent-iterations refresh
@@ -270,12 +271,9 @@ function updateDashboard(data) {
     feedWorkerTerminal(_activeWorkerLog, (data.worker_term[_activeWorkerLog] || []));
   }
 
-  // Append new log entries
+  // Append new log entries (dedup handled by appendLog)
   const logs = data.recent_logs || [];
-  if (logs.length > 0) {
-    for (let i = lastLogIdx + 1; i < logs.length; i++) appendLog(logs[i]);
-    lastLogIdx = logs.length - 1;
-  }
+  for (const entry of logs) appendLog(entry);
 }
 
 function updateLatestIteration(latest) {
@@ -500,6 +498,15 @@ function updateLiveIteration(live) {
 // ── Append-only log rendering (preserves text selection) ──────────────────
 function appendLog(entry) {
   if (!entry || !entry.message) return;
+  // Dedup: skip if already seen via status_update path
+  const key = `${entry.timestamp}|${entry.message}`;
+  if (_seenLogKeys.has(key)) return;
+  _seenLogKeys.add(key);
+  // Trim oldest entry when set exceeds MAX_SEEN_LOG_KEYS
+  if (_seenLogKeys.size > MAX_SEEN_LOG_KEYS) {
+    const iter = _seenLogKeys.values().next();
+    if (iter.value) _seenLogKeys.delete(iter.value);
+  }
   // Extract worker ID from message for filtering
   const workerMatch = entry.message.match(/worker\s*#(\d+)/i);
   const wid = workerMatch ? workerMatch[1] : null;
@@ -583,7 +590,7 @@ async function resetLedger() {
   try {
     const res = await fetch('/api/loop/reset', { method: 'POST' });
     const data = await res.json();
-    if (data.success) { lastLogIdx = -1; _lastWorkerLogCounts = {}; _lastSeenIterationCount = 0; fetchStatus(); }
+    if (data.success) { _seenLogKeys = new Set(); _lastWorkerLogCounts = {}; _lastSeenIterationCount = 0; fetchStatus(); }
     else alert('Reset failed: ' + (data.error || 'unknown'));
   } catch (err) { alert('Reset failed: ' + err.message); }
 }
@@ -597,7 +604,7 @@ async function controlLoop(action) {
     const res = await fetch(url, { method: 'POST' });
     const data = await res.json();
     if (!data.success) alert(`Error: ${data.error || 'Unknown error'}`);
-    if (action === 'start') { lastLogIdx = -1; _lastWorkerLogCounts = {}; _lastSeenIterationCount = 0; document.getElementById('log-container').innerHTML = ''; }
+    if (action === 'start') { _seenLogKeys = new Set(); _lastWorkerLogCounts = {}; _lastSeenIterationCount = 0; document.getElementById('log-container').innerHTML = ''; }
     setTimeout(fetchStatus, 500);
     setTimeout(fetchStatus, 2000);
   } catch (err) { alert(`Failed: ${err.message}`); }

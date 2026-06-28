@@ -94,8 +94,9 @@ def _execute_iteration(
                 f"[BEAT] Iteration #{iteration_count} still running ({elapsed}s elapsed)..."
             )
 
-    spawn_goal = spawn_goal if len(goals_list) > 1 else goals_list[0]
-
+    # The spawn_goal param is already set by loop.py:521 to the correct
+    # current_goal_spec (from goals cycling). No need to reassign — the
+    # parameter value is authoritative for both single and multi-goal mode.
     # Start iteration heartbeat thread (logs every 2 min during long-running spawns)
     heartbeat_thread = threading.Thread(
         target=_iteration_heartbeat, args=(120,), daemon=True

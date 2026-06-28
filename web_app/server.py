@@ -85,7 +85,7 @@ async def save_config(request: Request):
     try:
         data = await request.json()
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from None
 
     write_json_config(data)
     return {"success": True, "message": "Configuration saved", "path": CONFIG_PATH}
@@ -359,6 +359,16 @@ async def startup():
     task = asyncio.create_task(_status_poller())
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Clean up background tasks on server shutdown."""
+    for task in set(_background_tasks):
+        task.cancel()
+    if _background_tasks:
+        await asyncio.gather(*_background_tasks, return_exceptions=True)
+    _background_tasks.clear()
 
 
 # ── Entry point ─────────────────────────────────────────────────────────────

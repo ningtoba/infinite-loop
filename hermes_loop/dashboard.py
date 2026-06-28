@@ -880,9 +880,9 @@ def _build_sse_payload(state: dict) -> dict:
         if cps_list:
             avg_throughput = round(sum(cps_list) / len(cps_list), 1)
     metrics_summary_parts = []
-    if avg_chars_per_iter:
+    if avg_chars_per_iter is not None:
         metrics_summary_parts.append(f"{avg_chars_per_iter} chars/iter")
-    if avg_throughput:
+    if avg_throughput is not None:
         metrics_summary_parts.append(f"{avg_throughput} cps avg")
     if stats.get("avg_duration_seconds", 0):
         metrics_summary_parts.append(f'{stats["avg_duration_seconds"]:.0f}s avg')

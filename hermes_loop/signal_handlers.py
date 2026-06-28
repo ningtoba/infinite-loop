@@ -175,6 +175,8 @@ def _check_auto_reload(
 ) -> None:
     """Check if daemon source files changed on disk and restart if so."""
     global _startup_file_snapshots
+    if os.environ.get("HERMES_LOOP_NO_AUTO_RELOAD") == "1":
+        return
     if not _startup_file_snapshots or not workdir:
         return
 

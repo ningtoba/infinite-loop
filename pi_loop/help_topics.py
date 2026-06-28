@@ -12,9 +12,9 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-from .config import VERSION, LEDGER_PATH
 from .color_utils import colorizer
-from .file_utils import extract_json_from_output, write_ledger, read_ledger
+from .config import LEDGER_PATH, VERSION
+from .file_utils import extract_json_from_output, read_ledger, write_ledger
 
 
 def _introspection_flags() -> dict[str, str]:

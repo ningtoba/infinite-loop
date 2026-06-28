@@ -29,10 +29,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          pip install -e ".[test,dev]"
 
       - name: Run lint
         run: make lint-all
+
+      - name: Run mypy
+        run: make mypy
 
   test:
     runs-on: ubuntu-latest
@@ -59,7 +62,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          pip install -e ".[test,dev]"
 
       - name: Run tests
-        run: python -m pytest tests/ -v
+        run: make test

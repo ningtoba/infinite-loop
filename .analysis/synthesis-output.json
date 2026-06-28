@@ -1,0 +1,45 @@
+{
+  "selected_task_id": "BL-007",
+  "title": "Add schema validation to save_config_api endpoint",
+  "category": "security",
+  "priority": "high",
+  "impact": 7,
+  "effort": 3,
+  "value_score": 11.67,
+  "reasoning": "BL-007 is the single highest-value task. It's a security improvement (matching anti-stagnation preference away from bug fixes), activates the dead validate_config() function, prevents corrupt config writes from causing 500 errors, and is a focused low-effort change across 2 files. Recent commits were exclusively bug fixes (zombie processes, thinking_delta suppression, web UI hash, f-string compat). BL-007 scores highest on Value=Impact/(Effort*Risk/10)=11.67, with effort=3 well under the 5 cap.",
+  "files_to_change": [
+    "web_app/server.py",
+    "web_app/config_manager.py"
+  ],
+  "implementation_plan": [
+    "In server.py, import validate_config from .config_manager",
+    "In save_config_api(), call validate_config(data) before save_config(data)",
+    "Return HTTP 422 with structured validation errors on invalid input",
+    "Ensure partial config updates are supported (only validate keys present in the request body, not all required keys)",
+    "Add backward-compatible handling: empty/partial configs pass validation if no explicitly invalid values"
+  ],
+  "backlog_updates": {
+    "update_existing": [
+      {"id": "BL-007", "changes": "priority=high → critical (activates dead code, prevents security issue + 500 errors)"},
+      {"id": "BL-010", "changes": "status=completed (make lint-all + pytest exist in CI)"},
+      {"id": "BL-030", "changes": "status=completed (test dependencies defined in pyproject.toml)"},
+      {"id": "BL-047", "changes": "status=completed (Python 3.10-3.13 matrix exists)"},
+      {"id": "BL-052", "changes": "status=completed (test+lint pipeline runs in CI)"},
+      {"id": "BL-001", "changes": "status=completed (zombie process fix verified)"},
+      {"id": "BL-002", "changes": "update description to note coverage is partial (156 tests across 7 modules, missing loop_manager/server/loop.py tests)"},
+      {"id": "BL-011", "changes": "priority=high→critical (disabled pre-commit with zero enforcement)"},
+      {"id": "BL-019", "changes": "add evidence of diverging defaults between config_file.py (timeout=120, port=8000) and config_manager.py (timeout=600, no port)"},
+      {"id": "BL-020", "changes": "add validate_config (config_manager.py) to dead code list alongside validate_json_output"}
+    ],
+    "add_new": [
+      {"title": "Consolidate duplicate content_block_stop handler in _execute_task", "category": "code-quality", "priority": "medium"},
+      {"title": "Add mypy type-checking to CI pipeline + Makefile", "category": "CI/CD", "priority": "high"},
+      {"title": "Consolidate duplicate worker_term append logic in loop_manager._parse_daemon_line", "category": "code-quality", "priority": "medium"},
+      {"title": "Fix config_file.py/config_manager.py default port mismatch (8000 vs 8090)", "category": "technical-debt", "priority": "low"},
+      {"title": "Remove redundant pip install from make test target", "category": "dev-experience", "priority": "low"},
+      {"title": "Fix _get_memory_info() DATA_DIR path construction", "category": "code-quality", "priority": "low"},
+      {"title": "Add Dependabot config for dependency updates", "category": "CI/CD", "priority": "medium"},
+      {"title": "Fix _get_cpu_percent() first-read returning 0%", "category": "code-quality", "priority": "low"}
+    ]
+  }
+}

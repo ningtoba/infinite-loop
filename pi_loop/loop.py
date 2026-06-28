@@ -4,30 +4,30 @@ Simplified task execution loop that spawns subprocess workers and tracks
 progress in a JSON ledger.
 """
 
-from contextlib import suppress
-from datetime import datetime, timezone
 import json
 import os
 import subprocess
 import sys
 import time
+from contextlib import suppress
+from datetime import datetime, timezone
 
-from .config import VERSION, DEFAULT_CONVERGENCE_THRESHOLD, DEFAULT_CONVERGENCE_WINDOW
-from .file_utils import _log, write_ledger, write_status_file
+from .color_utils import colorizer
+from .config import DEFAULT_CONVERGENCE_THRESHOLD, DEFAULT_CONVERGENCE_WINDOW, VERSION
 from .error_recovery import _adapt_to_error, _set_originals
 from .error_utils import _suggest_actionable_fix
+from .file_utils import _log, write_ledger, write_status_file
 from .functions import (
+    _build_progressive_context,
     _cycle_goal,
+    _handle_cooldown,
     _load_goals_file,
     _log_startup_banner,
-    _build_progressive_context,
-    _handle_cooldown,
 )
 from .git_utils import _capture_git_state, _git_auto_commit
-from .system_utils import get_system_usage, get_system_usage_diff
-from .color_utils import colorizer
 from .stats import _recalc_stats
 from .status import write_status as _write_status_file
+from .system_utils import get_system_usage, get_system_usage_diff
 
 # Module-level shutdown flag
 _shutdown_requested = False
@@ -119,17 +119,11 @@ def _execute_task(
                     # Tool result
                     if ame_type == "content_block_stop":
                         delta = ame.get("delta", {})
-                        if (
-                            isinstance(delta, dict)
-                            and delta.get("type") == "tool_result"
-                        ):
+                        if isinstance(delta, dict) and delta.get("type") == "tool_result":
                             result_content = delta.get("content", "")
                             if isinstance(result_content, list):
                                 for cb in result_content:
-                                    if (
-                                        isinstance(cb, dict)
-                                        and cb.get("type") == "text"
-                                    ):
+                                    if isinstance(cb, dict) and cb.get("type") == "text":
                                         _term(f"[Result: {cb.get('text', '')[:200]}]")
                             elif isinstance(result_content, str):
                                 _term(f"[Result: {result_content[:200]}]")
@@ -161,17 +155,11 @@ def _execute_task(
                     # Tool result
                     if ame_type == "content_block_stop":
                         delta = ame.get("delta", {})
-                        if (
-                            isinstance(delta, dict)
-                            and delta.get("type") == "tool_result"
-                        ):
+                        if isinstance(delta, dict) and delta.get("type") == "tool_result":
                             result_content = delta.get("content", "")
                             if isinstance(result_content, list):
                                 for cb in result_content:
-                                    if (
-                                        isinstance(cb, dict)
-                                        and cb.get("type") == "text"
-                                    ):
+                                    if isinstance(cb, dict) and cb.get("type") == "text":
                                         _term(f"[Result: {cb.get('text', '')[:200]}]")
                             elif isinstance(result_content, str):
                                 _term(f"[Result: {result_content[:200]}]")
@@ -216,13 +204,9 @@ def _execute_task(
             sys.stdout.flush()
 
             if proc.returncode == 0:
-                final_output = (
-                    "\n".join(final_text_parts) if final_text_parts else stdout_text
-                )
+                final_output = "\n".join(final_text_parts) if final_text_parts else stdout_text
                 return {
-                    "output": final_output[:max_output_chars]
-                    if max_output_chars
-                    else final_output,
+                    "output": final_output[:max_output_chars] if max_output_chars else final_output,
                     "error": None,
                     "duration_seconds": round(duration, 1),
                     "returncode": 0,
@@ -230,9 +214,7 @@ def _execute_task(
             else:
                 last_error = f"exit code {proc.returncode}: {stderr_text[:500] or stdout_text[:500]}"
                 if attempts < max_attempts:
-                    _log(
-                        f"[RETRY] Attempt {attempts}/{max_attempts} failed: {last_error[:120]}"
-                    )
+                    _log(f"[RETRY] Attempt {attempts}/{max_attempts} failed: {last_error[:120]}")
                     time.sleep(retry_delay)
                 else:
                     all_output.append(stdout_text)
@@ -246,9 +228,7 @@ def _execute_task(
                     proc.kill()
                     proc.wait(timeout=5)
             if attempts < max_attempts:
-                _log(
-                    f"[RETRY] Attempt {attempts}/{max_attempts} timed out ({session_timeout}s)"
-                )
+                _log(f"[RETRY] Attempt {attempts}/{max_attempts} timed out ({session_timeout}s)")
                 time.sleep(retry_delay)
 
         except FileNotFoundError:
@@ -270,9 +250,7 @@ def _execute_task(
                 time.sleep(retry_delay)
 
     return {
-        "output": "\n".join(all_output)[:max_output_chars]
-        if max_output_chars
-        else "\n".join(all_output),
+        "output": "\n".join(all_output)[:max_output_chars] if max_output_chars else "\n".join(all_output),
         "error": last_error,
         "duration_seconds": round(time.time() - start_time, 1),
         "returncode": -1,
@@ -291,9 +269,7 @@ def _print_shutdown_summary(
     iters = state.get("iterations", [])
     total = iteration_count
     total_dur = state.get("stats", {}).get("total_duration_seconds", 0)
-    success_count = sum(
-        1 for it in iters if not it.get("error") and it.get("classification") != "stuck"
-    )
+    success_count = sum(1 for it in iters if not it.get("error") and it.get("classification") != "stuck")
     error_count = sum(1 for it in iters if it.get("error"))
     error_type_counts = state.get("error_type_counts", {})
     err_types = []
@@ -322,13 +298,42 @@ def _print_shutdown_summary(
 
     _log("")
     _log(f"  {c.group_title('Next steps:')}")
-    _log(
-        f"    {c.dim('View ledger:')}     cat /tmp/infinite-loop-state.json | python3 -m json.tool"
-    )
+    _log(f"    {c.dim('View ledger:')}     cat /tmp/infinite-loop-state.json | python3 -m json.tool")
     _log(f'    {c.dim("Re-run:")}          pi-loop --goal "..." --run')
     _log(f"    {c.dim('Help:')}            pi-loop --help")
     _log(f"{c.header('══════════════════════════════════════════════')}")
     _log("")
+
+
+def _shutdown(
+    state: dict,
+    iteration_count: int,
+    status_file: str,
+    stop_reason: str,
+    *,
+    goal: str = "",
+    git: bool = False,
+    workers: int = 1,
+    last_error: str | None = None,
+    write_status_file_entry: bool = True,
+) -> None:
+    """Unified shutdown sequence — set status, persist state, print summary."""
+    state["status"] = stop_reason
+    state["last_updated"] = datetime.now(timezone.utc).isoformat()
+    write_ledger(state)
+    write_status_file(status_file, state, iteration_count, stop_reason)
+    if write_status_file_entry:
+        from typing import Any
+
+        kwargs: dict[str, Any] = {
+            "running": False,
+            "iteration_count": iteration_count,
+            "version": VERSION,
+        }
+        if last_error is not None:
+            kwargs["last_error"] = last_error
+        _write_status_file(status_file, **kwargs)
+    _print_shutdown_summary(state, iteration_count, stop_reason, goal=goal, git=git, workers=workers)
 
 
 def run_loop(
@@ -406,7 +411,7 @@ def run_loop(
     force_reset: bool = False,
     json_logs: bool = False,
 ) -> None:
-    global _shutdown_requested  # noqa: used in while-loop body below
+    global _shutdown_requested
 
     _set_originals(session_timeout, cooldown, use_library, workers)
 
@@ -423,9 +428,7 @@ def run_loop(
     state["goals_specs"] = goals_tuples
 
     write_status_file(status_file, state, iteration_count, "running")
-    _write_status_file(
-        status_file, running=True, iteration_count=iteration_count, version=VERSION
-    )
+    _write_status_file(status_file, running=True, iteration_count=iteration_count, version=VERSION)
 
     _log_startup_banner(
         task_type="generic",
@@ -467,20 +470,15 @@ def run_loop(
     while True:
         if _shutdown_requested:
             _log("[STOP] Shutdown signal received. Stopping.")
-            stop_reason = "stopped: signal"
-            state["status"] = stop_reason
-            state["last_updated"] = datetime.now(timezone.utc).isoformat()
-            write_ledger(state)
-            write_status_file(status_file, state, iteration_count, stop_reason)
-            _write_status_file(
+            _shutdown(
+                state,
+                iteration_count,
                 status_file,
-                running=False,
-                iteration_count=iteration_count,
-                last_error=stop_reason,
-                version=VERSION,
-            )
-            _print_shutdown_summary(
-                state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
+                "stopped: signal",
+                goal=goal,
+                git=git,
+                workers=workers,
+                last_error="stopped: signal",
             )
             return
 
@@ -491,81 +489,35 @@ def run_loop(
             stop_signal = check_sentinel(sentinel_path)
             if stop_signal:
                 _log(f"[STOP] Sentinel detected ('{stop_signal}'). Stopping.")
-                stop_reason = f"stopped: {stop_signal}"
-                state["status"] = stop_reason
-                state["last_updated"] = datetime.now(timezone.utc).isoformat()
-                write_ledger(state)
-                write_status_file(status_file, state, iteration_count, stop_reason)
-                _write_status_file(
-                    status_file,
-                    running=False,
-                    iteration_count=iteration_count,
-                    last_error=stop_reason,
-                    version=VERSION,
-                )
-                _print_shutdown_summary(
+                _shutdown(
                     state,
                     iteration_count,
-                    stop_reason,
+                    status_file,
+                    f"stopped: {stop_signal}",
                     goal=goal,
                     git=git,
                     workers=workers,
+                    last_error=f"stopped: {stop_signal}",
                 )
                 return
 
         if max_iterations > 0 and iteration_count >= max_iterations:
-            _log(f"[STOP] Reached max_iterations={max_iterations}. Stopping.")
-            state["status"] = f"stopped: max_iterations ({max_iterations})"
-            state["last_updated"] = datetime.now(timezone.utc).isoformat()
-            write_ledger(state)
-            write_status_file(
-                status_file, state, iteration_count, "stopped: max_iterations"
-            )
-            _write_status_file(
-                status_file,
-                running=False,
-                iteration_count=iteration_count,
-                version=VERSION,
-            )
-            _print_shutdown_summary(
-                state,
-                iteration_count,
-                "stopped: max_iterations",
-                goal=goal,
-                git=git,
-                workers=workers,
-            )
+            stop_reason = f"stopped: max_iterations ({max_iterations})"
+            _log(f"[STOP] Reached {stop_reason}. Stopping.")
+            _shutdown(state, iteration_count, status_file, stop_reason, goal=goal, git=git, workers=workers)
             return
 
         if max_idle_iterations > 0 and consecutive_idle >= max_idle_iterations:
-            _log(
-                f"[STOP] Idle limit reached ({consecutive_idle} iterations). Stopping."
-            )
-            stop_reason = (
-                f"stopped: idle ({consecutive_idle} iterations without changes)"
-            )
-            state["status"] = stop_reason
-            state["last_updated"] = datetime.now(timezone.utc).isoformat()
-            write_ledger(state)
-            write_status_file(status_file, state, iteration_count, "stopped: idle")
-            _write_status_file(
-                status_file,
-                running=False,
-                iteration_count=iteration_count,
-                version=VERSION,
-            )
-            _print_shutdown_summary(
-                state, iteration_count, stop_reason, goal=goal, git=git, workers=workers
-            )
+            stop_reason = f"stopped: idle ({consecutive_idle} iterations without changes)"
+            _log(f"[STOP] Idle limit reached ({consecutive_idle} iterations). Stopping.")
+            _shutdown(state, iteration_count, status_file, stop_reason, goal=goal, git=git, workers=workers)
             return
 
         iteration_count += 1
         iteration_start_time = datetime.now(timezone.utc).isoformat()
 
         if quiet:
-            _log(
-                f"[ITER #{iteration_count}] {goal[:80]}{'...' if len(goal) > 80 else ''}"
-            )
+            _log(f"[ITER #{iteration_count}] {goal[:80]}{'...' if len(goal) > 80 else ''}")
         else:
             _log(f"{'=' * 60}")
             _log(f"    Iteration {iteration_count}")
@@ -581,23 +533,17 @@ def run_loop(
         # Cycle goals
         if len(goals_list) > 1:
             goals_index += 1
-            goal_text, exhausted = _cycle_goal(
-                goals_list, goals_index - 1, stop_at_goals_end
-            )
+            goal_text, exhausted = _cycle_goal(goals_list, goals_index - 1, stop_at_goals_end)
             if exhausted:
-                state["status"] = "stopped: goals-exhausted"
-                state["last_updated"] = datetime.now(timezone.utc).isoformat()
-                write_ledger(state)
-                write_status_file(
-                    status_file, state, iteration_count, "stopped: goals-exhausted"
-                )
-                _print_shutdown_summary(
+                _shutdown(
                     state,
                     iteration_count,
+                    status_file,
                     "stopped: goals-exhausted",
                     goal=goal,
                     git=git,
                     workers=workers,
+                    write_status_file_entry=False,
                 )
                 return
         else:
@@ -606,9 +552,7 @@ def run_loop(
         # Build context from progressive summaries
         progressive_context = _build_progressive_context(context, existing_summaries)
 
-        git_before = (
-            _capture_git_state(workdir, store_diff=store_git_diff) if git else {}
-        )
+        git_before = _capture_git_state(workdir, store_diff=store_git_diff) if git else {}
         sys_before = get_system_usage()
 
         # Execute task
@@ -627,14 +571,10 @@ def run_loop(
         combined_error = result["error"]
         combined_summary = result["output"][:500] if result["output"] else ""
 
-        git_after = (
-            _capture_git_state(workdir, store_diff=store_git_diff) if git else {}
-        )
+        git_after = _capture_git_state(workdir, store_diff=store_git_diff) if git else {}
         git_commit_hash = None
         if git_commit and not combined_error:
-            git_commit_hash = _git_auto_commit(
-                workdir, iteration_count, combined_summary
-            )
+            git_commit_hash = _git_auto_commit(workdir, iteration_count, combined_summary)
 
         # Idle detection
         if git:
@@ -714,9 +654,7 @@ def run_loop(
         )
 
         status_icon = "✓" if combined_error is None else "✗"
-        _log(
-            f"{status_icon} Iteration {iteration_count} ({total_duration}s): {combined_summary[:100]}"
-        )
+        _log(f"{status_icon} Iteration {iteration_count} ({total_duration}s): {combined_summary[:100]}")
 
         # Suggestion
         suggestion = _suggest_actionable_fix(
@@ -801,32 +739,20 @@ def run_loop(
                 _log("[AUTO-RECOVERY] Persistent failure detected — stopping daemon")
                 err_type = primary_error_type or "unknown"
                 stop_reason = f"stopped: {err_type}-failure"
-                state["status"] = stop_reason
-                state["last_updated"] = datetime.now(timezone.utc).isoformat()
-                write_ledger(state)
-                write_status_file(status_file, state, iteration_count, stop_reason)
-                _write_status_file(
-                    status_file,
-                    running=False,
-                    iteration_count=iteration_count,
-                    last_error=stop_reason,
-                    version=VERSION,
-                )
-                _print_shutdown_summary(
+                _shutdown(
                     state,
                     iteration_count,
+                    status_file,
                     stop_reason,
                     goal=goal,
                     git=git,
                     workers=workers,
+                    last_error=stop_reason,
                 )
                 return
 
         # Keep iteration cap
-        if (
-            keep_iterations > 0
-            and len(state.get("iterations", [])) > keep_iterations * 2
-        ):
+        if keep_iterations > 0 and len(state.get("iterations", [])) > keep_iterations * 2:
             state["iterations"] = state["iterations"][-keep_iterations:]
             state["total_iterations"] = iteration_count
             _recalc_stats(state)
@@ -843,9 +769,7 @@ def _evolve_goal(output: str, state: dict, iteration: int) -> None:
         if line.strip().upper().startswith("NEXT_GOAL:"):
             next_goal = line.split(":", 1)[1].strip()
             if next_goal:
-                _log(
-                    f"[EVOLVE] Iteration {iteration} proposed next goal: {next_goal[:80]}"
-                )
+                _log(f"[EVOLVE] Iteration {iteration} proposed next goal: {next_goal[:80]}")
                 state["evolved_goal"] = next_goal
 
 
@@ -858,9 +782,7 @@ def _build_dashboard_html(state: dict) -> str:
         status = "❌" if it.get("error") else "✅"
         dur = it.get("duration_seconds", 0)
         summary = (it.get("summary") or "")[:100]
-        rows += (
-            f"<tr><td>{n}</td><td>{status}</td><td>{dur}s</td><td>{summary}</td></tr>\n"
-        )
+        rows += f"<tr><td>{n}</td><td>{status}</td><td>{dur}s</td><td>{summary}</td></tr>\n"
 
     return f"""<!DOCTYPE html>
 <html><head><title>pi-loop Dashboard</title>

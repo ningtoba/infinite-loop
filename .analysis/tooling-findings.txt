@@ -1,0 +1,57 @@
+# Tooling/CI-CD Deep Analysis
+
+## Files analyzed
+- .github/workflows/ci.yml — CI pipeline
+- Makefile — Build targets
+- .githooks/pre-commit — Pre-commit hook (disabled)
+- pyproject.toml — Project config, dependencies
+- tests/ (7 test files, 156 tests)
+
+## Findings confirmed in ENGINEERING_BACKLOG.md
+- BL-011 (high): Pre-commit hook disabled (exit 0)
+- BL-029 (medium): No ruff/mypy config in pyproject.toml
+- BL-030 (medium): Missing dev/test dependencies — **FIXED** (test deps exist)
+- BL-047 (low): No Python version matrix in CI — **FIXED** (3.10-3.13 matrix exists)
+- BL-010 (high): CI pipeline references non-existent make targets — **FIXED** (make lint-all + pytest exist)
+- BL-052 (medium): CI pipeline with test + lint + type-check — **PARTIALLY IMPLEMENTED** (test+lint exist, no type-check)
+
+## New findings — NOT in ENGINEERING_BACKLOG.md
+
+### 1. No type checking in CI (high)
+The CI pipeline runs ruff (lint + format) and pytest, but has no mypy/pyright/type-check step. Adding type checking would catch a class of bugs that ruff can't detect (e.g., None-safety, type mismatches).
+- File: .github/workflows/ci.yml, Makefile
+- Fix: Add mypy target + CI step + pyproject.toml config
+
+### 2. make test re-installs dependencies every run (medium)
+The Makefile `test` target runs `pip install -e ".[test]"` before `python -m pytest`. This wastes 2-3 seconds per local test run. The `install-dev` target already installs test deps.
+- File: Makefile test target
+- Fix: Remove the pip install line from the test target (assume deps are installed)
+
+### 3. No Dependabot/Renovate configuration (medium)
+No automated dependency update configuration exists. Dependencies (FastAPI, uvicorn, pytest) won't get automatic PRs for security updates.
+- Fix: Add .github/dependabot.yml
+
+### 4. No pi binary availability check in CI (medium)
+The CI pipeline doesn't verify that `pi` (the external CLI used by the daemon) is available. A `pi` API change could break the daemon without CI catching it.
+- File: .github/workflows/ci.yml
+- Fix: Add a smoke-test step that installs `pi` and runs pi-loop --help
+
+### 5. No Ruff config in pyproject.toml (BL-029 tracked)
+Confirmed: pyproject.toml lacks [tool.ruff] section. This means ruff uses default rules, which may be too permissive or miss project-specific conventions.
+
+### 6. Test coverage gaps (medium)
+Current 156 tests cover: CLI parsing, validation, stats, error_utils, color_utils, config constants. Missing: loop_manager, server endpoints, loop.py execution logic, error_recovery, functions.py, git_utils, heartbeat.
+- File: tests/
+- Note: BL-002 (zero test coverage) was marked completed but coverage is still partial
+
+## Backlog items that should be updated
+
+### Status change: FIXED items now completed
+- BL-010 (CI make targets): **completed** — make lint-all and python -m pytest tests/ -v both exist
+- BL-030 (missing test deps): **completed** — pyproject.toml has [project.optional-dependencies] test
+- BL-047 (no Python version matrix): **completed** — CI has 3.10-3.13 matrix
+- BL-052 (CI pipeline): **implemented** — test + lint run in CI
+
+### Priority upgrade suggestion
+- BL-011 (pre-commit hook): Should be **critical** — disabled hook means zero pre-commit enforcement
+- BL-029 (ruff config): Should remain medium but note it's still unaddressed

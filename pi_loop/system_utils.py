@@ -33,7 +33,7 @@ def get_system_usage() -> dict:
                     parts = line.split()
                     if len(parts) >= 2:
                         result["memory_peak_mb"] = int(parts[1]) / 1024
-    except (FileNotFoundError, IOError, ValueError):
+    except (OSError, FileNotFoundError, ValueError):
         pass
 
     # Total RAM
@@ -48,7 +48,7 @@ def get_system_usage() -> dict:
                         if total_kb > 0:
                             result["memory_percent"] = round(rss_kb / total_kb, 4)
                     break
-    except (FileNotFoundError, IOError, ValueError):
+    except (OSError, FileNotFoundError, ValueError):
         pass
 
     # CPU time from /proc/pid/stat (user + system ticks)
@@ -68,7 +68,7 @@ def get_system_usage() -> dict:
                 total_ticks = utime + stime
                 result["cpu_ticks_used"] = total_ticks
                 result["cpu_seconds"] = total_ticks / ticks_per_sec
-    except (FileNotFoundError, IOError, ValueError, AttributeError):
+    except (OSError, FileNotFoundError, ValueError, AttributeError):
         pass
 
     return result

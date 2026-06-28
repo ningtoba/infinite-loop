@@ -5,8 +5,8 @@ Watches files, runs tasks in a loop, tracks progress in a JSON ledger,
 and integrates with the pi coding agent as a background worker.
 """
 
-from .config import VERSION
 from .cli import main
+from .config import VERSION
 
 __version__ = VERSION
 

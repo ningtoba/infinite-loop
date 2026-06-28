@@ -1,4 +1,4 @@
-.PHONY: install install-dev lint format test lint-all pre-commit clean help web web-dev
+.PHONY: install install-dev lint format test lint-all mypy pre-commit pre-commit-run clean help web web-dev
 
 PYTHON := python3
 
@@ -24,7 +24,7 @@ install:
 	pip install -e .
 
 install-dev:
-	pip install -e ".[test]"
+	pip install -e ".[test,dev]"
 
 lint:
 	ruff check pi_loop/ web_app/
@@ -35,14 +35,21 @@ format:
 lint-all:
 	ruff check pi_loop/ web_app/
 	ruff format --check pi_loop/ web_app/
+	mypy pi_loop/ --ignore-missing-imports --warn-unused-configs 2>/dev/null; true
 
 test:
-	pip install -e ".[test]"
 	python -m pytest tests/ -v
+
+mypy:
+	python -m mypy pi_loop/ --ignore-missing-imports --warn-unused-configs 2>/dev/null; true
 
 pre-commit:
 	pip install pre-commit
 	pre-commit install
+	@echo "pre-commit hooks installed."
+
+pre-commit-run:
+	pre-commit run --all-files
 
 web:
 	pip install -e .

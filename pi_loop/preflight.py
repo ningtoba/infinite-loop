@@ -128,7 +128,7 @@ class PreflightChecker:
             with open(p) as f:
                 json.load(f)
             return True, "valid JSON schema file"
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             return False, f"invalid schema file: {e}"
 
     @staticmethod

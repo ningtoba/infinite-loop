@@ -266,9 +266,7 @@ def _try_load_config_file() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _find_closest_match(
-    name: str, candidates: set[str], cutoff: float = 0.6
-) -> str | None:
+def _find_closest_match(name: str, candidates: set[str], cutoff: float = 0.6) -> str | None:
     """Return the closest known env var name, or None if below cutoff.
 
     Compares only the suffix (after the INFINITE_LOOP_ prefix) to avoid
@@ -311,32 +309,30 @@ def parse_env_vars_from_file(env_path: str) -> tuple[dict[str, str], list[str]]:
     errors: list[str] = []
 
     try:
-        fh = open(env_path)
+        with open(env_path) as fh:
+            for line_no, raw_line in enumerate(fh, 1):
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                # Skip purely structural comment markers that look like env vars
+                if line.startswith("---") or line.startswith("```"):
+                    continue
+
+                if "=" not in line:
+                    errors.append(f"Line {line_no}: No '=' found in '{line}'")
+                    continue
+
+                key, _, val = line.partition("=")
+                key = key.strip()
+                # Handle quoted values (basic shlex-like split)
+                if val:
+                    val = val.strip().strip('"').strip("'")
+                if not key:
+                    errors.append(f"Line {line_no}: Empty key in '{raw_line.strip()}'")
+                    continue
+                vars_found[key] = val
     except OSError as exc:
         return {}, [f"Cannot open file: {exc}"]
-
-    with fh:
-        for line_no, raw_line in enumerate(fh, 1):
-            line = raw_line.strip()
-            if not line or line.startswith("#"):
-                continue
-            # Skip purely structural comment markers that look like env vars
-            if line.startswith("---") or line.startswith("```"):
-                continue
-
-            if "=" not in line:
-                errors.append(f"Line {line_no}: No '=' found in '{line}'")
-                continue
-
-            key, _, val = line.partition("=")
-            key = key.strip()
-            # Handle quoted values (basic shlex-like split)
-            if val:
-                val = val.strip().strip('"').strip("'")
-            if not key:
-                errors.append(f"Line {line_no}: Empty key in '{raw_line.strip()}'")
-                continue
-            vars_found[key] = val
 
     return vars_found, errors
 
@@ -412,11 +408,7 @@ def validate_env_vars(
                 "type": "missing",
                 "key": key,
                 "message": "Not set — required unless --goal is passed as CLI flag",
-                "suggestion": (
-                    key.lower().replace("infinite_loop_", "")
-                    if key.startswith("INFINITE_LOOP_")
-                    else None
-                ),
+                "suggestion": (key.lower().replace("infinite_loop_", "") if key.startswith("INFINITE_LOOP_") else None),
             }
         )
 
@@ -474,10 +466,7 @@ def format_validation_results(results: list[dict], colorize: bool = True) -> str
 
     summary_parts: list[str] = []
     summary_parts.append(f"{counts.get('ok', 0)} recognized")
-    problems = sum(
-        counts.get(t, 0)
-        for t in ("typo", "unknown", "deprecated", "warning", "missing")
-    )
+    problems = sum(counts.get(t, 0) for t in ("typo", "unknown", "deprecated", "warning", "missing"))
     if problems > 0:
         summary_parts.append(f"{problems} issue{'s' if problems != 1 else ''}")
         for t, label in [
@@ -535,7 +524,5 @@ def check_env_file(env_path: str | None = None) -> int:
     output = format_validation_results(results, colorize=True)
     print(output)
 
-    has_issues = any(
-        r["type"] in ("typo", "unknown", "deprecated", "warning") for r in results
-    )
+    has_issues = any(r["type"] in ("typo", "unknown", "deprecated", "warning") for r in results)
     return 1 if has_issues else 0

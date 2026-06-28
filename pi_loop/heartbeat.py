@@ -1,5 +1,6 @@
 """Heartbeat helpers (Session Self-Healing)."""
 
+import contextlib
 import glob
 import json
 import os
@@ -9,10 +10,10 @@ import time
 
 from .config import (
     HEARTBEAT_DIR,
-    HEARTBEAT_PREFIX,
     HEARTBEAT_GRACE_FACTOR,
-    HEARTBEAT_POLL_INTERVAL,
     HEARTBEAT_KILL_GRACE,
+    HEARTBEAT_POLL_INTERVAL,
+    HEARTBEAT_PREFIX,
 )
 from .file_utils import _log
 
@@ -43,7 +44,7 @@ def _write_heartbeat_file(heartbeat_file: str, data: dict) -> bool:
             f.write(json.dumps(data) + "\n")
         os.rename(tmp, heartbeat_file)
         return True
-    except (OSError, IOError):
+    except OSError:
         return False
 
 
@@ -225,7 +226,5 @@ def _request_shutdown() -> None:
 def _cleanup_heartbeat_file(heartbeat_file: str | None) -> None:
     """Remove a single heartbeat file (on normal session completion)."""
     if heartbeat_file and os.path.exists(heartbeat_file):
-        try:
+        with contextlib.suppress(OSError):
             os.remove(heartbeat_file)
-        except OSError:
-            pass

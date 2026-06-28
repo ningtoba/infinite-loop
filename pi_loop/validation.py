@@ -38,9 +38,8 @@ def validate_json_output(output: dict, schema: dict) -> tuple[bool, str]:
         elif expected == "boolean":
             if not isinstance(value, bool):
                 return f"{path}: expected boolean, got {type(value).__name__}"
-        elif expected in ("array", "object"):
-            if not isinstance(value, dict if expected == "object" else list):
-                return f"{path}: expected {expected}, got {type(value).__name__}"
+        elif expected in ("array", "object") and not isinstance(value, dict if expected == "object" else list):
+            return f"{path}: expected {expected}, got {type(value).__name__}"
         return None
 
     def _validate(

@@ -3,7 +3,7 @@
 import os
 import time
 
-from .config import SENTINEL_PATH_DEFAULT, LEDGER_PATH, VERSION
+from .config import LEDGER_PATH, SENTINEL_PATH_DEFAULT, VERSION
 from .file_utils import _log
 
 # Note: max_output_chars is referenced in _log_startup_banner — it's a global
@@ -53,7 +53,7 @@ def _load_goals_file(goals_file: str, goal: str) -> list[tuple[str, str, str, st
             result = parsed
             _log(f"[GOALS] Loaded {len(result)} goals from {goals_file}")
             _log(f"[GOALS] First goal: {result[0][0][:100]}")
-    except (FileNotFoundError, IOError) as e:
+    except (OSError, FileNotFoundError) as e:
         _log(f"[GOALS] WARN: Could not read {goals_file}: {e}")
     return result
 

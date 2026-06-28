@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timezone
 
 from .color_utils import colorizer as _cu
-from .config import LOCK_PATH, LEDGER_PATH, LOG_FORMAT, LOG_DATE_FORMAT
+from .config import LEDGER_PATH, LOCK_PATH, LOG_DATE_FORMAT, LOG_FORMAT
 
 # Module-level logger reference
 _daemon_logger: logging.Logger | None = None
@@ -35,7 +35,7 @@ class FileLock:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 self._fd = fd
                 return self
-            except (IOError, OSError):
+            except OSError:
                 if time.monotonic() >= deadline:
                     os.close(fd)
                     raise TimeoutError(
@@ -154,9 +154,8 @@ def read_ledger() -> dict | None:
     if not os.path.exists(LEDGER_PATH):
         return None
     try:
-        with FileLock():
-            with open(LEDGER_PATH) as f:
-                return json.load(f)
+        with FileLock(), open(LEDGER_PATH) as f:
+            return json.load(f)
     except (json.JSONDecodeError, FileNotFoundError, TimeoutError):
         return None
 
@@ -188,7 +187,7 @@ def write_status_file(
         )
         with open(status_path, "w") as f:
             f.write(line + "\n")
-    except (OSError, IOError) as e:
+    except OSError as e:
         _log(f"[STATUS] Failed to write status file {status_path}: {e}")
 
 

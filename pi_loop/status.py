@@ -70,6 +70,6 @@ def write_status(
         with open(path, "w") as f:
             json.dump(data, f, indent=2, default=str)
             f.write("\n")
-    except (OSError, IOError):
+    except OSError:
         # Silently fail — status writing is best-effort
         pass

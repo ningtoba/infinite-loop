@@ -1,7 +1,7 @@
 """Automatic Error Recovery — per-type adaptation engine."""
 
-from datetime import datetime, timezone
 from collections.abc import Callable
+from datetime import datetime, timezone
 
 from .config import _ERROR_SEVERITY, _ERROR_THRESHOLDS
 from .file_utils import _log
@@ -13,15 +13,9 @@ _ORIGINAL_USE_LIBRARY: bool = False
 _ORIGINAL_WORKERS: int = 1
 
 
-def _set_originals(
-    session_timeout: int, cooldown: int, use_library: bool, workers: int
-) -> None:
+def _set_originals(session_timeout: int, cooldown: int, use_library: bool, workers: int) -> None:
     """Set original baseline values from run_loop for mitigation comparisons."""
-    global \
-        _ORIGINAL_SESSION_TIMEOUT, \
-        _ORIGINAL_COOLDOWN, \
-        _ORIGINAL_USE_LIBRARY, \
-        _ORIGINAL_WORKERS
+    global _ORIGINAL_SESSION_TIMEOUT, _ORIGINAL_COOLDOWN, _ORIGINAL_USE_LIBRARY, _ORIGINAL_WORKERS
     _ORIGINAL_SESSION_TIMEOUT = session_timeout
     _ORIGINAL_COOLDOWN = cooldown
     _ORIGINAL_USE_LIBRARY = use_library
@@ -46,7 +40,7 @@ def _adapt_to_error(
     log_fn: Callable | None = None,
 ) -> tuple:
     """Adapt runtime parameters based on error type and history."""
-    global _ORIGINAL_SESSION_TIMEOUT, _ORIGINAL_COOLDOWN, _ORIGINAL_USE_LIBRARY, _ORIGINAL_WORKERS  # noqa: global-assigned-via-_set_originals
+    global _ORIGINAL_SESSION_TIMEOUT, _ORIGINAL_COOLDOWN, _ORIGINAL_USE_LIBRARY, _ORIGINAL_WORKERS
 
     if log_fn is None:
         log_fn = _log
@@ -74,8 +68,7 @@ def _adapt_to_error(
                         cooldown // 2,
                     )
                 actions.append(
-                    f"[RECOVERY] Partial unwind (1st success): "
-                    f"timeout={new_timeout}s, cooldown={new_cooldown}s"
+                    f"[RECOVERY] Partial unwind (1st success): timeout={new_timeout}s, cooldown={new_cooldown}s"
                 )
                 new_level = max(0, level_before - 1)
 
@@ -85,9 +78,7 @@ def _adapt_to_error(
                 new_mode = "fixed" if _ORIGINAL_COOLDOWN > 0 else cooldown_mode
                 new_library = _ORIGINAL_USE_LIBRARY
                 new_workers = _ORIGINAL_WORKERS
-                actions.append(
-                    "[RECOVERY] Full recovery: all mitigations reset to original values"
-                )
+                actions.append("[RECOVERY] Full recovery: all mitigations reset to original values")
                 new_level = 0
 
             mitigations["mitigation_level"] = new_level
@@ -107,9 +98,7 @@ def _adapt_to_error(
 
     # --- Error: ramp up ---
     count = error_type_counts.get(error_type, 0)
-    thresholds = _ERROR_THRESHOLDS.get(
-        error_type, {"mild": 999, "moderate": 999, "stop": 999}
-    )
+    thresholds = _ERROR_THRESHOLDS.get(error_type, {"mild": 999, "moderate": 999, "stop": 999})
 
     if count >= thresholds.get("stop", 999):
         target_level = 3
@@ -125,50 +114,36 @@ def _adapt_to_error(
     if new_level >= 1 and level_before < 1:
         if error_type == "timeout":
             new_timeout = min(600, int(session_timeout or 0) * 150 // 100)
-            actions.append(
-                f"[MITIGATION] Timeout errors: increased timeout to {new_timeout}s"
-            )
+            actions.append(f"[MITIGATION] Timeout errors: increased timeout to {new_timeout}s")
         elif error_type == "network":
             new_cooldown = min(300, max(_ORIGINAL_COOLDOWN, cooldown * 4))
             if new_cooldown < 30:
                 new_cooldown = 30
             new_mode = "fixed"
-            actions.append(
-                f"[MITIGATION] Network errors: elevated cooldown to {new_cooldown}s"
-            )
+            actions.append(f"[MITIGATION] Network errors: elevated cooldown to {new_cooldown}s")
         elif error_type == "schema":
-            actions.append(
-                "[MITIGATION] Schema errors: monitoring (no parameter changes yet)"
-            )
+            actions.append("[MITIGATION] Schema errors: monitoring (no parameter changes yet)")
         elif error_type == "unknown":
             new_cooldown = min(120, max(_ORIGINAL_COOLDOWN, cooldown * 2))
             if new_cooldown < 15:
                 new_cooldown = 15
             new_mode = "fixed"
-            actions.append(
-                f"[MITIGATION] Unknown errors: elevated cooldown to {new_cooldown}s"
-            )
+            actions.append(f"[MITIGATION] Unknown errors: elevated cooldown to {new_cooldown}s")
         new_level = 1
 
     if new_level >= 2 and level_before < 2:
         if error_type == "timeout":
             new_cooldown = min(120, max(_ORIGINAL_COOLDOWN, cooldown * 2))
             new_mode = "fixed"
-            actions.append(
-                f"[MITIGATION] Timeout errors (escalated): cooldown → {new_cooldown}s"
-            )
+            actions.append(f"[MITIGATION] Timeout errors (escalated): cooldown → {new_cooldown}s")
         elif error_type == "network":
             new_library = False
             new_workers = 1
-            actions.append(
-                "[MITIGATION] Network errors (escalated): forced subprocess mode, reduced to 1 worker"
-            )
+            actions.append("[MITIGATION] Network errors (escalated): forced subprocess mode, reduced to 1 worker")
         elif error_type == "unknown":
             new_library = False
             new_workers = 1
-            actions.append(
-                "[MITIGATION] Unknown errors (escalated): forced subprocess mode, reduced to 1 worker"
-            )
+            actions.append("[MITIGATION] Unknown errors (escalated): forced subprocess mode, reduced to 1 worker")
         new_level = 2
 
     if new_level >= 3 and level_before < 3:
@@ -179,9 +154,7 @@ def _adapt_to_error(
             "unknown": "persistent-unknown-failure",
         }
         stop_reason = reason_map.get(error_type, "persistent-failure")
-        actions.append(
-            f"[MITIGATION] STOP: {stop_reason} after {count} {error_type} errors"
-        )
+        actions.append(f"[MITIGATION] STOP: {stop_reason} after {count} {error_type} errors")
         new_level = 3
 
     mitigations["mitigation_level"] = new_level

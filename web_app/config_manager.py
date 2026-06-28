@@ -6,8 +6,8 @@ pi_loop.config_file (no .env file needed).
 
 from typing import Any
 
-from pi_loop.config_file import load_config, save_config as _save_config
-
+from pi_loop.config_file import load_config
+from pi_loop.config_file import save_config as _save_config
 
 # Working configuration flags for pi-loop.
 # Only flags that pi actually uses are kept.

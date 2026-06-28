@@ -1,5 +1,6 @@
 """File watcher — poll a directory for changes and trigger iterations."""
 
+import contextlib
 import pathlib
 
 
@@ -21,17 +22,13 @@ class FileWatcherTrigger:
         state = {}
         p = pathlib.Path(self.path)
         if p.is_file():
-            try:
+            with contextlib.suppress(OSError):
                 state[self.path] = p.stat().st_mtime
-            except OSError:
-                pass
         elif p.is_dir():
             for child in sorted(p.rglob("*")):
                 if child.is_file():
-                    try:
+                    with contextlib.suppress(OSError):
                         state[str(child)] = child.stat().st_mtime
-                    except OSError:
-                        pass
         return state
 
     def check_change(self) -> bool:

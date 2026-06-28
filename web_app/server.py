@@ -1,6 +1,7 @@
 """FastAPI web server for the pi-loop web UI."""
 
 import asyncio
+import contextlib
 import json
 import os
 import time
@@ -15,13 +16,14 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from pi_loop.config_file import CONFIG_PATH  # noqa: resolves at runtime
+from pi_loop.config_file import CONFIG_PATH
+
 from .config_manager import (
     CONFIG_GROUPS,
-    get_config,
-    save_config,
-    get_raw_config,
     build_cli_args,
+    get_config,
+    get_raw_config,
+    save_config,
 )
 from .loop_manager import get_loop_manager
 
@@ -62,7 +64,7 @@ async def index():
     """Serve the main web UI."""
     index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_path):
-        with open(index_path, "r") as f:
+        with open(index_path) as f:
             return HTMLResponse(f.read())
     return HTMLResponse("<h1>pi-loop Web UI</h1><p>Static files not found.</p>")
 
@@ -99,7 +101,7 @@ async def save_config_api(request: Request):
     try:
         data = await request.json()
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from None
 
     save_config(data)
     return {"success": True, "message": "Configuration saved", "path": CONFIG_PATH}
@@ -264,9 +266,7 @@ def _get_memory_info():
     """Get memory info from /proc/meminfo."""
     try:
         with (
-            open(os.path.join(DATA_DIR, "..", "proc", "meminfo"))
-            if DATA_DIR != "/tmp"
-            else open("/proc/meminfo") as f
+            open(os.path.join(DATA_DIR, "..", "proc", "meminfo")) if DATA_DIR != "/tmp" else open("/proc/meminfo") as f
         ):
             meminfo = {}
             for line in f:
@@ -330,10 +330,8 @@ async def _broadcast_sse(data: dict[str, Any]) -> None:
             except asyncio.QueueFull:
                 stale.append(q)
         for q in stale:
-            try:
+            with contextlib.suppress(ValueError):
                 _sse_clients.remove(q)
-            except ValueError:
-                pass
 
 
 async def _sse_stream_impl(request: Request):
@@ -365,10 +363,8 @@ async def _sse_stream_impl(request: Request):
             pass
         finally:
             async with _sse_clients_lock:
-                try:
+                with contextlib.suppress(ValueError):
                     _sse_clients.remove(q)
-                except ValueError:
-                    pass
 
     return StreamingResponse(
         event_generator(),
@@ -415,17 +411,12 @@ async def _status_poller():
             # error_counts, mitigations, log count, terminal lines, and
             # latest iteration details (worktree merge, summary changes).
             iter_n = live.get("n", 0)
-            worker_statuses = "|".join(
-                f"{w.get('id', '')}:{w.get('status', '')}"
-                for w in live.get("workers", [])
-            )
+            worker_statuses = "|".join(f"{w.get('id', '')}:{w.get('status', '')}" for w in live.get("workers", []))
             err_counts = str(status.get("error_counts", {}))
             mitigations = str(status.get("mitigations", {}))
             worker_term = status.get("worker_term", {})
             # Hash the last 3 lines of each worker to detect content changes
-            term_content_hash = "".join(
-                "".join(v[-3:]) for v in sorted(worker_term.items(), key=lambda x: x[0])
-            )
+            term_content_hash = "".join("".join(v[-3:]) for v in sorted(worker_term.items(), key=lambda x: x[0]))
             log_count = len(status.get("recent_logs", []))
             latest = status.get("latest_iteration", {}) or {}
             latest_sig = "|".join(
@@ -479,9 +470,9 @@ async def startup():
 
 def main():
     """Entry point for the web app."""
-    import uvicorn
-
     import argparse
+
+    import uvicorn
 
     try:
         default_port = int(os.environ.get("WEB_PORT", "8090"))
@@ -489,9 +480,7 @@ def main():
         default_port = 8090
 
     parser = argparse.ArgumentParser(description="pi-loop Web UI Server")
-    parser.add_argument(
-        "--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)"
-    )
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
     parser.add_argument(
         "--port",
         type=int,
@@ -503,9 +492,7 @@ def main():
         default=None,
         help="Path to .env file (default: auto-detect)",
     )
-    parser.add_argument(
-        "--reload", action="store_true", help="Enable auto-reload (development)"
-    )
+    parser.add_argument("--reload", action="store_true", help="Enable auto-reload (development)")
     args = parser.parse_args()
 
     # Set env path if provided

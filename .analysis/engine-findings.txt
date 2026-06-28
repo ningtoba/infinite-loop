@@ -1,0 +1,52 @@
+# Engine (pi_loop/) Deep Analysis
+
+## Files analyzed
+- pi_loop/loop.py (881 lines) — Main loop logic
+- pi_loop/functions.py — Goal loading, startup banner, cycling
+- pi_loop/config.py — Constants and defaults
+- pi_loop/config_file.py — JSON persistence, DEFAULTS dict
+- pi_loop/cli.py — Argument parser (50+ flags)
+- pi_loop/error_recovery.py — Adaptive error mitigation
+- pi_loop/error_utils.py — Error classification
+- pi_loop/validation.py — JSON Schema validation (dead code)
+- pi_loop/heartbeat.py — Session self-healing
+- pi_loop/state.py — Ledger load/create
+- pi_loop/env_utils.py — Environment file handling
+
+## Findings confirmed in ENGINEERING_BACKLOG.md
+- BL-003 (high): Extreme parameter bloat in run_loop() — 60+ params
+- BL-004 (high): Duplicated shutdown logic DRY violation — 5+ copies
+- BL-005 (high): Dead _evolve_goal — writes evolved_goal but never reads it
+- BL-012 (high): Monolithic run_loop() violates SRP (~200+ lines mixing everything)
+- BL-016 (medium): Silent exception swallowing (bare except: pass)
+- BL-017 (medium): Retry loop output capture lossy
+- BL-018 (medium): No max-runtime guard in main while True
+- BL-020 (medium): Dead code: validate_json_output() + validate_config()
+- BL-032 (low): import urllib.request inside function body
+- BL-033 (low): Hardcoded 'worker #1' string
+- BL-048 (medium): Add heartbeat guard to main loop body
+- BL-049 (medium): Extract shutdown to _shutdown(reason) helper
+- BL-050 (low): Config object for run_loop parameters
+- BL-051 (low): Subprocess lifecycle with proper timeout cleanup
+
+## New findings — NOT in ENGINEERING_BACKLOG.md
+
+### 1. Duplicated content_block_stop handler in _execute_task (medium)
+The _execute_task function in loop.py has TWO identical blocks handling `content_block_stop` events (lines ~191-209 and ~210-227). Both check if delta.type == "tool_result" and render it via _term(). This wastes CPU cycles and can double-display tool results in terminal output.
+- File: pi_loop/loop.py lines ~191-227
+- Fix: Remove the second handler block
+
+### 2. _build_dashboard_html hardcodes /tmp path (low)
+The HTML dashboard builder hardcodes `/tmp/infinite-loop-state.json` in suggested commands even when `run_loop()` is configured with a different data directory.
+- File: pi_loop/loop.py, _build_dashboard_html()
+- Fix: Pass the actual ledger path as a parameter
+
+### 3. Docker detection via /.dockerenv is fragile (low)
+The only Docker-aware code is in web_app/loop_manager.py, but engine-side file_utils.py has no Docker awareness.
+- File: pi_loop/loop.py and related modules
+- Fix: Add a centralized `is_docker()` utility
+
+### 4. _cycle_goal uses modulus instead of tracking exhaustion (low)
+When stop_at_goals_end is False, goals cycle via modulus with no cap — but the exhaustion logic only works when stop_at_goals_end is True. The modulus wrapping means an unbounded loop with goals_file cycles through goals forever regardless of the limit.
+- File: pi_loop/functions.py _cycle_goal()
+- Note: This is by-design for the non-stopping case, but lacks a "max_cycle" guard

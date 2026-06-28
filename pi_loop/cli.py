@@ -5,33 +5,33 @@ import json
 import os
 import sys
 
+from .color_utils import colorizer, configure_color_mode
 from .config import (
-    LEDGER_PATH,
-    SENTINEL_PATH_DEFAULT,
+    BASE_TOOLSETS,
     DEFAULT_CONVERGENCE_THRESHOLD,
     DEFAULT_CONVERGENCE_WINDOW,
-    BASE_TOOLSETS,
+    LEDGER_PATH,
+    SENTINEL_PATH_DEFAULT,
     VERSION,
 )
-from .file_utils import _log, _init_daemon_log, write_ledger, read_ledger
-from .help_topics import (
-    _list_flags,
-    _list_examples,
-    _run_healthcheck,
-    _run_doctor,
-    _explain_flag,
-    _help_topic,
-    _render_status,
-)
-from .preflight import PreflightChecker
-from .validation import load_json_schema
-from .state import load_or_create_ledger
-from .loop import run_loop
-from .heartbeat import _cleanup_stale_heartbeats
-from .color_utils import colorizer, configure_color_mode
 from .env_utils import (
     check_env_file,
 )
+from .file_utils import _init_daemon_log, _log, read_ledger, write_ledger
+from .heartbeat import _cleanup_stale_heartbeats
+from .help_topics import (
+    _explain_flag,
+    _help_topic,
+    _list_examples,
+    _list_flags,
+    _render_status,
+    _run_doctor,
+    _run_healthcheck,
+)
+from .loop import run_loop
+from .preflight import PreflightChecker
+from .state import load_or_create_ledger
+from .validation import load_json_schema
 
 
 def _create_parser(for_introspection: bool = False) -> argparse.ArgumentParser:
@@ -585,7 +585,7 @@ def main() -> None:
         try:
             with open(os.path.expanduser(args.context_file)) as cf:
                 resolved_context = cf.read().strip()
-        except (FileNotFoundError, IOError) as e:
+        except (OSError, FileNotFoundError) as e:
             _log(f"[ERROR] Could not read context file: {e}")
             sys.exit(1)
 

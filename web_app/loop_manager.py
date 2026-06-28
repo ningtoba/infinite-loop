@@ -1,6 +1,7 @@
 """Loop process manager — spawns, monitors, and controls the daemon subprocess."""
 
 import asyncio
+import contextlib
 import json
 import os
 import re
@@ -34,9 +35,7 @@ class LoopManager:
         self._live_iteration: dict[str, Any] = {}
         self._worker_states: dict[str, dict[str, Any]] = {}
         self._worker_logs: dict[str, list[dict[str, Any]]] = {}  # wid -> log entries
-        self._worker_term: dict[
-            str, list[str]
-        ] = {}  # wid -> raw terminal lines (ANSI intact)
+        self._worker_term: dict[str, list[str]] = {}  # wid -> raw terminal lines (ANSI intact)
 
     @property
     def live_iteration(self) -> dict[str, Any]:
@@ -68,7 +67,7 @@ class LoopManager:
         try:
             if self._log_fp is None:
                 os.makedirs(os.path.dirname(self._log_file), exist_ok=True)
-                self._log_fp = open(self._log_file, "a")
+                self._log_fp = open(self._log_file, "a")  # noqa: SIM115  # keep instance attr open for reuse
             ts = entry["timestamp"][:19]
             self._log_fp.write(f"[{ts}] [{level}] {message}\n")
             self._log_fp.flush()
@@ -85,9 +84,7 @@ class LoopManager:
 
         # When running inside Docker, the workdir is always mounted at /workdir.
         # On the host, use the user's actual path from config (or cwd if empty).
-        in_docker = os.path.exists("/.dockerenv") or os.environ.get(
-            "DOCKER_CONTAINER", ""
-        )
+        in_docker = os.path.exists("/.dockerenv") or os.environ.get("DOCKER_CONTAINER", "")
         if in_docker:
             config["INFINITE_LOOP_WORKDIR"] = "/workdir"
         elif config.get("INFINITE_LOOP_WORKDIR", "") == "/workdir":
@@ -109,16 +106,13 @@ class LoopManager:
 
         # Only pass --worktree if the workdir is actually a git repo
         workdir = config.get("INFINITE_LOOP_WORKDIR", "") or os.getcwd()
-        if not os.path.isdir(os.path.join(workdir, ".git")):
-            if "--worktree" in cli_args:
-                cli_args.remove("--worktree")
+        if not os.path.isdir(os.path.join(workdir, ".git")) and "--worktree" in cli_args:
+            cli_args.remove("--worktree")
 
         # Clean up stale sentinel
         if os.path.exists(SENTINEL_PATH):
-            try:
+            with contextlib.suppress(OSError):
                 os.remove(SENTINEL_PATH)
-            except OSError:
-                pass
 
         cmd = [sys.executable, "-m", "pi_loop"] + cli_args
 
@@ -257,7 +251,7 @@ class LoopManager:
         """Read the current ledger state."""
         try:
             if os.path.exists(self._ledger_path):
-                with open(self._ledger_path, "r") as f:
+                with open(self._ledger_path) as f:
                     return json.load(f)
         except (json.JSONDecodeError, OSError):
             pass
@@ -403,14 +397,10 @@ class LoopManager:
                 pass
 
         # Heartbeat
-        m = re.search(
-            r"\[BEAT\]\s+Iteration\s+#?(\d+)\s+still\s+running\s+\((\d+)s", text
-        )
+        m = re.search(r"\[BEAT\]\s+Iteration\s+#?(\d+)\s+still\s+running\s+\((\d+)s", text)
         if m:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 self._live_iteration["elapsed_seconds"] = int(m.group(2))
-            except (ValueError, TypeError):
-                pass
 
         # Error type
         m = re.search(r"\[ERROR-TYPE\]\s+(\w+)", text)

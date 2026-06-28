@@ -1,0 +1,62 @@
+# Web App Deep Analysis
+
+## Files analyzed
+- web_app/server.py (531 lines) — FastAPI server, SSE, system monitoring
+- web_app/loop_manager.py (474 lines) — Subprocess manager, log parsing
+- web_app/config_manager.py — Config schema, read/write, CLI arg builder
+- web_app/static/index.html — UI template (inline onclick handlers)
+- web_app/static/app.js (979+ lines) — Frontend JS (global namespace pollution)
+- web_app/static/style.css (24KB) — CSS with duplicated theme blocks
+
+## Findings confirmed in ENGINEERING_BACKLOG.md
+- BL-006 (high): Race condition in loop_manager.stop() concurrent with _monitor_process
+- BL-007 (high): No schema validation on save_config_api
+- BL-013 (high): TOCTOU race in loop_manager.stop()
+- BL-014 (high): Race: status='running' set before stream readers/monitor created
+- BL-015 (high): Race: _read_stream can AttributeError on self._process
+- BL-021 (medium): Blocking synchronous I/O in async endpoints (index route)
+- BL-022 (medium): Config file corruption causes HTTP 500
+- BL-023 (medium): No request timeouts, rate limiting, or auth
+- BL-024 (medium): Global namespace pollution in app.js
+- BL-025 (medium): Inline onclick handlers in HTML
+- BL-031 (medium): pause()/resume() race with stale status
+- BL-034 (low): SSE _status_poller runs with zero clients
+- BL-035 (low): Wrong HTTP status codes for logical errors
+- BL-036 (low): Unbounded limit/offset parameters
+- BL-037 (low): CORS allow_origins=['*']
+- BL-053 (medium): Event-loop-safe async I/O in web endpoints
+
+## New findings — NOT in ENGINEERING_BACKLOG.md
+
+### 1. Duplicate worker_term append logic in loop_manager.py (medium)
+LoopManager._parse_daemon_line() has two separate code paths that append to self._worker_term[wid]:
+- Lines ~169-175: Generic TERM prefix regex catches [TERM (worker #N)] and appends
+- Lines ~200-205: Explicit TERM prefix handler ALSO extracts term content and appends
+Both cap at the same 2000-line limit, but the first path (generic) leaves the [TERM (worker #N)] prefix in the content, while the second (explicit) strips it. This means terminal lines may appear twice — once with and once without the prefix.
+- File: web_app/loop_manager.py lines 169-175 and 200-205
+- Fix: Consolidate into a single code path; remove the generic fallthrough
+
+### 2. _get_memory_info() path construction bug (medium)
+The memory info function constructs a path using `os.path.join(DATA_DIR, "..", "proc", "meminfo")` but DATA_DIR defaults to "/tmp", making this path "/tmp/../proc/meminfo" which happens to resolve. But if DATA_DIR is customized, this path can break. The else branch correctly uses "/proc/meminfo" directly.
+- File: web_app/server.py _get_memory_info()
+- Fix: Remove the confusing conditional and always read from "/proc/meminfo"
+
+### 3. config_file.py vs config_manager.py defaults divergence (medium)
+- config_file.py DEFAULTS: SESSION_TIMEOUT=120, WEB_PORT=8000
+- config_manager.py CONFIG_DEFAULTS: SESSION_TIMEOUT=600, no port default
+These overlapping sets of defaults diverge and can cause confusion on first run.
+- Files: pi_loop/config_file.py, web_app/config_manager.py
+- Fix: Consolidate defaults into a single source of truth
+
+### 4. Default port mismatch (low)
+config_file.py says WEB_PORT=8000; server.py uses 8090 as the fallback.
+- Files: pi_loop/config_file.py (8000), web_app/server.py (8090)
+- Fix: Harmonize default port to 8090
+
+### 5. SSE poller runs with zero clients (BL-034 already tracks)
+_confirmed alert: idle_ticks tracking exists but could be more efficient with early return
+
+### 6. _get_cpu_percent() first-read returns 0.0 always (low)
+The first call to _get_cpu_percent() always returns 0.0 because no delta exists yet. This causes a brief "0%" display on page load.
+- File: web_app/server.py _get_cpu_percent()
+- Fix: Return None on first call so UI can display "..." instead of 0%

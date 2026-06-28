@@ -4,6 +4,7 @@ import json
 import os
 import queue
 import threading
+import time
 
 from .config import LAUNCH_LOOP_VERSION
 from .file_utils import _log
@@ -12,6 +13,11 @@ from .goal_utils import _goal_hash
 # SSE (Server-Sent Events) client tracking for live dashboard
 _sse_clients: list = []
 _sse_clients_lock = threading.Lock()
+# Monotonic-time stale-client detection: id(q) -> last_active (time.monotonic())
+# Clients with no activity for >_CLIENT_STALE_TIMEOUT seconds are proactively
+# removed on the next broadcast sweep, even if their queue never filled up.
+_CLIENT_STALE_TIMEOUT: float = 60.0
+_sse_client_last_active: dict[int, float] = {}
 
 
 # Status HTML template (static HTML page, no SSE)
@@ -863,21 +869,43 @@ def _broadcast_to_sse_clients(state: dict) -> None:
     Uses bounded queues (maxsize=128 in webhook.py _handle_sse) so that
     slow or disconnected clients are detected via queue.Full and dropped,
     preventing unbounded memory growth.
+
+    Also uses monotonic-time stale-client detection: clients with no
+    activity for >_CLIENT_STALE_TIMEOUT seconds are proactively removed
+    on the next broadcast sweep, skipping the unnecessary
+    ``q.put_nowait()`` for dead clients and avoiding silent queue buildup.
     """
     global _sse_clients
     payload = _build_sse_payload(state)
     payload_json = json.dumps(payload, default=str)
+    now = time.monotonic()
     with _sse_clients_lock:
         alive = []
         for q in _sse_clients:
+            qid = id(q)
+            last_active = _sse_client_last_active.get(qid, now)
+            # Proactive stale sweep: skip q.put_nowait() entirely for
+            # clients that haven't consumed anything in >60s
+            if now - last_active > _CLIENT_STALE_TIMEOUT:
+                continue  # stale — drop without even trying put_nowait
             try:
                 q.put_nowait(payload_json)
+                # Update last_active only on successful put, so clients
+                # that silently disconnect stop being touched and get
+                # swept on the next cycle.
+                _sse_client_last_active[qid] = now
                 alive.append(q)
             except queue.Full:
                 pass  # consumer too slow — bounded queue hit capacity, drop client
             except Exception:
                 pass  # safeguard for any other queue errors
         _sse_clients = alive
+        # Garbage-collect stale entries from the tracking dict so it
+        # doesn't accumulate dead qid references over time
+        alive_ids = {id(q) for q in alive}
+        for stale_qid in list(_sse_client_last_active.keys()):
+            if stale_qid not in alive_ids:
+                del _sse_client_last_active[stale_qid]
 
 
 def _build_sse_payload(state: dict) -> dict:

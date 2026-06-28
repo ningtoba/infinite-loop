@@ -7,6 +7,7 @@ Module-level constant: colorizer — ready to use anywhere.
 """
 
 import os
+import re
 import sys
 
 
@@ -169,6 +170,5 @@ def configure_color_mode(mode: str) -> None:
 
 def strip_ansi(text: str) -> str:
     """Remove all ANSI escape sequences from *text*."""
-    import re
 
     return re.sub(r"\033\[[0-9;]*m", "", text)

@@ -20,8 +20,15 @@ from .signal_handlers import (
     _startup_file_snapshots,
     _snapshot_file,
 )
+import random
+import subprocess
+import time
+from datetime import datetime
+
+from .file_utils import read_ledger
+
 from .preflight import PreflightChecker
-from .hermes_utils import find_hermes, detect_task_type
+from .hermes_utils import find_hermes, detect_task_type, _build_delegation_prompt
 from .validation import load_json_schema
 from .state import load_or_create_ledger
 from .loop import run_loop
@@ -772,13 +779,9 @@ def _run_demo() -> None:
     print(f"  {c.dim('Attempting to run a live demo session...')}")
     print()
 
-    from .hermes_utils import find_hermes
-
     hermes_bin = find_hermes()
     if shutil.which(hermes_bin) or shutil.which("hermes"):
         # Build a minimal prompt
-        from .hermes_utils import _build_delegation_prompt
-
         demo_prompt = _build_delegation_prompt(
             iteration=1,
             goal=test_goal,
@@ -788,8 +791,6 @@ def _run_demo() -> None:
             evolve=False,
             task_type="content",
         )
-        import subprocess
-
         cmd = [
             hermes_bin if shutil.which(hermes_bin) else "hermes",
             "chat",
@@ -987,14 +988,11 @@ def _run_demo() -> None:
 
 def _simulate_demo_output(c, goal: str):
     """Print a simulated demo output when Hermes is not available."""
-    import random
-    import time as _time
-
     words = ["Printed", "Returned", "Fetched", "Showed", "Displayed"]
     print(f"    {c.dim('[simulated] Spawning hermes chat -q...')}")
-    _time.sleep(0.5)
+    time.sleep(0.5)
     print(f"    {c.dim('[simulated] Session active, processing...')}")
-    _time.sleep(0.5)
+    time.sleep(0.5)
     print(f"    {c.dim('[simulated] Received output (1 lines)...')}")
     print()
     summary = f"{random.choice(words)} current UTC time and greeting"
@@ -1016,10 +1014,6 @@ def _simulate_demo_output(c, goal: str):
 
 def _display_status():
     """Read the ledger and print a compact colorized status. Used by --status flag."""
-    from .file_utils import read_ledger
-    from datetime import datetime
-    import time
-
     ledger = read_ledger()
     c = colorizer
 

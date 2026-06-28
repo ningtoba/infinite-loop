@@ -9,6 +9,7 @@ import re
 import time
 from datetime import datetime, timezone
 
+from .color_utils import colorizer as _cu
 from .config import LOCK_PATH, LEDGER_PATH, LOG_FORMAT, LOG_DATE_FORMAT
 
 # Module-level logger reference
@@ -60,8 +61,6 @@ def _colorize_log_tags(msg: str) -> str:
     Uses the global colorizer singleton. If color is disabled, returns
     the original message unchanged.
     """
-    from .color_utils import colorizer as _cu
-
     if not _cu._enabled():
         return msg
 

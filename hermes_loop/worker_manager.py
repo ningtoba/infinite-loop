@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import time
+import socket
 import urllib.request
 
 from .file_utils import _log
@@ -29,7 +30,6 @@ class HermesWorkerManager:
 
     def start(self) -> str:
         """Start the worker and return its URL. Returns '' on failure."""
-        import socket
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("", 0))

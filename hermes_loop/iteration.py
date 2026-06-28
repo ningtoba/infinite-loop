@@ -16,6 +16,7 @@ from .system_utils import get_system_usage, get_system_usage_diff
 from .goal_utils import GoalSpec
 from .hermes_utils import _build_delegation_prompt, spawn_delegation_session
 from .library_worker import _run_library_workers_parallel
+import urllib.request
 from .notifications import _send_per_iteration_notifications
 
 from .signal_handlers import _shutdown_requested
@@ -737,7 +738,6 @@ def _handle_callbacks(
 
     if http_callback:
         try:
-            import urllib.request
 
             notify_data = json.dumps(payload, default=str).encode("utf-8")
             req = urllib.request.Request(

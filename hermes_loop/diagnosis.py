@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import time
+import socket
 from pathlib import Path
 
 
@@ -372,7 +373,6 @@ def _check_gateway_connectivity() -> list[dict]:
     gateway_port = os.environ.get("HERMES_GATEWAY_PORT", "8000")
     host = "127.0.0.1"
     try:
-        import socket
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(2)

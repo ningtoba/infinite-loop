@@ -9,6 +9,9 @@ the closest match for misspelled variable names.
 import difflib
 import os
 
+from .color_utils import colorizer
+from .file_utils import _log
+
 # ── Known environment variables — canonical list ──────────────────────────────
 # Sorted set of every INFINITE_LOOP_* variable that the daemon recognises.
 # This MUST be kept in sync with .env.example and run.sh.
@@ -272,7 +275,6 @@ def _mask_sensitive(key: str, value: str) -> str:
 
 def format_validation_results(results: list[dict], colorize: bool = True) -> str:
     """Format validation results for display."""
-    from .color_utils import colorizer
 
     lines: list[str] = []
     counts: dict[str, int] = {}
@@ -339,7 +341,6 @@ def format_validation_results(results: list[dict], colorize: bool = True) -> str
 
 def check_env_file(env_path: str | None = None) -> int:
     """Validate a .env file and print results. Returns exit code (0=OK, 1=issues)."""
-    from .file_utils import _log
 
     if env_path is None:
         env_path = os.path.join(os.getcwd(), ".env")

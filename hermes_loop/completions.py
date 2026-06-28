@@ -10,6 +10,8 @@ Usage:
     hermes_loop --completion-script bash | source /dev/stdin
 """
 
+import os
+
 
 def _classify_flags(parser):
     """Introspect parser and return (bool_flags, value_flags, choice_flags).
@@ -370,7 +372,6 @@ return 0
 
 def regenerate_completion_files(base_dir, parser):
     """Regenerate the bash and zsh completion scripts in scripts/completion/."""
-    import os
 
     comp_dir = os.path.join(base_dir, "scripts", "completion")
     os.makedirs(comp_dir, exist_ok=True)

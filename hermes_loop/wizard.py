@@ -29,6 +29,8 @@ a summary of how to run.
 """
 
 import os
+import shutil
+import subprocess
 import sys
 
 
@@ -473,7 +475,6 @@ def _run_readiness_check(env_lines: list[str]) -> None:
             env[key.strip()] = val.strip().strip('"')
 
     # Check 1: hermes binary
-    import shutil
 
     hermes_found = shutil.which("hermes")
     if hermes_found:
@@ -512,7 +513,6 @@ def _run_readiness_check(env_lines: list[str]) -> None:
     # Check 4: git repo (if --git is enabled)
     use_git = env.get("INFINITE_LOOP_GIT", "").lower() == "true"
     if use_git:
-        import subprocess
 
         try:
             result = subprocess.run(

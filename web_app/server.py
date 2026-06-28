@@ -21,6 +21,9 @@ from .config_manager import (
     write_json_config,
     build_cli_args,
 )
+import argparse
+import shlex
+
 from .loop_manager import get_loop_manager
 
 # Determine static directory
@@ -96,8 +99,6 @@ async def preview_cli_args():
     """Preview the CLI arguments that would be used to start the daemon."""
     config = get_raw_config()
     cli_args = build_cli_args(config)
-    import shlex
-
     return {"args": cli_args, "command": "hermes_loop " + shlex.join(cli_args)}
 
 
@@ -404,8 +405,6 @@ async def shutdown():
 def main():
     """Entry point for the web app."""
     import uvicorn
-
-    import argparse
 
     default_port = int(os.environ.get("WEB_PORT", "8090"))
 

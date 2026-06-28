@@ -5,6 +5,7 @@ sessions and merges their changes back to the main branch after each iteration.
 """
 
 import os
+import re
 import subprocess
 
 from .file_utils import _log
@@ -485,7 +486,6 @@ def _extract_worker_from_branch(branch_name: str) -> int | None:
     Returns the worker ID integer, or None if the branch doesn't follow
     the expected pattern.
     """
-    import re
 
     m = re.search(r"[_-]w[_-](\d+)$", branch_name)
     if m:

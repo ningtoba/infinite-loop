@@ -8,6 +8,11 @@ import subprocess
 import threading
 import time
 
+import concurrent.futures
+import pty
+import select
+import urllib.request
+
 from .config import TASK_PATTERNS
 from .file_utils import _log, extract_json_from_output
 from .error_utils import classify_error
@@ -102,9 +107,6 @@ def _run_hermes_with_pty(
     Returns (accumulated_stdout, exit_code).
     Raises ``subprocess.TimeoutExpired`` if the process exceeds the timeout.
     """
-    import pty
-    import select
-
     lines: list[str] = []
     start = time.time()
     last_output_time = start
@@ -743,8 +745,6 @@ def spawn_delegation_session(
                 pass_session_id=pass_session_id,
                 session_id=resume_session_id if resume_session_id else None,
             )
-            import concurrent.futures
-
             try:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                     future = pool.submit(agent.run_conversation, user_message=prompt)
@@ -860,8 +860,6 @@ def spawn_delegation_session(
             }
         )
         try:
-            import urllib.request
-
             req = urllib.request.Request(
                 url,
                 data=payload.encode(),

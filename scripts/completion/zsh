@@ -34,6 +34,7 @@ bool_flags=(
     '--json-logs[Output each iteration result as a single JSON line to stdout]'
     '--no-auto-toolsets[Disable automatic toolset enrichment based on task type]'
     '--no-failure-learning[Disable injection of past failure context into spawned sessions]'
+    '--no-tool-shortcut[Inject anti-shortcut instructions into spawned worker prompts to force real tool execution (the model tends to fabricate tool results on warm runs)]'
     '--notify-desktop[Send desktop notifications via notify-send on each iteration result (Linux only)]'
     '--notify-on-completion[Send a summary notification when the daemon finishes]'
     '--pass-session-id[Pass session ID to spawned sessions]'

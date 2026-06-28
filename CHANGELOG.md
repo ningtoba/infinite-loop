@@ -7,6 +7,7 @@ All notable changes to the **Infinite Loop Daemon** project are documented here.
 ## [14.39.2] — 2026-06-28
 
 ### Added
+- **`--no-tool-shortcut` flag** — injects anti-shortcut instructions into spawned worker prompts to force real tool execution. Prevents the model from fabricating tool results (tool shortcut) during warm runs. Passed through the full chain: cli.py → loop.py → iteration.py → hermes_utils.py. Documented in SKILL.md. Addresses the profiling finding from worker-startup-profile-v5.md where only 1/3 runs actually executed tools. (Iteration #27)
 - **`IMPROVEMENT_PLAN.md` — Improvement plan scan pass (iter #3)**: Ran comprehensive codebase scan. Checked git log for neglected files, read 6 modules (goal_utils.py, legacy.py, functions.py, stats.py, cooldown.py, git_utils.py, similarity.py, file_watcher.py), ran ruff (clean), grep for TODOs/FIXMEs (none found), and test collection (no pytest tests as expected). Cleared stale backlog items (the 2 hygiene inline imports were already at module top level; the features item about webhook signing was N/A since Pushbullet/ntfy aren't webhooks). All 12 self-tests pass. No actionable items found — codebase is in excellent health with all previous issues resolved.
 
 ## [14.39.1] — 2026-06-28

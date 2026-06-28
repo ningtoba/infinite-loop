@@ -249,6 +249,7 @@ def _build_delegation_prompt(
     task_type: str = "general",
     prior_context: str = "",
     heartbeat_interval: int = 0,
+    no_tool_shortcut: bool = False,
 ) -> str:
     """Build the prompt for a spawned Hermes session.
 
@@ -532,6 +533,30 @@ def _build_delegation_prompt(
             ]
         )
 
+    if no_tool_shortcut:
+        instructions.extend(
+            [
+                "",
+                "=== NO TOOL SHORTCUT MODE ===",
+                "",
+                "YOU MUST ACTUALLY CALL YOUR TOOLS — do NOT fabricate or simulate tool",
+                "output. The model has a known tendency to 'shortcut' by returning",
+                "fake/imagined tool results instead of actually executing tools.",
+                "This is strictly forbidden in this session.",
+                "",
+                "RULES:",
+                "1. Every time you need information or need to perform an action,",
+                "   call the actual tool (terminal, read_file, web_search, etc.)",
+                "2. Do NOT return JSON with made-up values that look like tool output.",
+                "3. Do NOT skip tool execution because you 'know what the result would be'.",
+                "4. If a tool call fails, you MUST report the error — do NOT substitute",
+                "   a fabricated success value.",
+                "5. The daemon is specifically measuring tool execution latency. Fake",
+                "   tool output will produce garbage measurements.",
+                "",
+            ]
+        )
+
     instructions.extend(
         [
             "",
@@ -644,6 +669,7 @@ def spawn_delegation_session(
     continue_session: bool = False,
     heartbeat_timeout: int = 0,
     iteration_count: int = 0,
+    no_tool_shortcut: bool = False,
 ) -> dict:
     hermes_bin = find_hermes()
     prompt = _build_delegation_prompt(
@@ -661,6 +687,7 @@ def spawn_delegation_session(
         task_type=task_type,
         prior_context=prior_context,
         heartbeat_interval=heartbeat_timeout,
+        no_tool_shortcut=no_tool_shortcut,
     )
     tools_str = ",".join(toolsets)
     cmd = [

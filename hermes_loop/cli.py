@@ -2065,6 +2065,13 @@ def _create_parser(for_introspection=False):
         help="Resume the most recent session in spawned sessions. "
         "Passes --continue to spawned hermes chat -q.",
     )
+    group.add_argument(
+        "--no-tool-shortcut",
+        action="store_true",
+        help="Inject anti-shortcut instructions into spawned worker prompts to "
+        "force real tool execution (the model tends to fabricate tool results "
+        "on warm runs). Adds a strict instruction requiring actual tool calls.",
+    )
 
     # ── 22. Startup & Debug ─────────────────────────────────────────────────
     group = parser.add_argument_group(
@@ -2991,6 +2998,7 @@ def main():
         _log(f"  On-error cmd:   {args.on_error_cmd or 'none'}")
         _log(f"  Tag:            {args.tag or '(none)'}")
         _log(f"  Prompt suffix:  {args.prompt_suffix or '(none)'}")
+        _log(f"  No tool shortcut: {'yes' if args.no_tool_shortcut else 'no'}")
         _log(f"  Force reset:    {'yes' if args.force_reset else 'no'}")
         _log(f"  Auto toolsets:  {'yes' if not args.no_auto_toolsets else 'no'}")
         _log(
@@ -3122,6 +3130,7 @@ def main():
     state["keep_iterations"] = args.keep_iterations
     state["tag"] = args.tag
     state["prompt_suffix"] = args.prompt_suffix
+    state["no_tool_shortcut"] = args.no_tool_shortcut
     state["max_turns"] = args.max_turns
     state["output_schema_file"] = args.output_schema_file or ""
     state["output_schema_inline"] = args.output_schema or ""
@@ -3229,6 +3238,7 @@ def main():
             on_error_cmd=args.on_error_cmd or None,
             tag=args.tag,
             prompt_suffix=args.prompt_suffix,
+            no_tool_shortcut=args.no_tool_shortcut,
             max_turns=args.max_turns,
             auto_toolsets=not args.no_auto_toolsets,
             failure_learning=not args.no_failure_learning,

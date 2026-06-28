@@ -116,6 +116,6 @@ time →
 
 ## Next Steps
 
-1. **Add `--no-tool-shortcut`** to spawned worker sessions to force real tool execution
+1. ✅ **Add `--no-tool-shortcut`** to spawned worker sessions to force real tool execution (Done — Iteration #27)
 2. **Model-level optimization**: The 5.3s model TTFT is the true bottleneck; consider a faster model for iteration tasks or keepalive pings
 3. **Validate with real worker prompts** (not just benchmark prompts) to see if tool shortcut persists with complex goals

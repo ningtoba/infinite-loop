@@ -40,6 +40,7 @@ _hermes_loop_completions()
         --json-logs
         --no-auto-toolsets
         --no-failure-learning
+        --no-tool-shortcut
         --notify-desktop
         --notify-on-completion
         --pass-session-id

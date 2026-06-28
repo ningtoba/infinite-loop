@@ -77,6 +77,7 @@ def _execute_iteration(
     output_schema: dict | None,
     git: bool,
     store_git_diff: bool,
+    no_tool_shortcut: bool = False,
     heartbeat_timeout: int = 0,
     quiet: bool = False,
 ) -> tuple[list[dict], GoalSpec, bool]:
@@ -205,6 +206,7 @@ def _execute_iteration(
                         accept_hooks=accept_hooks,
                         worktree=worktree,
                         continue_session=continue_session,
+                        no_tool_shortcut=no_tool_shortcut,
                         heartbeat_timeout=heartbeat_timeout,
                         iteration_count=iteration_count,
                     )
@@ -265,6 +267,7 @@ def _execute_iteration(
                 accept_hooks=accept_hooks,
                 worktree=worktree,
                 continue_session=continue_session,
+                no_tool_shortcut=no_tool_shortcut,
                 heartbeat_timeout=heartbeat_timeout,
                 iteration_count=iteration_count,
                 worker_id=0,

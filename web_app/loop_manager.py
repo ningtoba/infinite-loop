@@ -101,10 +101,7 @@ class LoopManager:
         if in_docker and "--workdir" not in cli_args:
             cli_args.extend(["--workdir", "/workdir"])
 
-        # Force --worker-url '' for live stdout streaming (direct subprocess mode).
-        # build_cli_args skips empty values, but the daemon defaults to 'auto'.
-        if "--worker-url" not in cli_args:
-            cli_args.extend(["--worker-url", ""])
+        # pi-loop uses direct subprocess mode (no worker-url concept).
 
         # Only pass --worktree if the workdir is actually a git repo
         workdir = config.get("INFINITE_LOOP_WORKDIR", "") or os.getcwd()

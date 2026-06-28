@@ -17,7 +17,11 @@ def _set_originals(
     session_timeout: int, cooldown: int, use_library: bool, workers: int
 ) -> None:
     """Set original baseline values from run_loop for mitigation comparisons."""
-    global _ORIGINAL_SESSION_TIMEOUT, _ORIGINAL_COOLDOWN, _ORIGINAL_USE_LIBRARY, _ORIGINAL_WORKERS
+    global \
+        _ORIGINAL_SESSION_TIMEOUT, \
+        _ORIGINAL_COOLDOWN, \
+        _ORIGINAL_USE_LIBRARY, \
+        _ORIGINAL_WORKERS
     _ORIGINAL_SESSION_TIMEOUT = session_timeout
     _ORIGINAL_COOLDOWN = cooldown
     _ORIGINAL_USE_LIBRARY = use_library

@@ -393,7 +393,6 @@ def _run_doctor() -> None:
     print(f"\n  {c.header('══════════════════════════════════════════════')}\n")
 
 
-
 def _explain_flag(flag_name: str, parser=None) -> None:
     """Show detailed help for a single CLI flag."""
     if parser is None:

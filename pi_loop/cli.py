@@ -183,6 +183,12 @@ See 'pi-loop --examples' for more usage patterns.
         "--skills", type=str, default="", help="Skills to enable for workers"
     )
     worker.add_argument(
+        "--max-output-chars",
+        type=int,
+        default=2000,
+        help="Max chars of spawned output to store (default: 2000)",
+    )
+    worker.add_argument(
         "--output-schema",
         type=str,
         default="",

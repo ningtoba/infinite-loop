@@ -103,6 +103,10 @@ class LoopManager:
 
         # pi-loop uses direct subprocess mode (no worker-url concept).
 
+        # Always pass --run — clicking Start implies the user wants to run
+        if "--run" not in cli_args:
+            cli_args.append("--run")
+
         # Only pass --worktree if the workdir is actually a git repo
         workdir = config.get("INFINITE_LOOP_WORKDIR", "") or os.getcwd()
         if not os.path.isdir(os.path.join(workdir, ".git")):

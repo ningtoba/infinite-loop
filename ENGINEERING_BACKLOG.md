@@ -10,17 +10,17 @@
 | Severity | Count |
 |----------|-------|
 | 🔴 **P0 — Critical** | 1 |
-| 🟠 **P1 — High** | 5 |
+| 🟠 **P1 — High** | 4 |
 | 🟡 **P2 — Medium** | 17 |
 | 🔵 **P3 — Low** | 10 |
 | ⚪ **P4 — Wishlist** | 3 |
 | ✅ **Completed** | 28 |
-| **Total Active** | **36** |
+| **Total Active** | **35** |
 
 | Category | Count |
 |----------|-------|
 | Bug | 3 |
-| Technical Debt | 6 |
+| Technical Debt | 5 |
 | Architecture | 3 |
 | Performance | 2 |
 | Security | 2 |
@@ -107,19 +107,17 @@
 | **Title** | Extreme parameter bloat in run_loop() — 71 parameters |
 | **Category** | Technical Debt |
 | **Priority** | 🟠 P1 — High |
-| **Impact** | Nearly impossible to test, reason about, document, or refactor. Function signature spans ~60 lines. 90+ parameters are never used inside the function body (dead params from migration). |
 | **Effort** | Large |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
-**Reasoning:** `run_loop()` accepts 71 parameters covering config, paths, notifications, git, convergence, cooldown, error handling, workers, and more. The signature alone is ~60 lines. Many of these parameters are never actually referenced in the function body — they were carried over from the hermes-agent era and are dead code. This makes the function nearly impossible to test exhaustively, document, or safely modify.
-
-**Research notes:** The fix is to introduce a `LoopConfig` dataclass (in `config.py` or a new `loop_config.py`) that encapsulates all configuration dimensions. The dataclass should have typed fields with defaults, and `run_loop()` should accept a single `LoopConfig` parameter. This reduces the signature from 71 params to 2 (config + state). See also ARCH-001 (monolithic body) which depends on this.
+**Fix applied:** Introduced `LoopConfig` dataclass in `config.py` with 57 typed fields and a `from_args()` factory. `run_loop()` signature reduced from 71+ params (~80 lines) to 2 params `(cfg: LoopConfig, state: dict)`. Body extracts locals from cfg; ruff removed 27 dead params never referenced in the body.
 
 **Affected files:**
 
-- `pi_loop/loop.py` (line ~331 signature)
+- `pi_loop/loop.py` (signature + body)
 - `pi_loop/config.py` (new `LoopConfig` dataclass)
+- `pi_loop/cli.py` (uses `LoopConfig.from_args()`)
 
 ### ARCH-001 — Monolithic run_loop() body violates Single Responsibility Principle
 
@@ -130,8 +128,8 @@
 | **Priority** | 🟠 P1 — High |
 | **Impact** | ~435 lines handling shutdown, git state capture, notification dispatch, error recovery, cooldown, HTML dashboard generation, HTTP callbacks, goal cycling, iteration cap trimming, and convergence detection — all interleaved in one `while True` loop |
 | **Effort** | X-Large |
-| **Dependencies** | TECHDEPT-001 |
-| **Status** | ❌ Blocked by TECHDEPT-001 |
+| **Dependencies** | None (TECHDEPT-001 resolved) |
+| **Status** | ⏳ Pending |
 
 **Reasoning:** The `run_loop()` body is ~435 lines with 6 independent exit-early conditions mixed with normal flow. It handles: sentinel checks, iteration counting, goal cycling, progressive context, subprocess execution, git capture, idle detection, error classification, notifications, HTML dashboard, HTTP callbacks, on-error commands, cooldown, error recovery adaptation, iteration cap trimming, and goal evolution. Each responsibility should be extracted into its own function or class.
 
@@ -175,8 +173,8 @@
 | **Priority** | 🟠 P1 — High |
 | **Impact** | The daemon's core value proposition (subprocess lifecycle, iteration orchestration, error recovery) has zero real-process testing. CI cannot catch regressions in the actual `pi` subprocess interaction. |
 | **Effort** | X-Large |
-| **Dependencies** | TECHDEPT-001, ARCH-001 |
-| **Status** | ❌ Blocked by TECHDEPT-001, ARCH-001 |
+| **Dependencies** | ARCH-001 |
+| **Status** | ❌ Blocked by ARCH-001 |
 
 **Reasoning:** All 404 tests are pure unit tests with heavy mocking — no real subprocess invocation of `pi`, no real ledger file lifecycle tested end-to-end, no actual daemon lifecycle (start → iterate → stop). The `subprocess.Popen` calls in `_execute_task` and `LoopManager.start()` are entirely untested at the integration level.
 
@@ -1051,7 +1049,7 @@ The **pi-loop** (hermes-loop) repository is a well-structured, actively maintain
 | **Test count** | 404 (all passing, 0.53s) |
 | **Test coverage** | 83% file coverage (19/23 modules) |
 | **Active backlog items** | 40 |
-| **Completed this iteration** | 32 |
+| **Completed this iteration** | 33 |
 | **Functions with >100 lines** | 12 |
 | **Longest function** | `run_loop()` — 435 lines, 71 parameters |
 | **Total commits** | 191 (all by `ningtoba`) |

@@ -54,10 +54,10 @@
 | **Priority** | High |
 | **Impact** | High — `evolve` feature is dead code. The daemon writes `state["evolved_goal"]` every iteration when `--evolve` is set, but `run_loop` never switches to it. Users who enable `--evolve` get a no-op feature. |
 | **Effort** | Small |
-| **Status** | pending |
-| **Description** | `_evolve_goal()` in `functions.py` parses pi output for `NEXT_GOAL:` headers and stores them in `state["evolved_goal"]`. However, `run_loop()` in `loop.py` at no point reads `state["evolved_goal"]` to override the current goal. The feature is mechanically complete (writes) but has no consumer (reads). |
-| **Rationale** | The evolve feature was designed to let pi sessions self-direct by proposing the next task. Without the read side, the write is pure overhead — wasted string parsing and dict writes on every iteration. This is a regression or incomplete implementation that should either be completed (wire the read) or removed with clear deprecation messaging. |
-| **Affected Files** | `pi_loop/loop.py`, `pi_loop/functions.py` |
+| **Status** | completed ✅ |
+| **Description** | B-001 is now complete. Read side wired at `loop.py:558–563`: `state.pop("evolved_goal")` when gated behind `evolve` flag, with clean fallback to original `goal`. Write side at `loop.py:781–793` calls `_evolve_goal()` only in single-goal mode. `_evolve_goal()` (798–803) case-insensitively scans for `NEXT_GOAL:` marker and skips empty values. All 460 tests pass. |
+| **Rationale** | B-001 was the highest-priority bug: the read side was missing entirely, making `--evolve` a silent no-op. Now the feature works end-to-end: the AI proposes `NEXT_GOAL:` in its output, and the loop consumes it via `pop()` for one-time consumption with automatic fallback. |
+| **Affected Files** | `pi_loop/loop.py` |
 
 ### BUG-002 — `suppress(Exception)` silently swallows notification and HTTP callback failures
 
@@ -478,7 +478,7 @@
 
 ### What needs immediate attention
 
-1. **`_evolve_goal()` dead code** (BUG-001) — The evolve feature is mechanically complete on the write side but has no consumer. Users enabling `--evolve` get silent no-ops.
+1. ~~**`_evolve_goal()` dead code** (BUG-001) — The evolve feature is mechanically complete on the write side but has no consumer. Users enabling `--evolve` get silent no-ops.~~ ✅ DONE
 2. **Silent notification failures** (BUG-002) — `suppress(Exception)` hides failed notifications and HTTP callbacks. At minimum, log them.
 3. **No integration tests** (TEST-001) — 460 unit tests but zero end-to-end verification of the core `pi` subprocess spawning. A `pi` CLI change would break the daemon silently.
 4. **Monolithic `run_loop()`** (TECH-DEBT-001) — 300+ lines, 60+ locals. Decomposition should be prioritized before any new features.
@@ -500,14 +500,14 @@
 | Priority | Count |
 |---|---|
 | 🔴 **Critical** | 2 |
-| 🟠 **High** | 8 |
+| 🟠 **High** | 7 |
 | 🟡 **Medium** | 12 |
 | 🔵 **Low** | 6 |
-| **Total** | **28** |
+| **Total** | **27** |
 
 | Category | Count |
 |---|---|
-| Bug | 6 |
+| Bug | 5 |
 | Technical Debt | 6 |
 | Testing | 4 |
 | Performance | 3 |
@@ -520,4 +520,4 @@
 
 ---
 
-*This backlog is a living document. Items should be re-prioritized quarterly. The top 5 (BUG-001, TEST-001, TECH-DEBT-001, TECH-DEBT-002, CI-CD-001) represent the highest-value work for the next sprint.*
+*This backlog is a living document. Items should be re-prioritized quarterly. The top 4 (BUG-001 completed ✅ → TEST-001, TECH-DEBT-001, TECH-DEBT-002, CI-CD-001) represent the highest-value work for the next sprint.*

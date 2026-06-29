@@ -1,17 +1,17 @@
 {
   "errors": [],
-  "generated_at": "2026-06-29T18:25:38Z",
+  "generated_at": "2026-06-29T19:09:40Z",
   "metrics": {
     "_totals": {
       "CONFIDENCE.HIGH": 27,
       "CONFIDENCE.LOW": 0,
-      "CONFIDENCE.MEDIUM": 3,
+      "CONFIDENCE.MEDIUM": 2,
       "CONFIDENCE.UNDEFINED": 0,
       "SEVERITY.HIGH": 1,
       "SEVERITY.LOW": 26,
-      "SEVERITY.MEDIUM": 3,
+      "SEVERITY.MEDIUM": 2,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 5629,
+      "loc": 5642,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -50,7 +50,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 229,
+      "loc": 242,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -76,7 +76,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 1,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 364,
+      "loc": 360,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -89,7 +89,7 @@
       "SEVERITY.LOW": 0,
       "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 84,
+      "loc": 83,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -219,7 +219,7 @@
       "SEVERITY.LOW": 4,
       "SEVERITY.MEDIUM": 1,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 702,
+      "loc": 706,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -343,13 +343,13 @@
     "web_app/config_manager.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
-      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.MEDIUM": 0,
       "CONFIDENCE.UNDEFINED": 0,
       "SEVERITY.HIGH": 0,
       "SEVERITY.LOW": 0,
-      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.MEDIUM": 0,
       "SEVERITY.UNDEFINED": 0,
-      "loc": 326,
+      "loc": 327,
       "nosec": 0,
       "skipped_tests": 0
     },
@@ -1066,7 +1066,7 @@
       "test_name": "subprocess_without_shell_equals_true"
     },
     {
-      "code": "685             try:\n686                 subprocess.run(\n687                     [\n688                         \"notify-send\",\n689                         \"pi-loop\",\n690                         combined_summary[:100] or f\"Iteration {iteration_count}\",\n691                     ],\n692                     timeout=5,\n693                 )\n694             except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:\n",
+      "code": "690             try:\n691                 subprocess.run(\n692                     [\n693                         \"notify-send\",\n694                         \"pi-loop\",\n695                         combined_summary[:100] or f\"Iteration {iteration_count}\",\n696                     ],\n697                     timeout=5,\n698                 )\n699             except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:\n",
       "col_offset": 16,
       "end_col_offset": 17,
       "filename": "pi_loop/loop.py",
@@ -1077,23 +1077,23 @@
       },
       "issue_severity": "LOW",
       "issue_text": "Starting a process with a partial executable path",
-      "line_number": 686,
+      "line_number": 691,
       "line_range": [
-        686,
-        687,
-        688,
-        689,
-        690,
         691,
         692,
-        693
+        693,
+        694,
+        695,
+        696,
+        697,
+        698
       ],
       "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html",
       "test_id": "B607",
       "test_name": "start_process_with_partial_path"
     },
     {
-      "code": "685             try:\n686                 subprocess.run(\n687                     [\n688                         \"notify-send\",\n689                         \"pi-loop\",\n690                         combined_summary[:100] or f\"Iteration {iteration_count}\",\n691                     ],\n692                     timeout=5,\n693                 )\n694             except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:\n",
+      "code": "690             try:\n691                 subprocess.run(\n692                     [\n693                         \"notify-send\",\n694                         \"pi-loop\",\n695                         combined_summary[:100] or f\"Iteration {iteration_count}\",\n696                     ],\n697                     timeout=5,\n698                 )\n699             except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:\n",
       "col_offset": 16,
       "end_col_offset": 17,
       "filename": "pi_loop/loop.py",
@@ -1104,23 +1104,23 @@
       },
       "issue_severity": "LOW",
       "issue_text": "subprocess call - check for execution of untrusted input.",
-      "line_number": 686,
+      "line_number": 691,
       "line_range": [
-        686,
-        687,
-        688,
-        689,
-        690,
         691,
         692,
-        693
+        693,
+        694,
+        695,
+        696,
+        697,
+        698
       ],
       "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
       "test_id": "B603",
       "test_name": "subprocess_without_shell_equals_true"
     },
     {
-      "code": "714                     req.add_header(\"Authorization\", http_callback_secret)\n715                 urllib.request.urlopen(req, timeout=10)\n716             except (ImportError, OSError, ValueError, json.JSONDecodeError) as e:\n",
+      "code": "719                     req.add_header(\"Authorization\", http_callback_secret)\n720                 urllib.request.urlopen(req, timeout=10)\n721             except (ImportError, OSError, ValueError, json.JSONDecodeError) as e:\n",
       "col_offset": 16,
       "end_col_offset": 55,
       "filename": "pi_loop/loop.py",
@@ -1131,16 +1131,16 @@
       },
       "issue_severity": "MEDIUM",
       "issue_text": "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.",
-      "line_number": 715,
+      "line_number": 720,
       "line_range": [
-        715
+        720
       ],
       "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b310-urllib-urlopen",
       "test_id": "B310",
       "test_name": "blacklist"
     },
     {
-      "code": "721             try:\n722                 subprocess.run(on_error_cmd, shell=True, timeout=30)\n723             except (OSError, subprocess.TimeoutExpired) as e:\n",
+      "code": "726             try:\n727                 subprocess.run(on_error_cmd, shell=True, timeout=30)\n728             except (OSError, subprocess.TimeoutExpired) as e:\n",
       "col_offset": 16,
       "end_col_offset": 68,
       "filename": "pi_loop/loop.py",
@@ -1151,39 +1151,13 @@
       },
       "issue_severity": "HIGH",
       "issue_text": "subprocess call with shell=True identified, security issue.",
-      "line_number": 722,
+      "line_number": 727,
       "line_range": [
-        722
+        727
       ],
       "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b602_subprocess_popen_with_shell_equals_true.html",
       "test_id": "B602",
       "test_name": "subprocess_popen_with_shell_equals_true"
-    },
-    {
-      "code": "72     \"INFINITE_LOOP_SHUTDOWN_SENTINEL\": {\n73         \"default\": \"/tmp/infinite-loop-stop\",\n74         \"type\": \"string\",\n75         \"group\": \"iteration\",\n76         \"label\": \"Shutdown Sentinel\",\n77         \"description\": \"Path to sentinel file for external stop control.\",\n78     },\n79     # \u2500\u2500 Git Integration \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n80     \"INFINITE_LOOP_GIT\": {\n",
-      "col_offset": 19,
-      "end_col_offset": 44,
-      "filename": "web_app/config_manager.py",
-      "issue_confidence": "MEDIUM",
-      "issue_cwe": {
-        "id": 377,
-        "link": "https://cwe.mitre.org/data/definitions/377.html"
-      },
-      "issue_severity": "MEDIUM",
-      "issue_text": "Probable insecure usage of temp file/directory.",
-      "line_number": 73,
-      "line_range": [
-        72,
-        73,
-        74,
-        75,
-        76,
-        77,
-        78
-      ],
-      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b108_hardcoded_tmp_directory.html",
-      "test_id": "B108",
-      "test_name": "hardcoded_tmp_directory"
     }
   ]
 }

@@ -16,7 +16,7 @@
 ## Findings confirmed in ENGINEERING_BACKLOG.md
 - BL-003 (high): Extreme parameter bloat in run_loop() — 60+ params
 - BL-004 (high): Duplicated shutdown logic DRY violation — 5+ copies
-- BL-005 (high): Dead _evolve_goal — writes evolved_goal but never reads it
+- ~~BL-005 (high): Dead _evolve_goal — writes evolved_goal but never reads it~~ ✅ FIXED (read side wired at loop.py:560 with pop())
 - BL-012 (high): Monolithic run_loop() violates SRP (~200+ lines mixing everything)
 - BL-016 (medium): Silent exception swallowing (bare except: pass)
 - BL-017 (medium): Retry loop output capture lossy

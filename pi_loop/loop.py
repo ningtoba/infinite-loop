@@ -556,7 +556,12 @@ def run_loop(
                 )
                 return
         else:
-            goal_text = goal
+            # Prefer evolved goal if one exists (consumed with pop to avoid stale reuse)
+            if evolve and "evolved_goal" in state:
+                goal_text = state.pop("evolved_goal")
+                _log(f"[EVOLVE] Using evolved goal for iteration {iteration_count}")
+            else:
+                goal_text = goal
 
         # Build context from progressive summaries
         progressive_context = _build_progressive_context(context, existing_summaries)

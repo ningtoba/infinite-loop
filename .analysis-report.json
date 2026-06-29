@@ -1,0 +1,181 @@
+{
+  "docs_gaps": {
+    "SECURITY.md_missing_DOC_004": {
+      "exists": false,
+      "severity": "missing",
+      "note": "No SECURITY.md found in repo root. No security policy, vulnerability reporting process, or disclosure timeline documented."
+    },
+    "CONTRIBUTING.md_accuracy": {
+      "exists": true,
+      "issues": [
+        "Title says 'pi-loop' but remote is ningtoba/infinite-loop, local dir is hermes-loop",
+        "References 480+ tests / 25+ test files — actual count is 838 tests across more files",
+        "'cd pi-loop' assumes wrong directory name",
+        "Coverage recommendation uses pi_loop instead of hermes_loop",
+        "Mentions .env indirectly but project uses JSON config now",
+        "Section says 'run.sh' in project-structure tree but run.sh was removed"
+      ],
+      "severity": "stale"
+    },
+    "CHANGELOG.md_format": {
+      "exists": true,
+      "issues": [
+        "Unreleased section contains v14.33.0-era items (not truly unreleased — already shipped)",
+        "Lines like 'feat: implement SEC-001' and 'feat: auto-approve pi commands' mixed with old v14.x entries in [Unreleased]",
+        "SEC-001 in CHANGELOG refers to API-key auth middleware, but ENGINEERING_BACKLOG.md's SEC-001 refers to URL scheme validation — ID collision",
+        "No version bump section for latest changes (HEAD is beyond v14.39.0 mentions)"
+      ],
+      "severity": "moderate"
+    },
+    "README_issues_DOC_001": {
+      "Swagger_link": { "present": true, "ok": true },
+      "screenshot": {
+        "present": false,
+        "note": "Placeholder text: 'A screenshot of the dashboard is coming soon.'",
+        "severity": "minor"
+      },
+      "pi_version_requirement": {
+        "present": false,
+        "note": "README says 'pi coding agent' and shows 'pi --version' but states no minimum version. Users have no way to know if their pi is compatible.",
+        "severity": "moderate"
+      },
+      "other_issues": [
+        "README title 'pi-loop' doesn't match repo name 'hermes-loop' or remote 'ningtoba/infinite-loop'",
+        "Install steps use 'pip install -e .' but pyproject.toml uses 'hermes-loop' package name",
+        "References 'infinite-loop-state.json' path in /tmp (legacy path)"
+      ]
+    }
+  },
+  "git_issues": {
+    "stale_hermes_branches_CLEAN_001": {
+      "branches": [
+        "hermes/hermes-bd038f68",
+        "hermes/hermes-d19eb158",
+        "hermes/hermes-edaf42c8"
+      ],
+      "count": 3,
+      "status": "local-only, not on remote",
+      "action_needed": "git branch -d hermes/hermes-* (safe to delete, no remote tracking)",
+      "note": "These were created via git worktree during hermes-era iterations. No remote hermes branches exist. Local branches merge with remote main — incorrect config."
+    },
+    "stale_worktree_dirs_CLEAN_001": {
+      "worktrees": [
+        ".worktrees/hermes-bd038f68",
+        ".worktrees/hermes-d19eb158",
+        ".worktrees/hermes-edaf42c8"
+      ],
+      "count": 3,
+      "status": "locked, not pruned by `git worktree prune`",
+      "action_needed": "git worktree remove .worktrees/hermes-*/ (after confirming no active use)",
+      "note": "These are git worktrees containing old hermes-era files (CHANGELOG.md 63KB, CONTRIBUTING.md 22KB, SKILL.md 88KB, etc.). All locked."
+    },
+    "branch_structure": {
+      "local_only": "main",
+      "local_hermes_worktrees": "3",
+      "remote": "ningtoba/infinite-loop",
+      "remote_dependabot_branches": [
+        "dependabot/github_actions/actions/checkout-7",
+        "dependabot/github_actions/actions/setup-python-6",
+        "dependabot/pip/fastapi-0.138.2",
+        "dependabot/pip/pydantic-core-2.47.0",
+        "dependabot/pip/safety-schemas-0.0.18",
+        "dependabot/pip/typer-0.26.8"
+      ],
+      "note": "Remote is ningtoba/infinite-loop not nekophobia/hermes-loop. Local hermes branches track remote main instead of non-existent remote hermes branches."
+    },
+    "remote_name_mismatch": {
+      "remote_url": "git@github.com:ningtoba/infinite-loop.git",
+      "local_dir": "hermes-loop",
+      "issue": "Local directory name doesn't match GitHub repo name",
+      "severity": "info"
+    }
+  },
+  "pre_commit_duality_TOOL_002": {
+    "pre_commit_config_yaml_exists": true,
+    "pre_commit_config_content": "ruff (fix+format), trailing-whitespace, eof-fixer, check-json/yaml/toml, merge-conflict, detect-private-key, large-files",
+    "githooks_pre_commit_exists": true,
+    "githooks_pre_commit_content": "ruff check + ruff format --check on staged Python files only",
+    "duality_issue": "Both co-exist with overlapping ruff checks but different scopes: .pre-commit-config.yaml runs on all files via pre-commit framework, .githooks/pre-commit runs only on staged Python files via bash.",
+    "githooks_README_mismatch": {
+      "issue": true,
+      "what_README_says": "pre-commit hook regenerates shell completion scripts (scripts/completion/{bash,zsh})",
+      "what_actual_hook_does": "ruff check + ruff format --check on staged Python files",
+      "severity": "incorrect documentation"
+    },
+    "recommendation": "Either update .githooks/README.md to match actual hook behavior, or update the hook to match the documented behavior."
+  },
+  "tooling_gaps": {
+    "py_typed_missing_TOOL_003": {
+      "exists": false,
+      "severity": "missing",
+      "note": "No pi_loop/py.typed marker file. PEP 561 packages need this for mypy to type-check users of the package. Without it, mypy assumes the package is untyped."
+    },
+    "editorconfig_missing_TOOL_004": {
+      "exists": false,
+      "severity": "missing",
+      "note": "No .editorconfig. Different editors may use inconsistent indentation (ruff formatter catches this, but .editorconfig provides universal editor settings for all file types including non-Python)."
+    },
+    "env_in_gitignore_SEC_002": {
+      "issue": "remediated_or_not_applicable",
+      "detail": ".env, .env.local, .env.* are all in .gitignore. ENGINEERING_BACKLOG lists SEC-002 as 'Pending' but the issue is already fixed.",
+      "note": "Backlog SEC-002 status is stale — should be marked Done."
+    }
+  },
+  "security_issues": {
+    "bandit_report": {
+      "exists": true,
+      "generated_at": "2026-06-29T19:09:40Z",
+      "up_to_date": true,
+      "findings": {
+        "HIGH": 1,
+        "MEDIUM": 2,
+        "LOW": 26,
+        "total": 29
+      },
+      "top_findings": {
+        "HIGH": [
+          "subprocess_popen_with_shell_equals_true:727 — subprocess.run(on_error_cmd, shell=True)"
+        ],
+        "MEDIUM": [
+          "hardcoded_tmp_directory:22 — /tmp/infinite-loop-state.json path",
+          "blacklist:720 — urllib.request.urlopen(http_callback) with no scheme validation"
+        ]
+      }
+    },
+    "SEC_001_http_callback_url_validation": {
+      "status": "unresolved",
+      "code_location": "pi_loop/loop.py ~line 714",
+      "issue": "urllib.request.urlopen(http_callback) called without validating URL scheme. A file:// URL would read local files; data:// could trigger unexpected behavior (Bandit B310).",
+      "fix_needed": "Add urlparse-based validation restricting schemes to http and https only. Reject file://, data://, ftp://, etc."
+    },
+    "SEC_001_changelog_id_collision": {
+      "issue": "CHANGELOG uses SEC-001 for 'API-key authentication middleware' (implemented), ENGINEERING_BACKLOG uses SEC-001 for 'http_callback URL scheme validation' (pending). These are different fixes sharing the same ID.",
+      "severity": "confusing"
+    },
+    "SEC_005_shell_true_guarding": {
+      "status": "unresolved",
+      "code_location": "pi_loop/loop.py ~line 731",
+      "issue": "subprocess.run(on_error_cmd, shell=True, timeout=30) where on_error_cmd is user-configurable via config.json. No command logging, no length/character restrictions, no documented risk.",
+      "fix_needed": "At minimum: (1) log command before execution at INFO level, (2) add length/character restrictions, (3) document risk in README, (4) warn on startup when configured.",
+      "backlog_status": "Pending (Phase 2 in ACTION_PLAN)",
+      "severity": "HIGH"
+    }
+  },
+  "affected_files": [
+    ".githooks/README.md",
+    ".githooks/pre-commit",
+    ".pre-commit-config.yaml",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "ENGINEERING_BACKLOG.md",
+    "README.md",
+    "bandit-report.json",
+    "pi_loop/loop.py",
+    "pi_loop/py.typed (missing)",
+    ".editorconfig (missing)",
+    "SECURITY.md (missing)",
+    ".worktrees/hermes-bd038f68/",
+    ".worktrees/hermes-d19eb158/",
+    ".worktrees/hermes-edaf42c8/"
+  ]
+}

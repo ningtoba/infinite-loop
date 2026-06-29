@@ -5,12 +5,15 @@ importing pi_loop runtime modules directly.
 """
 
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
 from typing import Any
 
 from .config import _get_data_dir
+
+logger = logging.getLogger(__name__)
 
 # Default status file path (overridable via PI_LOOP_STATUS_FILE)
 STATUS_FILE_DEFAULT = os.environ.get("PI_LOOP_STATUS_FILE", os.path.join(_get_data_dir(), "loop-status.json"))
@@ -70,6 +73,5 @@ def write_status(
         with open(path, "w") as f:
             json.dump(data, f, indent=2, default=str)
             f.write("\n")
-    except OSError:
-        # Silently fail — status writing is best-effort
-        pass
+    except OSError as e:
+        logger.warning("Failed to write status file to %s: %s", path, e)

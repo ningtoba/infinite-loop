@@ -1,6 +1,9 @@
 import json
+import logging
 import os
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 CONFIG_DIR = Path.home() / ".config" / "pi-loop"
 CONFIG_PATH = CONFIG_DIR / "config.json"
@@ -48,8 +51,8 @@ def save_config(config):
     try:
         with open(CONFIG_PATH, "w") as f:
             json.dump(merged, f, indent=2)
-    except OSError:
-        pass
+    except OSError as e:
+        logger.warning("Failed to write config to %s: %s", CONFIG_PATH, e)
     return merged
 
 

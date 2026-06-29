@@ -9,6 +9,7 @@ progress in a JSON ledger.
 # LoopConfig dataclass refactor. F841 covers dead local assignments from
 # the cfg.* local-extraction block.
 
+import html
 import json
 import os
 import subprocess
@@ -788,16 +789,20 @@ def _evolve_goal(output: str, state: dict, iteration: int) -> None:
 
 
 def _build_dashboard_html(state: dict) -> str:
-    """Build a minimal HTML dashboard for the loop state."""
+    """Build a minimal HTML dashboard for the loop state.
+
+    IMPORTANT: All user-controlled values are HTML-escaped to prevent stored XSS.
+    """
     iters = state.get("iterations", [])
     rows = ""
     for it in reversed(iters[-50:]):
-        n = it.get("n", "?")
+        n = html.escape(str(it.get("n", "?")))
         status = "❌" if it.get("error") else "✅"
         dur = it.get("duration_seconds", 0)
-        summary = (it.get("summary") or "")[:100]
+        summary = html.escape((it.get("summary") or "")[:100])
         rows += f"<tr><td>{n}</td><td>{status}</td><td>{dur}s</td><td>{summary}</td></tr>\n"
 
+    status_label = html.escape(str(state.get("status", "unknown")))
     return f"""<!DOCTYPE html>
 <html><head><title>pi-loop Dashboard</title>
 <meta charset="utf-8"><meta http-equiv="refresh" content="5">
@@ -809,7 +814,7 @@ th {{ background: #f0f0f0; }}
 tr:nth-child(even) {{ background: #fafafa; }}
 </style></head><body>
 <h1>pi-loop Dashboard</h1>
-<p>Status: <strong>{state.get("status", "unknown")}</strong>
+<p>Status: <strong>{status_label}</strong>
 | Iterations: {len(iters)}
 | Total: {state.get("stats", {}).get("total_duration_seconds", 0):.0f}s</p>
 <table><thead><tr><th>#</th><th>Status</th><th>Duration</th><th>Summary</th></tr></thead>

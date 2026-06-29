@@ -1,7 +1,10 @@
 """Git state capture and auto-commit helpers."""
 
+import logging
 import os
 import subprocess
+
+logger = logging.getLogger(__name__)
 
 
 def _capture_git_state(workdir: str | None, store_diff: bool = False) -> dict:
@@ -51,7 +54,8 @@ def _capture_git_state(workdir: str | None, store_diff: bool = False) -> dict:
             diff_text = r4.stdout.strip()
             if diff_text:
                 result["diff"] = diff_text[:10240]
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        logger.warning("Git state capture failed: %s", e)
         return {}
     return result
 
@@ -86,5 +90,6 @@ def _git_auto_commit(workdir: str | None, iteration: int, summary: str) -> str |
             timeout=5,
         )
         return r2.stdout.strip() if r2.returncode == 0 else None
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        logger.warning("Git auto-commit failed: %s", e)
         return None

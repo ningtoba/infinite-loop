@@ -1,8 +1,8 @@
 """Heartbeat helpers (Session Self-Healing)."""
 
-import contextlib
 import glob
 import json
+import logging
 import os
 import subprocess
 import threading
@@ -18,6 +18,8 @@ from .config import (
 )
 from .file_utils import _log
 
+logger = logging.getLogger(__name__)
+
 # Module-level shutdown flag — threading.Event for safe cross-thread/cross-signal access
 _shutdown_requested = threading.Event()
 
@@ -32,7 +34,10 @@ def _read_heartbeat(heartbeat_file: str) -> dict | None:
     try:
         with open(heartbeat_file) as f:
             return cast(dict, json.load(f))
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
+    except FileNotFoundError:
+        return None
+    except (json.JSONDecodeError, OSError) as e:
+        logger.debug("Failed to read heartbeat %s: %s", heartbeat_file, e)
         return None
 
 
@@ -45,7 +50,8 @@ def _write_heartbeat_file(heartbeat_file: str, data: dict) -> bool:
             f.write(json.dumps(data) + "\n")
         os.rename(tmp, heartbeat_file)
         return True
-    except OSError:
+    except OSError as e:
+        logger.warning("Failed to write heartbeat %s: %s", heartbeat_file, e)
         return False
 
 
@@ -202,8 +208,8 @@ def _cleanup_stale_heartbeats() -> None:
         try:
             os.remove(f)
             removed += 1
-        except OSError:
-            pass
+        except OSError as e:
+            logger.debug("Failed to remove stale heartbeat %s: %s", f, e)
     if removed > 0:
         _log(f"[HEARTBEAT] Cleaned up {removed} stale heartbeat file(s)", level="DEBUG")
 
@@ -217,5 +223,7 @@ def _request_shutdown() -> None:
 def _cleanup_heartbeat_file(heartbeat_file: str | None) -> None:
     """Remove a single heartbeat file (on normal session completion)."""
     if heartbeat_file and os.path.exists(heartbeat_file):
-        with contextlib.suppress(OSError):
+        try:
             os.remove(heartbeat_file)
+        except OSError as e:
+            logger.debug("Failed to cleanup heartbeat %s: %s", heartbeat_file, e)

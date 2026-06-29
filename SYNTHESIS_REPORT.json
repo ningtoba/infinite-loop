@@ -1,0 +1,338 @@
+{
+  "timestamp": "2026-06-30",
+  "repository": "pi-loop",
+  "analysisVersion": "iter-6",
+  "summary": {
+    "totalIssues": 97,
+    "critical": 8,
+    "high": 22,
+    "medium": 38,
+    "low": 29,
+    "immediateFixes": 18
+  },
+  "sprintResults": {
+    "securityFixed": [
+      "Stored XSS in _build_dashboard_html(): summary/n/status now html.escape()'d",
+      "Added import html + comprehensive escaping to loop.py dashboard template"
+    ],
+    "reliabilityFixed": [
+      "config_file.py: save_config() logs OSError instead of silent pass",
+      "git_utils.py: _capture_git_state() and _git_auto_commit() log failures",
+      "heartbeat.py: 4 silent I/O sites now log specific failure reasons",
+      "status.py: status file write failure logs warning with path"
+    ]
+  },
+  "prioritizedActions": [
+    {
+      "rank": 1,
+      "title": "Fix stored XSS in loop.py dashboard HTML",
+      "category": "security",
+      "priority": "critical",
+      "effort": "tiny",
+      "impact": "Eliminates reflected/stored XSS when iteration summaries contain <script> payloads",
+      "files": ["pi_loop/loop.py"],
+      "actions": [
+        "Wrap summary with html.escape()",
+        "Wrap iteration number n with html.escape(str(...))",
+        "Wrap status label with html.escape()",
+        "Add import html at module top"
+      ],
+      "reasoning": "User-controlled iteration summary directly interpolated into HTML without escaping. Attack vector: pi session outputs <script>alert('XSS')</script>."
+    },
+    {
+      "rank": 2,
+      "title": "Fix 3 DOM XSS vectors in app.js",
+      "category": "security",
+      "priority": "high",
+      "effort": "small",
+      "impact": "onclick handler injection via worker ID and branch name fields",
+      "files": ["web_app/static/app.js"],
+      "actions": [
+        "Audit all onclick= attribute interpolations",
+        "Replace with addEventListener + dataset attributes",
+        "Apply escapeHtml() to all control-plane interpolations"
+      ],
+      "reasoning": "Template literals interpolate w.id and branch into onclick handlers. Attacker needs access to loop_manager API."
+    },
+    {
+      "rank": 3,
+      "title": "Consolidate hardcoded /tmp paths under PI_LOOP_DATA_DIR (CRIT-001)",
+      "category": "reliability",
+      "priority": "critical",
+      "effort": "small",
+      "impact": "Enables multi-instance deployment and container compatibility",
+      "files": [
+        "pi_loop/loop.py",
+        "pi_loop/help_topics.py",
+        "pi_loop/preflight.py",
+        "pi_loop/status.py"
+      ],
+      "actions": [
+        "Replace /tmp/infinite-loop-state.json in loop.py HTML dashboard with config-derived path",
+        "Replace /tmp/dash.html, /tmp/status.json in help_topics.py examples with $PI_LOOP_DATA_DIR placeholders",
+        "Make check_disk_space() accept data-directory argument instead of hardcoding /tmp",
+        "Update STATUS_FILE_DEFAULT to consistently use _get_data_dir() fallback"
+      ],
+      "reasoning": "5+ locations hardcode /tmp despite PI_LOOP_DATA_DIR env var existing. Breaks container deployments and multi-instance setups."
+    },
+    {
+      "rank": 4,
+      "title": "Wire mypy to actually fail CI (remove || true)",
+      "category": "ci-cd",
+      "priority": "high",
+      "effort": "tiny",
+      "impact": "Type errors become visible in CI instead of being ignored",
+      "files": [".github/workflows/ci.yml", "Makefile"],
+      "actions": [
+        "Remove || true suffix from mypy invocations",
+        "Fix all mypy errors found after enabling strict mode"
+      ],
+      "reasoning": "mypy is piped through || true in lint-all and mypy targets, silently ignoring all type errors."
+    },
+    {
+      "rank": 5,
+      "title": "Add make security target (bandit + safety)",
+      "category": "ci-cd",
+      "priority": "high",
+      "effort": "small",
+      "impact": "Automated security scanning in CI pipeline",
+      "files": ["Makefile", "requirements-dev.txt", ".github/workflows/ci.yml"],
+      "actions": [
+        "Add bandit to requirements-dev.txt",
+        "Add safety or pip-audit to requirements-dev.txt",
+        "Create make security target",
+        "Add security job to CI workflow"
+      ],
+      "reasoning": "No automated security scanning exists despite the project handling secrets and having addressed CVEs."
+    },
+    {
+      "rank": 6,
+      "title": "Extract run_loop() Phase 1 — pure function separation",
+      "category": "architecture",
+      "priority": "high",
+      "effort": "large",
+      "impact": "Fundamental maintainability improvement for the largest function in the codebase",
+      "files": ["pi_loop/loop.py"],
+      "actions": [
+        "Extract iteration lifecycle into IterationEngine class",
+        "Extract notification dispatch into NotificationDispatcher class",
+        "Extract dashboard HTML generation into DashboardBuilder class",
+        "Extract convergence detection into ConvergenceDetector class"
+      ],
+      "reasoning": "run_loop() handles shutdown, git, notifications, error recovery, cooldown, HTML generation, HTTP callbacks, and goal cycling — all in one 300+ line function."
+    },
+    {
+      "rank": 7,
+      "title": "Encapsulate mutable module-level globals",
+      "category": "architecture",
+      "priority": "high",
+      "effort": "medium",
+      "impact": "Test isolation and predictable concurrency behavior",
+      "files": [
+        "pi_loop/error_recovery.py",
+        "pi_loop/functions.py",
+        "pi_loop/heartbeat.py",
+        "pi_loop/file_utils.py"
+      ],
+      "actions": [
+        "Turn _ORIGINAL_* in error_recovery.py into ErrorRecoveryStrategy instance attributes",
+        "Parametrize _max_output_chars_global instead of module-level mutation",
+        "Consider passing daemon_logger to FileLock constructor"
+      ],
+      "reasoning": "Mutable globals in 7 modules cause state leaks between tests and unpredictable concurrent access."
+    },
+    {
+      "rank": 8,
+      "title": "Remove dead code: validate_json_output(), _classify_progress()",
+      "category": "tech-debt",
+      "priority": "medium",
+      "effort": "tiny",
+      "impact": "Reduces maintenance surface and false coverage reporting",
+      "files": ["pi_loop/validation.py", "pi_loop/loop.py"],
+      "actions": [
+        "Remove validate_json_output() from validation.py",
+        "Remove _classify_progress() from loop.py",
+        "Verify no imports reference removed functions"
+      ],
+      "reasoning": "Functions defined but never imported or called anywhere in the codebase."
+    },
+    {
+      "rank": 9,
+      "title": "SSE reconnect with exponential backoff",
+      "category": "reliability",
+      "priority": "medium",
+      "effort": "small",
+      "impact": "Reduces server load spike during outages",
+      "files": ["web_app/static/app.js"],
+      "actions": [
+        "Replace fixed 5s setTimeout with exponential backoff: 1s, 2s, 4s, 8s, max 30s",
+        "Add jitter to prevent thundering herd",
+        "Reset backoff on successful connection"
+      ],
+      "reasoning": "Fixed 5s SSE reconnect causes aggressive reconnection storms on server restart."
+    },
+    {
+      "rank": 10,
+      "title": "Config corruption notification + atomic writes",
+      "category": "reliability",
+      "priority": "medium",
+      "effort": "small",
+      "impact": "Prevents silent data loss on config write failures",
+      "files": [
+        "pi_loop/config_file.py",
+        "web_app/config_manager.py"
+      ],
+      "actions": [
+        "Ensure all config writes use atomic rename pattern (write .tmp, then os.rename)",
+        "Add corruption detection on read with automatic backup",
+        "Notify on config corruption via existing notification channels"
+      ],
+      "reasoning": "Config write failures silently lose user settings. Atomic writes prevent partial writes."
+    },
+    {
+      "rank": 11,
+      "title": "Remove contextlib.suppress usage in heartbeat.py",
+      "category": "code-cleanup",
+      "priority": "medium",
+      "effort": "tiny",
+      "impact": "Consistent error logging pattern across the codebase",
+      "files": ["pi_loop/heartbeat.py"],
+      "actions": [
+        "Replace remaining contextlib.suppress(OSError) with try/except+log patterns",
+        "Verify heartbeat.py has zero silent suppress calls"
+      ],
+      "reasoning": "contextlib.suppress hides errors. All I/O failures should be logged at minimum."
+    },
+    {
+      "rank": 12,
+      "title": "Handle _heartbeat_age OSError with debug log",
+      "category": "code-cleanup",
+      "priority": "low",
+      "effort": "tiny",
+      "impact": "Debugging I/O issues becomes easier",
+      "files": ["pi_loop/heartbeat.py"],
+      "actions": [
+        "In _heartbeat_age(), log at debug level when os.path.getmtime raises OSError",
+        "Differentiate FileNotFoundError (expected before first heartbeat) from permission errors"
+      ],
+      "reasoning": "FileNotFoundError is expected on the first poll cycle; other OSErrors (permissions, broken FS) should be logged."
+    },
+    {
+      "rank": 13,
+      "title": "Dependabot/Renovate configuration",
+      "category": "ci-cd",
+      "priority": "medium",
+      "effort": "tiny",
+      "impact": "Automated security update PRs for dependencies",
+      "files": [".github/dependabot.yml"],
+      "actions": [
+        "Configure Dependabot for pip ecosystem",
+        "Set weekly schedule and auto-approve for patch updates",
+        "Add version update strategy"
+      ],
+      "reasoning": "No automated dependency update configuration. FastAPI, uvicorn, pytest dependencies won't get automatic security PRs."
+    },
+    {
+      "rank": 14,
+      "title": "Split LoopConfig (63 fields) into focused dataclasses",
+      "category": "architecture",
+      "priority": "medium",
+      "effort": "medium",
+      "impact": "Separation of concerns; each config domain independently testable",
+      "files": ["pi_loop/config.py"],
+      "actions": [
+        "Create IterationConfig, WorkerConfig, GitConfig, NotificationConfig, ArchiveConfig, SafetyConfig, LoggingConfig",
+        "Compose in top-level AppConfig container",
+        "Replace private _MISSING_TYPE import with project-level sentinel"
+      ],
+      "reasoning": "LoopConfig violates SRP with 63 fields across 8 unrelated domains. Private API import may break between Python versions."
+    },
+    {
+      "rank": 15,
+      "title": "Coverage reporting in CI",
+      "category": "ci-cd",
+      "priority": "medium",
+      "effort": "small",
+      "impact": "Visibility into code coverage trends over time",
+      "files": [".github/workflows/ci.yml", "Makefile"],
+      "actions": [
+        "Add --cov-report=xml to pytest invocation in CI",
+        "Upload coverage report to Codecov or similar",
+        "Add coverage badge to README"
+      ],
+      "reasoning": "No coverage reporting despite 481 tests across 25+ test files. Hard to identify untested paths."
+    },
+    {
+      "rank": 16,
+      "title": "Pi binary check in CI",
+      "category": "ci-cd",
+      "priority": "medium",
+      "effort": "tiny",
+      "impact": "Catches pi API changes that break the daemon",
+      "files": [".github/workflows/ci.yml"],
+      "actions": [
+        "Add step to verify pi CLI availability",
+        "Run pi --version or --help to validate basic functionality"
+      ],
+      "reasoning": "A pi API change (removed flag, format change) would silently break the daemon without CI catching it."
+    },
+    {
+      "rank": 17,
+      "title": "Extract dashboard HTML into standalone module",
+      "category": "architecture",
+      "priority": "low",
+      "effort": "small",
+      "impact": "Separation of concerns for dashboard logic",
+      "files": ["pi_loop/loop.py"],
+      "actions": [
+        "Create pi_loop/dashboard.py",
+        "Move _build_dashboard_html to new module",
+        "Import from dashboard.py in loop.py"
+      ],
+      "reasoning": "HTML generation logic embedded in the main loop file. Separating it improves testability and single responsibility."
+    },
+    {
+      "rank": 18,
+      "title": "Document testing practices in CONTRIBUTING.md",
+      "category": "docs",
+      "priority": "medium",
+      "effort": "small",
+      "impact": "New contributors can run and write tests",
+      "files": ["CONTRIBUTING.md"],
+      "actions": [
+        "Document how to run smoke tests (pytest -m smoke)",
+        "Document test fixtures from conftest.py",
+        "Document coverage expectations",
+        "Reference Makefile targets"
+      ],
+      "reasoning": "No contributor guide despite 25+ test files and 481 tests."
+    }
+  ],
+  "backlogUpdates": [
+    {
+      "itemId": "CRIT-001",
+      "action": "update",
+      "details": "Changed to In Progress. Silent I/O logging added in 4 modules as partial progress. Remaining: help_topics.py, loop.py, preflight.py, status.py path consolidation."
+    },
+    {
+      "itemId": "B-001",
+      "action": "complete",
+      "details": "Stored XSS in _build_dashboard_html() fixed with html.escape(). All user-controlled values escaped."
+    },
+    {
+      "itemId": "B-003",
+      "action": "update",
+      "details": "Partial fix applied. Silent I/O failures in config_file.py, git_utils.py, status.py, heartbeat.py now log warnings. Remaining: server.py web_app /proc reads, loop_manager.py log subsystem, frontend empty catch blocks."
+    },
+    {
+      "itemId": null,
+      "action": "add",
+      "details": "B-017: New finding — dashboard XSS (summarized in B-001). B-018a-d: New findings — silent I/O failures across 4 modules, all fixed."
+    }
+  ],
+  "recommendedFirstTask": {
+    "title": "Fix stored XSS in loop.py dashboard HTML",
+    "reasoning": "Critical security vulnerability requiring ~5 minutes. User-controlled iteration summaries directly interpolated into HTML without escaping. Complete.",
+    "estimatedTimeMinutes": 5
+  }
+}

@@ -19,6 +19,7 @@ import time
 import urllib.request
 from contextlib import suppress
 from datetime import datetime, timezone
+from typing import Any
 from urllib.parse import urlparse
 
 from .color_utils import colorizer
@@ -70,6 +71,12 @@ def _validate_on_error_cmd(cmd: str, allow_metachars: bool = False) -> tuple[boo
 
 # Module-level shutdown flag (threading.Event for safe signal-handler access)
 _shutdown_requested = threading.Event()
+
+
+def _drain_pipe(buf: list[str], stream: Any) -> None:
+    """Drain a pipe into a list, used as a concurrent daemon thread target."""
+    for line in stream:
+        buf.append(line)
 
 
 def _request_shutdown() -> None:
@@ -124,6 +131,8 @@ def _execute_task(
         attempt_final_text_parts: list[str] = []
         attempt_text_buf: list[str] = []
         attempt_raw_lines: list[str] = []
+        _stderr_buf: list[str] = []
+        _stderr_thread: threading.Thread | None = None
         try:
             proc = subprocess.Popen(
                 cmd,
@@ -135,6 +144,18 @@ def _execute_task(
 
             if proc.stdout is None:
                 raise RuntimeError("pi subprocess has no stdout pipe")
+
+            # Drain stderr concurrently in a daemon thread to prevent
+            # deadlock when the subprocess fills the ~64KB stderr pipe
+            # buffer while stdout is still being consumed.
+            _stderr_stream: Any = proc.stderr
+            if _stderr_stream is not None:
+                _stderr_thread = threading.Thread(
+                    target=_drain_pipe,
+                    args=(_stderr_buf, _stderr_stream),
+                    daemon=True,
+                )
+                _stderr_thread.start()
 
             for raw_line in proc.stdout:
                 # Enforce session timeout between stdout lines
@@ -228,9 +249,9 @@ def _execute_task(
             duration = time.time() - attempt_start
             stdout_text = "\n".join(attempt_raw_lines)
 
-            stderr_text = ""
-            if proc.stderr:
-                stderr_text = proc.stderr.read()
+            if _stderr_thread is not None:
+                _stderr_thread.join(timeout=10)
+            stderr_text = "".join(_stderr_buf)
 
             status_str = "ok" if proc.returncode == 0 else "failed"
             print(f"[WORKER (worker #{worker_id})] Response in {duration:.1f}s (status={status_str})")
@@ -268,6 +289,10 @@ def _execute_task(
                 with suppress(Exception):
                     proc.kill()
                     proc.wait(timeout=5)
+                # Join the stderr drain thread so its pipe reference is
+                # released before the next retry attempt allocates a new proc.
+                if _stderr_thread is not None:
+                    _stderr_thread.join(timeout=5)
             if attempts < max_attempts:
                 time.sleep(retry_delay)
 
@@ -287,6 +312,8 @@ def _execute_task(
                 with suppress(Exception):
                     proc.kill()
                     proc.wait(timeout=5)
+                if _stderr_thread is not None:
+                    _stderr_thread.join(timeout=5)
             if attempts < max_attempts:
                 time.sleep(retry_delay)
 

@@ -1,6 +1,7 @@
 """CLI entry point — main() function with argparse setup."""
 
 import argparse
+import difflib
 import json
 import os
 import signal
@@ -178,7 +179,16 @@ def main() -> None:
         try:
             with open(config_path) as f:
                 file_config = json.load(f)
+            # Build set of known argparse dest names for config-key validation
+            known_dests = {
+                action.dest for action in parser._actions if hasattr(action, "dest") and action.option_strings != []
+            }
             for key, val in file_config.items():
+                if key not in known_dests:
+                    close_matches = difflib.get_close_matches(key, known_dests, n=3, cutoff=0.6)
+                    hint = f" — did you mean {close_matches}?" if close_matches else ""
+                    _log(f"[CONFIG] WARNING: Unknown config key '{key}'{hint}; ignoring")
+                    continue
                 if (
                     key in args
                     and getattr(args, key) not in (None, "", False, 0)

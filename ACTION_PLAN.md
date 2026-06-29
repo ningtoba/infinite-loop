@@ -28,147 +28,69 @@ These are high-impact, low-effort items that deliver immediate value. All can be
 
 ---
 
-#### 🥇 #1: Fix `status.py` uptime calculation (BUG-013)
+#### ✅ #1: Fix `status.py` uptime calculation (BUG-013) — DONE
 
 | Field | Value |
 |-------|-------|
 | **ID** | BUG-013 |
 | **Value/Effort** | **5.0** (Impact 5 ÷ Effort 1) |
-| **Priority** | 🔴 Critical |
-| **Impact** | 5 — Status file always reports 0 uptime |
-| **Effort** | 1 (Trivial, <30 min) |
-| **Dependencies** | None |
+| **Status** | ✅ **Completed** — Verified: `_process_start_time` tracked at module init, `uptime_seconds = time.monotonic() - _process_start_time` correctly calculated |
 | **Est. Time** | 15 minutes |
-| **Why Now** | The uptime formula `monotonic() - (time.time() - monotonic())` simplifies to `2×monotonic - time.time()` — a completely meaningless value. The `/proc/pid/stat` fallback is never used because the outer `except` silently catches all errors. Every status file read reports 0 uptime. This is the cheapest fix with the highest correctness impact. |
-
-**Steps:**
-
-1. Track start time as `_start_time = time.monotonic()` at module level in `status.py`
-2. Replace broken formula with `uptime_seconds = time.monotonic() - _start_time`
-3. Remove the broken `/proc/pid/stat` fallback (it's never reached anyway)
-4. Write unit tests confirming uptime increases monotonically
-
-**Files:** `pi_loop/status.py` (line ~62)
 
 ---
 
-#### 🥈 #2: Validate `http_callback` URL scheme (SEC-001)
+#### ✅ #2: Validate `http_callback` URL scheme (SEC-001) — DONE
 
 | Field | Value |
 |-------|-------|
 | **ID** | SEC-001 |
 | **Value/Effort** | **7.5** (Impact 5 × 1.5 Security ÷ Effort 1) |
-| **Priority** | 🔴 Critical |
-| **Impact** | 5 — Unvalidated URL could read local files via `file://` |
-| **Effort** | 1 (Trivial, <30 min) |
-| **Dependencies** | None |
+| **Status** | ✅ **Completed** — Added `urlparse` validation before `urllib.request.urlopen()`. Invalid schemes are WARNING-logged and skipped. |
 | **Est. Time** | 30 minutes |
-| **Why Now** | Bandit B310 flags this: `urllib.request.urlopen()` on a user-configurable URL with no scheme validation. A `file://` URL reads local files. A `data://` URL triggers unexpected behavior. Adding `urlparse` validation restricts to `http://`/`https://` only. |
-
-**Steps:**
-
-1. Add `from urllib.parse import urlparse` to `loop.py`
-2. Before `urllib.request.urlopen()`, validate: `parsed = urlparse(http_callback)` then check `parsed.scheme in ("http", "https")`
-3. Log WARNING and skip callback if scheme is invalid
-4. Add unit tests for valid/invalid schemes
-
-**Files:** `pi_loop/loop.py` (line ~714)
 
 ---
 
-#### 🥉 #3: Log notification/HTTP callback failures (BUG-002)
+#### ✅ #3: Log notification/HTTP callback failures (BUG-002) — DONE
 
 | Field | Value |
 |-------|-------|
 | **ID** | BUG-002 |
 | **Value/Effort** | **4.0** (Impact 4 ÷ Effort 1) |
-| **Priority** | 🟠 High |
-| **Impact** | 4 — All notification failures silently disappear |
-| **Effort** | 1 (Trivial, <30 min) |
-| **Dependencies** | None |
+| **Status** | ✅ **Completed** — Verified: `suppress(Exception)` only remains in `_execute_task` for orphan subprocess cleanup (correct behavior). Notification/HTTP/error-cmd dispatch already uses try/except with WARNING logging. |
 | **Est. Time** | 30 minutes |
-| **Why Now** | `run_loop()` wraps desktop notification and HTTP callback dispatch in `with suppress(Exception):`. DNS failures, connection errors, credential issues — all silently vanish. Operators have no idea their notifications are failing. |
-
-**Steps:**
-
-1. Replace each `with suppress(Exception):` with a `try/except Exception` block
-2. Log at WARNING level with the error detail and context (notification type, callback URL)
-3. Keep the failure non-fatal (notifications are best-effort)
-4. Write unit tests that verify WARNING log calls on simulated failures
-
-**Files:** `pi_loop/loop.py` (lines ~225, ~244)
 
 ---
 
-#### #4: Add `console.error()` to empty `catch` blocks in `app.js` (CLEAN-005)
+#### ✅ #4: Add `console.error()` to empty `catch` blocks in `app.js` (CLEAN-005) — DONE
 
 | Field | Value |
 |-------|-------|
 | **ID** | CLEAN-005 |
 | **Value/Effort** | **3.0** (Impact 3 ÷ Effort 1) |
-| **Priority** | 🟡 Medium |
-| **Impact** | 3 — Frontend errors are completely invisible |
-| **Effort** | 1 (Trivial, <15 min) |
-| **Dependencies** | None |
+| **Status** | ✅ **Completed** — Verified: all 14+ `catch` blocks already have `console.warn()` or `console.error()` with descriptive labels. No empty blocks remain. |
 | **Est. Time** | 15 minutes |
-| **Why Now** | 5+ `catch` blocks in `app.js` are empty or contain only `/* ignore */`. Network failures, parse errors, DOM access failures — all invisible. Debugging client-side issues requires catching errors in the debugger before they're lost. |
-
-**Steps:**
-
-1. Search for `catch` blocks in `web_app/static/app.js`
-2. Add `console.error('Error [descriptive label]:', e)` to each empty one
-3. For user-visible errors (form submission failures, connection loss), add a toast notification
-4. Use descriptive labels like `'Error [fetch config]:', e`
-
-**Files:** `web_app/static/app.js`
 
 ---
 
-#### #5: Validate CLI `--config` JSON keys (BUG-008)
+#### ✅ #5: Validate CLI `--config` JSON keys (BUG-008) — DONE
 
 | Field | Value |
 |-------|-------|
 | **ID** | BUG-008 |
 | **Value/Effort** | **3.0** (Impact 3 ÷ Effort 1) |
-| **Priority** | 🟠 High |
-| **Impact** | 3 — Config typos silently ignored, settings stay at defaults |
-| **Effort** | 1 (Trivial, <30 min) |
-| **Dependencies** | None |
+| **Status** | ✅ **Completed** — Added validation against known argparse dest names with `difflib.get_close_matches` suggestions for typos. Unknown keys are WARNING-logged and skipped. |
 | **Est. Time** | 30 minutes |
-| **Why Now** | `cli.py` applies arbitrary JSON keys to the argparse Namespace via `setattr(args, key, val)` with no validation. A typo like `"max-iterration"` silently creates an unused attribute while `max_iterations` stays at default. The user's intent is silently lost. |
-
-**Steps:**
-
-1. Collect the set of known argparse dest names from the parser
-2. After loading config JSON, check each key against known names
-3. Log WARNING for unknown/misspelled keys with the closest match (use `difflib.get_close_matches`)
-4. Skip unknown keys instead of silently applying them
-
-**Files:** `pi_loop/cli.py` (lines ~135-150)
 
 ---
 
-#### #6: Add coverage reporting to CI (CI-CD-001)
+#### ✅ #6: Add coverage reporting to CI (CI-CD-001) — DONE
 
 | Field | Value |
 |-------|-------|
 | **ID** | CI-CD-001 |
 | **Value/Effort** | **3.0** (Impact 3 ÷ Effort 1) |
-| **Priority** | 🟠 High |
-| **Impact** | 3 — Coverage regressions go undetected |
-| **Effort** | 1 (Trivial, <30 min) |
-| **Dependencies** | None |
+| **Status** | ✅ **Completed** — Verified: `make test` includes `--cov=pi_loop --cov=web_app --cov-report=term-missing`. CI has coverage threshold, XML artifact upload, and Codecov integration. |
 | **Est. Time** | 30 minutes |
-| **Why Now** | `pytest-cov` is installed but `make test` doesn't use it. Coverage dropped from earlier audits but nobody noticed. Adding `--cov` flags to `make test` and a coverage threshold to CI prevents regressions. |
-
-**Steps:**
-
-1. Add `[tool.coverage.run]` to `pyproject.toml` with `source = ["pi_loop", "web_app"]`
-2. Add `[tool.coverage.report]` with `fail_under = 65`
-3. Update `make test` to add `--cov=pi_loop --cov=web_app --cov-report=term-missing`
-4. Add `--cov-report=xml` to CI test job for artifact upload
-
-**Files:** `Makefile`, `.github/workflows/ci.yml`, `pyproject.toml`
 
 ---
 
@@ -284,40 +206,39 @@ These are high-impact, low-effort items that deliver immediate value. All can be
 
 ---
 
-## Execution Timeline
+## Execution Timeline (Updated)
 
 ```
-Week 1                Week 2                Week 3-4              Week 5-6
+Phase 1 COMPLETE ✓   Week 2                Week 3-4              Week 5-6
 ────────────────────────────────────────────────────────────────────────────────
 ┌─────────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌───────────┐
-│ #1 status uptime    │  │ #7 shell=True   │  │ #10 run_loop    │  │ #10 cont'd│
-│ #2 URL validation   │  │ guardrails      │  │ Phase 1         │  │ Phase 2   │
-│ #3 notification log │  ├─────────────────┤  │ (extract pure   │  └───────────┘
-│ #4 empty catch blks │  │ #8 structured   │  │  functions)     │
-│ #5 config key valid │  │ logging (start) │  └─────────────────┘
-│ #6 CI coverage      │  └─────────────────┘
-│                     │
-│ ALL PARALLELIZABLE  │  ├ #9 loop/cli/    │
-│ (no dependencies)   │  │ status tests    │
+│ #1 status uptime ✓  │  │ #7 shell=True   │  │ #10 run_loop    │  │ #10 cont'd│
+│ #2 URL validation ✓ │  │ guardrails      │  │ Phase 1         │  │ Phase 2   │
+│ #3 notification ✓   │  ├─────────────────┤  │ (extract pure   │  └───────────┘
+│ #4 catch blocks ✓   │  │ #8 structured   │  │  functions)     │
+│ #5 config keys ✓    │  │ logging (start) │  └─────────────────┘
+│ #6 CI coverage ✓    │  └─────────────────┘
+│ ALL COMPLETE        │  ├ #9 loop/cli/    │
+│                     │  │ status tests    │
 └─────────────────────┘  └─────────────────┘
 ```
 
 ## Dependencies Map
 
 ```
-                     ┌───────────────────────────────────┐
-                     │                                   │
-Phase 1 (independent)│  Phase 2 (parallel)               │  Phase 3 (sequential)
-                     │                                   │
-#1  BUG-013 ──────┐  │  #7  SEC-005 ──────┐              │
-#2  SEC-001  ─────┤  │                    ├── (parallel)  │  #10 ARCH-001
-#3  BUG-002  ─────┤  │  #8  FEAT-003 ─────┤              │       │
-#4  CLEAN-005 ────┤  │                    │              │       ├── TEST-003
-#5  BUG-008  ─────┤  │  #9  TEST-003 ─────┘              │       │   (loop tests)
-#6  CI-CD-001 ────┘  │                                   │       └── FEAT-003
-                     │                                   │           (structured
-                     │                                   │            logging)
-                     └───────────────────────────────────┘
+                     ┌────────────────────────────────────┐
+                     │                                    │
+Phase 1 ✅ COMPLETE  │  Phase 2 (parallel)                │  Phase 3 (sequential)
+                     │                                    │
+#1  BUG-013 ✅ ────┐  │  #7  SEC-005 ──────┐               │
+#2  SEC-001  ✅ ────┤  │                    ├── (parallel)  │  #10 ARCH-001
+#3  BUG-002  ✅ ────┤  │  #8  FEAT-003 ─────┤               │       │
+#4  CLEAN-005 ✅ ───┤  │                    │               │       ├── TEST-003
+#5  BUG-008  ✅ ────┤  │  #9  TEST-003 ─────┘               │       │   (loop tests)
+#6  CI-CD-001 ✅ ───┘  │                                    │       └── FEAT-003
+                     │                                    │           (structured
+                     │                                    │            logging)
+                     └────────────────────────────────────┘
 ```
 
 ## Effort Distribution

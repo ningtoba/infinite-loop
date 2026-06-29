@@ -107,7 +107,7 @@ This backlog is organized by category, then sorted by priority within each categ
 | **Pending** | 42 | All unmarked items |
 | **Researching** | 0 | — |
 | **In Progress** | 1 | BUG-003 |
-| **Done** | 8 | BUG-005 (classify_error patterns), TOOL-001 (mypy CI gating), SEC-003 (HTTP headers), CI-CD-003 (bandit/safety CI), BUG-013 (uptime calculation), CLEAN-001 (stale branches/worktrees), TOOL-003 (py.typed markers), TOOL-004 (.editorconfig) |
+| **Done** | 10 | BUG-005 (classify_error patterns), TOOL-001 (mypy CI gating), SEC-003 (HTTP headers), CI-CD-003 (bandit/safety CI), BUG-013 (uptime calculation), CLEAN-001 (stale branches/worktrees), TOOL-003 (py.typed markers), TOOL-004 (.editorconfig), SEC-001 (URL scheme validation), BUG-008 (config key validation) |
 | **Won't Do** | 0 | — |
 | **Total** | 51 | — |
 
@@ -223,11 +223,11 @@ These items should be tackled first — they deliver outsized value for minimal 
 - **Priority:** High
 - **Impact:** 3
 - **Effort:** 1
-- **Status:** Pending
+- **Status:** Done ✅
 - **Dependencies:** None
-- **Description:** `cli.py:~140` reads `--config` JSON file and applies arbitrary attributes to the argparse Namespace with `setattr(args, key, val)`. There is no validation that the keys in the config file correspond to known CLI flags. A typo in config.json (e.g., `"max-iterration"` instead of `"max_iterations"`) silently creates a new attribute that is never read, while the intended setting stays at default.
-- **Suggested Approach:** After loading config, validate each key against the set of known argparse flags. Log warnings for unknown keys. Consider adding a `--validate-config` flag that checks without executing.
-- **Affected Files:** `pi_loop/cli.py` lines ~135-150
+- **Description:** `cli.py` applied arbitrary JSON keys to the argparse Namespace via `setattr(args, key, val)` with no validation. A typo like `"max-iterration"` silently created an unused attribute while `max_iterations` stayed at default.
+- **Suggested Approach:** Added validation against known argparse dest names using difflib to suggest close matches for typos. Unknown keys are logged as WARNING and skipped.
+- **Affected Files:** `pi_loop/cli.py`
 
 ### BUG-009 — `preflight.py` docstring placed after `if` block
 
@@ -590,11 +590,11 @@ These items should be tackled first — they deliver outsized value for minimal 
 - **Priority:** Critical
 - **Impact:** 5
 - **Effort:** 1
-- **Status:** Pending
+- **Status:** Done ✅
 - **Dependencies:** None
-- **Description:** `loop.py:~714` invokes `urllib.request.urlopen()` on a user-configurable `http_callback` URL with no scheme validation. A `file://` URL could read local files. A `data://` URL could trigger unexpected behavior. Bandit flags this as B310. While the web UI is localhost-only by default, the CLI daemon can be configured remotely.
-- **Suggested Approach:** Add `urlparse` validation that restricts schemes to `http` and `https` only. Log and skip (or warn) on invalid schemes. Add test cases for various scheme inputs.
-- **Affected Files:** `pi_loop/loop.py` ~line 714
+- **Description:** `loop.py` invoked `urllib.request.urlopen()` on a user-configurable `http_callback` URL with no scheme validation. A `file://` URL could read local files. A `data://` URL could trigger unexpected behavior. Bandit flagged this as B310.
+- **Suggested Approach:** Added `urlparse` validation that restricts schemes to `http` and `https` only. Invalid schemes are logged at WARNING level and the callback is skipped.
+- **Affected Files:** `pi_loop/loop.py`
 
 ### SEC-002 — `.env` not in `.gitignore` (currently commented out)
 

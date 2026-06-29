@@ -19,6 +19,7 @@ import time
 import urllib.request
 from contextlib import suppress
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from .color_utils import colorizer
 from .config import VERSION, LoopConfig, _get_data_dir
@@ -712,18 +713,22 @@ def run_loop(
                 _log(f"[DASHBOARD] Failed to write HTML dashboard: {e}")
 
         if http_callback:
-            try:
-                data = json.dumps(record).encode()
-                req = urllib.request.Request(
-                    http_callback,
-                    data=data,
-                    headers={"Content-Type": "application/json"},
-                )
-                if http_callback_secret:
-                    req.add_header("Authorization", http_callback_secret)
-                urllib.request.urlopen(req, timeout=10)
-            except (ImportError, OSError, ValueError, json.JSONDecodeError) as e:
-                _log(f"[HTTP-CALLBACK] Failed: {e}")
+            parsed = urlparse(http_callback)
+            if parsed.scheme not in ("http", "https"):
+                _log(f"[HTTP-CALLBACK] WARNING: Invalid URL scheme '{parsed.scheme}' in http_callback — skipping")
+            else:
+                try:
+                    data = json.dumps(record).encode()
+                    req = urllib.request.Request(
+                        http_callback,
+                        data=data,
+                        headers={"Content-Type": "application/json"},
+                    )
+                    if http_callback_secret:
+                        req.add_header("Authorization", http_callback_secret)
+                    urllib.request.urlopen(req, timeout=10)
+                except (ImportError, OSError, ValueError, json.JSONDecodeError) as e:
+                    _log(f"[HTTP-CALLBACK] Failed: {e}")
 
         # On-error command
         if combined_error and on_error_cmd:

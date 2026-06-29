@@ -1,6 +1,6 @@
 # Action Plan — Top 10 Prioritized Items
 
-> Execution plan for pi-loop v14.39.0 engineering backlog.
+> Execution plan for **pi-loop** v14.39.0 engineering backlog.
 > Items ranked by **value/effort ratio** and ordered for minimal blocking dependencies.
 > Generated: 2026-06-30
 
@@ -8,338 +8,362 @@
 
 ## Ranking Methodology
 
-Each item is scored on a **Value/Effort** ratio using:
+Each item is scored on a **Value/Effort** ratio where:
 
-- **Value** = Impact (1–5) × Urgency Multiplier  
-  - Security/Critical = 1.5×  
-  - Performance = 1.2×  
-  - Quality = 1.0×  
-  - Polish = 0.8×  
-- **Effort** = 1 (trivial) to 5 (XLarge)
+- **Impact** = 1–5 (severity of the problem or benefit of solving it)
+- **Effort** = 1–5 (estimated cost to implement)
+- **Value/Effort** = Impact ÷ Effort (higher is better)
+- **Security/Critical items**: Impact multiplied by 1.5× urgency multiplier
+- **Performance/Observability items**: Impact multiplied by 1.2× urgency multiplier
 
-The top 10 items maximize engineering ROI — fixing things that hurt the most with the least effort first.
+The top 10 items maximize engineering ROI — fixing what hurts the most with the least effort first.
 
 ---
 
 ## Top 10 Execution Plan
 
-### Phase 1: Foundation Fixes (Weeks 1–2)
+### Phase 1: Quick Wins (Week 1)
 
-These are high-impact, low-effort items that should be addressed immediately.
+These are high-impact, low-effort items that deliver immediate value. All can be parallelized.
 
 ---
 
-#### 🥇 #1: Wire mypy to actually fail CI
+#### 🥇 #1: Fix `status.py` uptime calculation (BUG-013)
 
 | Field | Value |
 |-------|-------|
-| **ID** | CICD-001 |
-| **Value/Effort** | 4.0 (Impact 4 × 1.0 Quality / Effort 1) |
-| **Priority** | 🟠 High |
-| **Effort** | 2 / 5 (Medium) |
+| **ID** | BUG-013 |
+| **Value/Effort** | **5.0** (Impact 5 ÷ Effort 1) |
+| **Priority** | 🔴 Critical |
+| **Impact** | 5 — Status file always reports 0 uptime |
+| **Effort** | 1 (Trivial, <30 min) |
 | **Dependencies** | None |
-| **Est. Time** | 1–2 hours |
-| **Why Now** | Type checking is the cheapest bug-prevention strategy. Currently it's silently disabled — catching nothing. |
+| **Est. Time** | 15 minutes |
+| **Why Now** | The uptime formula `monotonic() - (time.time() - monotonic())` simplifies to `2×monotonic - time.time()` — a completely meaningless value. The `/proc/pid/stat` fallback is never used because the outer `except` silently catches all errors. Every status file read reports 0 uptime. This is the cheapest fix with the highest correctness impact. |
 
 **Steps:**
 
-1. Remove `|| true` and `; true` from `Makefile` `mypy` target
-2. Run `make mypy` locally and catalog all current errors
-3. Fix or suppress (with `# type: ignore[code]`) each error
-4. Update `.github/workflows/ci.yml` to run mypy as a gating step
-5. Consider enabling `disallow_untyped_defs = true` for newly written code
+1. Track start time as `_start_time = time.monotonic()` at module level in `status.py`
+2. Replace broken formula with `uptime_seconds = time.monotonic() - _start_time`
+3. Remove the broken `/proc/pid/stat` fallback (it's never reached anyway)
+4. Write unit tests confirming uptime increases monotonically
 
-**Files:** `Makefile`, `.github/workflows/ci.yml`, multiple `.py` files for fixes
+**Files:** `pi_loop/status.py` (line ~62)
 
 ---
 
-#### 🥈 #2: Audit API auth endpoint coverage
+#### 🥈 #2: Validate `http_callback` URL scheme (SEC-001)
 
 | Field | Value |
 |-------|-------|
 | **ID** | SEC-001 |
-| **Value/Effort** | 6.0 (Impact 4 × 1.5 Security / Effort 1) |
-| **Priority** | 🟠 High |
-| **Effort** | 1 / 5 (Small) |
+| **Value/Effort** | **7.5** (Impact 5 × 1.5 Security ÷ Effort 1) |
+| **Priority** | 🔴 Critical |
+| **Impact** | 5 — Unvalidated URL could read local files via `file://` |
+| **Effort** | 1 (Trivial, <30 min) |
 | **Dependencies** | None |
-| **Est. Time** | 30 min |
-| **Why Now** | Recently added auth middleware needs verification that it actually protects everything. Cheap audit. |
+| **Est. Time** | 30 minutes |
+| **Why Now** | Bandit B310 flags this: `urllib.request.urlopen()` on a user-configurable URL with no scheme validation. A `file://` URL reads local files. A `data://` URL triggers unexpected behavior. Adding `urlparse` validation restricts to `http://`/`https://` only. |
 
 **Steps:**
 
-1. Enumerate all routes in `server.py`
-2. Test each POST/PUT/DELETE endpoint without auth header — verify it's rejected
-3. Test auth-disable path (config or flag)
-4. Verify API key is not logged anywhere
-5. Verify static files and error pages don't leak the key
-6. Write parametrized test (see TEST-005)
+1. Add `from urllib.parse import urlparse` to `loop.py`
+2. Before `urllib.request.urlopen()`, validate: `parsed = urlparse(http_callback)` then check `parsed.scheme in ("http", "https")`
+3. Log WARNING and skip callback if scheme is invalid
+4. Add unit tests for valid/invalid schemes
 
-**Files:** `web_app/server.py`, `tests/test_auth.py`
+**Files:** `pi_loop/loop.py` (line ~714)
 
 ---
 
-#### 🥉 #3: Fix empty catch blocks in `app.js`
+#### 🥉 #3: Log notification/HTTP callback failures (BUG-002)
+
+| Field | Value |
+|-------|-------|
+| **ID** | BUG-002 |
+| **Value/Effort** | **4.0** (Impact 4 ÷ Effort 1) |
+| **Priority** | 🟠 High |
+| **Impact** | 4 — All notification failures silently disappear |
+| **Effort** | 1 (Trivial, <30 min) |
+| **Dependencies** | None |
+| **Est. Time** | 30 minutes |
+| **Why Now** | `run_loop()` wraps desktop notification and HTTP callback dispatch in `with suppress(Exception):`. DNS failures, connection errors, credential issues — all silently vanish. Operators have no idea their notifications are failing. |
+
+**Steps:**
+
+1. Replace each `with suppress(Exception):` with a `try/except Exception` block
+2. Log at WARNING level with the error detail and context (notification type, callback URL)
+3. Keep the failure non-fatal (notifications are best-effort)
+4. Write unit tests that verify WARNING log calls on simulated failures
+
+**Files:** `pi_loop/loop.py` (lines ~225, ~244)
+
+---
+
+#### #4: Add `console.error()` to empty `catch` blocks in `app.js` (CLEAN-005)
 
 | Field | Value |
 |-------|-------|
 | **ID** | CLEAN-005 |
-| **Value/Effort** | 3.0 (Impact 3 × 1.0 Quality / Effort 1) |
+| **Value/Effort** | **3.0** (Impact 3 ÷ Effort 1) |
 | **Priority** | 🟡 Medium |
-| **Effort** | 1 / 5 (Small) |
+| **Impact** | 3 — Frontend errors are completely invisible |
+| **Effort** | 1 (Trivial, <15 min) |
 | **Dependencies** | None |
-| **Est. Time** | 15 min |
-| **Why Now** | Frontend errors are completely invisible. A single `console.error()` per catch block makes debugging possible. |
+| **Est. Time** | 15 minutes |
+| **Why Now** | 5+ `catch` blocks in `app.js` are empty or contain only `/* ignore */`. Network failures, parse errors, DOM access failures — all invisible. Debugging client-side issues requires catching errors in the debugger before they're lost. |
 
 **Steps:**
 
-1. Search for `catch` blocks in `app.js` (5+ empty ones)
-2. Add `console.error('Error [descriptive label]:', e)` to each
-3. Optionally add user-visible toast for critical errors
+1. Search for `catch` blocks in `web_app/static/app.js`
+2. Add `console.error('Error [descriptive label]:', e)` to each empty one
+3. For user-visible errors (form submission failures, connection loss), add a toast notification
+4. Use descriptive labels like `'Error [fetch config]:', e`
 
 **Files:** `web_app/static/app.js`
 
 ---
 
-#### #4: Add coverage reporting to CI
+#### #5: Validate CLI `--config` JSON keys (BUG-008)
 
 | Field | Value |
 |-------|-------|
-| **ID** | CICD-004 |
-| **Value/Effort** | 2.5 (Impact 3 × 1.0 Quality / Effort 1.2) |
-| **Priority** | 🟡 Medium |
-| **Effort** | 1 / 5 (Small) |
+| **ID** | BUG-008 |
+| **Value/Effort** | **3.0** (Impact 3 ÷ Effort 1) |
+| **Priority** | 🟠 High |
+| **Impact** | 3 — Config typos silently ignored, settings stay at defaults |
+| **Effort** | 1 (Trivial, <30 min) |
 | **Dependencies** | None |
-| **Est. Time** | 30 min |
-| **Why Now** | pytest-cov is installed but unused. Knowing coverage on every PR prevents regressions. |
+| **Est. Time** | 30 minutes |
+| **Why Now** | `cli.py` applies arbitrary JSON keys to the argparse Namespace via `setattr(args, key, val)` with no validation. A typo like `"max-iterration"` silently creates an unused attribute while `max_iterations` stays at default. The user's intent is silently lost. |
 
 **Steps:**
 
-1. Add `--cov=pi_loop --cov=web_app --cov-report=term-missing` to `make test`
-2. Add coverage step to CI `test` job
-3. Set minimum coverage threshold (e.g., 65%) to prevent drops
+1. Collect the set of known argparse dest names from the parser
+2. After loading config JSON, check each key against known names
+3. Log WARNING for unknown/misspelled keys with the closest match (use `difflib.get_close_matches`)
+4. Skip unknown keys instead of silently applying them
 
-**Files:** `Makefile`, `.github/workflows/ci.yml`
-
----
-
-### Phase 2: Observability & Testing (Weeks 2–4)
-
-These items build on the foundation to make the system observable and verifiable.
+**Files:** `pi_loop/cli.py` (lines ~135-150)
 
 ---
 
-#### #5: Implement structured logging
+#### #6: Add coverage reporting to CI (CI-CD-001)
+
+| Field | Value |
+|-------|-------|
+| **ID** | CI-CD-001 |
+| **Value/Effort** | **3.0** (Impact 3 ÷ Effort 1) |
+| **Priority** | 🟠 High |
+| **Impact** | 3 — Coverage regressions go undetected |
+| **Effort** | 1 (Trivial, <30 min) |
+| **Dependencies** | None |
+| **Est. Time** | 30 minutes |
+| **Why Now** | `pytest-cov` is installed but `make test` doesn't use it. Coverage dropped from earlier audits but nobody noticed. Adding `--cov` flags to `make test` and a coverage threshold to CI prevents regressions. |
+
+**Steps:**
+
+1. Add `[tool.coverage.run]` to `pyproject.toml` with `source = ["pi_loop", "web_app"]`
+2. Add `[tool.coverage.report]` with `fail_under = 65`
+3. Update `make test` to add `--cov=pi_loop --cov=web_app --cov-report=term-missing`
+4. Add `--cov-report=xml` to CI test job for artifact upload
+
+**Files:** `Makefile`, `.github/workflows/ci.yml`, `pyproject.toml`
+
+---
+
+### Phase 2: Security & Quality (Weeks 2–3)
+
+---
+
+#### #7: Add guardrails for `shell=True` error command (SEC-005)
+
+| Field | Value |
+|-------|-------|
+| **ID** | SEC-005 |
+| **Value/Effort** | **3.0** (Impact 4 × 1.5 Security ÷ Effort 2) |
+| **Priority** | 🟠 High |
+| **Impact** | 4 — Config file compromise → arbitrary command execution |
+| **Effort** | 2 (Small, <2 hr) |
+| **Dependencies** | None |
+| **Est. Time** | 1-2 hours |
+| **Why Now** | `subprocess.run(on_error_cmd, shell=True)` on a user-configurable command is intentional but under-protected. If `~/.config/pi-loop/config.json` is compromised, arbitrary shell commands execute with daemon privileges. |
+
+**Steps:**
+
+1. Log the full `on_error_cmd` at INFO level before execution (audit trail)
+2. Validate command length (reject > 500 chars) and character restrictions (reject shell metacharacters `;`, `|`, `` ` ``, `$()`  unless explicitly needed)
+3. Add a startup WARNING log when `on_error_cmd` is configured
+4. Document the risk explicitly in README security section
+
+**Files:** `pi_loop/loop.py` (line 727), `README.md`
+
+---
+
+#### #8: Implement structured JSON logging (FEAT-003)
 
 | Field | Value |
 |-------|-------|
 | **ID** | FEAT-003 |
-| **Value/Effort** | 4.8 (Impact 4 × 1.2 Performance / Effort 1) |
+| **Value/Effort** | **1.6** (Impact 4 × 1.2 Performance ÷ Effort 3) |
 | **Priority** | 🟠 High |
-| **Effort** | 3 / 5 (Medium) |
+| **Impact** | 4 — Without structured logs, debugging is manual scraping |
+| **Effort** | 3 (Medium, 4-6 hr) |
 | **Dependencies** | None |
-| **Est. Time** | 4–6 hours |
-| **Why Now** | Without structured logging, production debugging is manual log scraping. Correlation IDs enable tracing iterations end-to-end. |
+| **Est. Time** | 4-6 hours |
+| **Why Now** | All daemon logging uses bare `print()` calls and `logger.info(f"...")` with inline formatting. No structured fields (event type, iteration number, error code, duration). The web UI's regex-based parsers (BUG-003) are a direct consequence — they exist because there's no structured event stream. |
 
 **Steps:**
 
-1. Replace all `print()` calls with `structlog` or stdlib `logging` with JSON formatter
-2. Define log levels: DEBUG (diagnostics), INFO (normal), WARNING (recoverable), ERROR (failures)
-3. Add correlation/iteration/loop IDs to every log line
-4. File output: JSON format for aggregators (Loki, ELK)
-5. Console output: human-readable format
-6. Consistent structured fields: `event`, `iteration`, `duration_ms`, `error_type`
+1. Define a `StructuredEvent` dataclass with fields: `event`, `iteration`, `duration_ms`, `error_type`, `worker_id`, `correlation_id`
+2. Create a `log_event()` function that writes JSON lines to the log file
+3. Console output remains human-readable; file output uses JSON format
+4. Add correlation ID per daemon run (generated at startup, logged in every event)
+5. Migrate `print()` calls incrementally, starting with iteration lifecycle events
 
-**Files:** `pi_loop/loop.py`, `pi_loop/error_recovery.py`, `pi_loop/git_utils.py`, `pi_loop/heartbeat.py`, `pi_loop/preflight.py`, `web_app/server.py`
+**Files:** `pi_loop/file_utils.py`, `pi_loop/loop.py`, `pi_loop/error_recovery.py`, `pi_loop/git_utils.py`, `pi_loop/heartbeat.py`, `web_app/loop_manager.py`
 
 ---
 
-#### #6: Cover critical modules — `loop.py`, `cli.py`, `status.py`
+#### #9: Cover critical modules — `loop.py`, `cli.py`, `status.py` (TEST-003)
 
 | Field | Value |
 |-------|-------|
 | **ID** | TEST-003 |
-| **Value/Effort** | 2.4 (Impact 4 × 1.0 Quality / Effort 1.67) |
+| **Value/Effort** | **1.3** (Impact 4 ÷ Effort 3) |
 | **Priority** | 🟠 High |
-| **Effort** | 3 / 5 (Medium) |
-| **Dependencies** | ARCH-001 (partially — loop tests easier after decomposition) |
-| **Est. Time** | 8–12 hours |
-| **Why Now** | The core loop and CLI entry point are the most critical code paths and have the lowest coverage. |
+| **Impact** | 4 — Core loop is the most critical code path with lowest coverage |
+| **Effort** | 3 (Medium, 8-12 hr) |
+| **Dependencies** | ARCH-001 (recommended for `loop.py` — easier after decomposition) |
+| **Est. Time** | 8-12 hours |
+| **Why Now** | `loop.py` has 19% coverage, `cli.py` has 12%, `status.py` has 26%. These are the three most user-facing modules. Any refactoring or feature work risks undetected regressions. |
 
 **Steps:**
 
-1. **`loop.py`**: Test exit-early conditions (sentinel, max turns, convergence, idle, goal exhausted), iteration lifecycle, notification paths, error/scenario handling
-2. **`cli.py`**: Test all 14+ flag combinations, help/doctor/preflight/status/invoke commands, flag interaction errors
-3. **`status.py`**: Test all rendering paths (active, idle, error, done) with controlled state dicts
+1. **`loop.py`**: Write characterization tests first (capture current behavior without changing it). Test exit-early conditions (sentinel, max iterations, convergence, idle), iteration lifecycle, notification paths.
+2. **`cli.py`**: Test all 14+ introspection flags (`--status`, `--doctor`, `--preflight`, `--list-flags`, `--explain`, `--help-topic`). Test config file loading with valid/invalid/missing files.
+3. **`status.py`**: Test all rendering paths (running, idle, error, done) with controlled state dicts.
 
-**Files:** `tests/test_loop.py`, `tests/test_cli.py`, `tests/test_status.py`
-
----
-
-### Phase 3: Architecture & Engineering (Weeks 3–6)
-
-These are the high-impact, higher-effort items that improve the system's structural integrity.
+**Files:** `tests/test_loop.py`, `tests/test_cli.py`, new `tests/test_status.py`
 
 ---
 
-#### #7: Decompose monolithic `run_loop()` — Phase 1 (Extract helpers)
+### Phase 3: Architecture (Weeks 3–6)
+
+---
+
+#### #10: Decompose monolithic `run_loop()` — Phase 1 (ARCH-001)
 
 | Field | Value |
 |-------|-------|
 | **ID** | ARCH-001 |
-| **Value/Effort** | 3.0 (Impact 5 × 1.0 Quality / Effort 1.67) |
+| **Value/Effort** | **1.0** (Impact 5 ÷ Effort 5) |
 | **Priority** | 🔴 Critical |
-| **Effort** | 5 / 5 (XLarge) |
-| **Dependencies** | None (can start with Phase 1 independently) |
-| **Est. Time** | 3–5 days (split across phases) |
-| **Why Now** | Decomposing `run_loop()` unlocks all other loop improvements — testability, error handling, concurrency. The LoopConfig dataclass was the prerequisite; now decompose the body. |
+| **Impact** | 5 — Largest barrier to all other loop improvements |
+| **Effort** | 5 (X-Large, 3-5 days) |
+| **Dependencies** | None (Phase 1 is independent) |
+| **Est. Time** | 3-5 days (split across phases) |
+| **Why Now** | `run_loop()` is 435 lines with 60+ local variables and 20+ condition branches. It has 19% test coverage because mocking 60 variables is impractical. Every new feature touches it, increasing regression risk. Decomposition is the prerequisite for: integration tests (TEST-001), state machine (ARCH-005), structured logging (FEAT-003), and confidence in any loop change. |
 
 **Phase 1 approach (this sprint):**
 
-1. Extract pure functions first (no IO): convergence check, termination check, progress classification
-2. Extract _emit_notifications, _apply_recovery, _build_dashboard_html
-3. Write unit tests for each extracted function before touching it (characterization tests)
-4. Each extraction is a separate commit for clean review
+1. Write characterization tests for `run_loop()` — capture current behavior as test assertions
+2. Extract pure functions first (no I/O): convergence check, termination check, progress classification
+3. Extract I/O-bound operations: `_emit_notifications()`, `_apply_recovery()`, `_build_dashboard_html()`
+4. Each extraction is a separate commit with the characterization test passing before and after
+5. Update call sites in `run_loop()` to call extracted functions
 
 **Phase 2 (future sprint):**
 
-1. Extract IterationContext preparation
-2. Extract subprocess execution into TaskExecutor
-3. Refactor main loop body to call extracted functions
+1. Extract iteration context preparation into `IterationContext` dataclass
+2. Extract subprocess execution into `TaskExecutor` class
+3. Extract cooldown logic into `CooldownManager`
+4. Main loop body becomes a readable pipeline of extracted functions
 
-**Files:** `pi_loop/loop.py`, new `pi_loop/executor.py`, `pi_loop/orchestrator.py`, `pi_loop/reporter.py`
-
----
-
-#### #8: Fix config corruption notification + atomic writes
-
-| Field | Value |
-|-------|-------|
-| **ID** | BUG-001 |
-| **Value/Effort** | 3.0 (Impact 3 × 1.0 Quality / Effort 1) |
-| **Priority** | 🟡 Medium |
-| **Effort** | 1 / 5 (Small) |
-| **Dependencies** | None |
-| **Est. Time** | 1–2 hours |
-| **Why Now** | Silent data loss with no feedback — users lose custom config without knowing. |
-
-**Steps:**
-
-1. Add `corrupt: true` flag to config API response when defaults are used
-2. Show warning banner in web UI HTML when `corrupt` is true
-3. Log at WARNING level with corrupt file path
-4. Implement atomic write pattern: write to `.config.json.tmp`, then `os.rename()`
-
-**Files:** `pi_loop/config_file.py`, `web_app/config_manager.py`, `web_app/static/app.js`, `web_app/static/index.html`
-
----
-
-#### #9: SSE reconnect with exponential backoff
-
-| Field | Value |
-|-------|-------|
-| **ID** | PERF-003 |
-| **Value/Effort** | 2.4 (Impact 2 × 1.2 Performance / Effort 1) |
-| **Priority** | 🟡 Medium |
-| **Effort** | 1 / 5 (Small) |
-| **Dependencies** | None |
-| **Est. Time** | 30 min |
-| **Why Now** | Prevent thundering-herd on server restart. Simple change, high reliability impact. |
-
-**Steps:**
-
-1. Replace fixed 5s delay with exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
-2. Add ±25% random jitter to prevent synchronized reconnects
-3. Reset backoff to minimum on successful SSE connection
-4. Merge into `sse.js` when CLEAN-001 is done
-
-**Files:** `web_app/static/app.js`
-
----
-
-#### #10: Integration tests for subprocess lifecycle
-
-| Field | Value |
-|-------|-------|
-| **ID** | TEST-001 |
-| **Value/Effort** | 1.6 (Impact 4 × 1.0 Quality / Effort 2.5) |
-| **Priority** | 🟠 High |
-| **Effort** | 5 / 5 (XLarge) |
-| **Dependencies** | ARCH-001 (recommended — easier isolation after decomposition) |
-| **Est. Time** | 2–3 days |
-| **Why Now** | The core value proposition (subprocess task execution) has zero end-to-end verification. |
-
-**Steps:**
-
-1. Create `tests/integration/` with conftest fixtures
-2. Build `mock_pi.sh` — shell script emitting realistic NDJSON output
-3. Test single iteration end-to-end
-4. Test multi-iteration convergence detection
-5. Test error recovery with injected subprocess failures
-6. Test sentinel-based stop/pause
-7. Test web UI endpoints interacting with a running daemon
-
-**Files:** `tests/integration/` (new directory), `tests/integration/conftest.py`, `tests/integration/mock_pi.sh`, `tests/integration/test_subprocess_lifecycle.py`, `tests/integration/test_web_daemon.py`
+**Files:** `pi_loop/loop.py`, new `pi_loop/executor.py`, new `pi_loop/convergence.py`, new `pi_loop/notifications.py`
 
 ---
 
 ## Execution Timeline
 
 ```
-Week 1          Week 2          Week 3          Week 4          Week 5-6
-──────────────────────────────────────────────────────────────────────────────
-#1 mypy CI    ├── #5 logging  ├── #7 run_loop ├── #7 cont'd   ├── #10 integ.
-#2 auth audit |               |   Phase 1     |               |   tests
-#3 catch blks |── #6 coverage |               ├── #9 SSE      |
-#4 CI coverage|   (loop/cli/  ├── #8 config   |   backoff     |
-              |    status)    |   atomic write |               |
-              |               |               |               |
+Week 1                Week 2                Week 3-4              Week 5-6
+────────────────────────────────────────────────────────────────────────────────
+┌─────────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌───────────┐
+│ #1 status uptime    │  │ #7 shell=True   │  │ #10 run_loop    │  │ #10 cont'd│
+│ #2 URL validation   │  │ guardrails      │  │ Phase 1         │  │ Phase 2   │
+│ #3 notification log │  ├─────────────────┤  │ (extract pure   │  └───────────┘
+│ #4 empty catch blks │  │ #8 structured   │  │  functions)     │
+│ #5 config key valid │  │ logging (start) │  └─────────────────┘
+│ #6 CI coverage      │  └─────────────────┘
+│                     │
+│ ALL PARALLELIZABLE  │  ├ #9 loop/cli/    │
+│ (no dependencies)   │  │ status tests    │
+└─────────────────────┘  └─────────────────┘
 ```
 
 ## Dependencies Map
 
 ```
-#1 mypy CI        ─────────► #5 structured logging  ──► #7 run_loop decomposition
-                                                    │      │
-#2 auth audit ◄──► TEST-005 (parametrized auth test) │      │
-                                                    │      ▼
-#3 catch blocks   ─────────► CLEAN-001 (JS modules)  │  #10 integration tests
-                                                    │
-#4 CI coverage    ─────────► #6 loop/cli/status tests
-                                                    │
-#8 config atomic  ─────────► (independent)
-                                                    │
-#9 SSE backoff    ─────────► CLEAN-001 (JS modules)
+                     ┌───────────────────────────────────┐
+                     │                                   │
+Phase 1 (independent)│  Phase 2 (parallel)               │  Phase 3 (sequential)
+                     │                                   │
+#1  BUG-013 ──────┐  │  #7  SEC-005 ──────┐              │
+#2  SEC-001  ─────┤  │                    ├── (parallel)  │  #10 ARCH-001
+#3  BUG-002  ─────┤  │  #8  FEAT-003 ─────┤              │       │
+#4  CLEAN-005 ────┤  │                    │              │       ├── TEST-003
+#5  BUG-008  ─────┤  │  #9  TEST-003 ─────┘              │       │   (loop tests)
+#6  CI-CD-001 ────┘  │                                   │       └── FEAT-003
+                     │                                   │           (structured
+                     │                                   │            logging)
+                     └───────────────────────────────────┘
 ```
 
-## Effort Estimates for All 42 Items
+## Effort Distribution
 
 | Effort | Count | Items |
 |--------|-------|-------|
-| **1 (Trivial)** | 10 | BUG-004, TOOL-002, TOOL-003, TOOL-004, TOOL-005, CLEAN-004, CLEAN-005, CLEAN-006, CICD-002, CICD-005 |
-| **2 (Small)** | 14 | BUG-001, BUG-002, BUG-003, BUG-005, PERF-001, PERF-003, SEC-001, SEC-002, TEST-002, TEST-005, CICD-001, DOC-001, DOC-003, FEAT-004 |
-| **3 (Medium)** | 11 | ARCH-004, ARCH-005, PERF-002, TEST-004, CLEAN-001, CLEAN-002, CLEAN-003, CICD-004, FEAT-001, FEAT-002, FEAT-003 |
-| **4 (Large)** | 4 | ARCH-002, ARCH-003, TEST-003, FEAT-005 |
-| **5 (XLarge)** | 4 | ARCH-001, TEST-001, TOOL-006, CICD-003 |
+| **1 (Trivial)** | 5 | #1 (BUG-013), #2 (SEC-001), #3 (BUG-002), #4 (CLEAN-005), #5 (BUG-008), #6 (CI-CD-001) |
+| **2 (Small)** | 1 | #7 (SEC-005) |
+| **3 (Medium)** | 2 | #8 (FEAT-003), #9 (TEST-003) |
+| **4 (Large)** | 0 | — |
+| **5 (X-Large)** | 1 | #10 (ARCH-001) |
 
 ## Value/Effort Heatmap
 
 ```
-High Impact ─────────────────────────────────────────────────────
+Impact High ─────────────────────────────────────────────────────
             │                                          │
-            │  #2 SEC-001 (6.0)                        │  #7 ARCH-001 (3.0)
-            │  #5 FEAT-003 (4.8)                       │  #1 CICD-001 (4.0)
-            │  #10 TEST-001 (3.2)                      │  #6 TEST-003 (2.4)
+            │  #1 BUG-013 (5.0)                        │
+            │  #2 SEC-001  (7.5)                       │  #10 ARCH-001 (1.0)
+            │  #3 BUG-002  (4.0)                       │
+            │  #5 BUG-008  (3.0)                       │  #9 TEST-003  (1.3)
+            │  #7 SEC-005  (3.0)                       │
+            │  #6 CI-CD-001(3.0)                       │
+            │  #4 CLEAN-005(3.0)                       │  #8 FEAT-003  (1.6)
             │                                          │
-            │  #3 CLEAN-005 (3.0)                      │  #9 PERF-003 (2.4)
-            │  #8 BUG-001 (3.0)                        │  #4 CICD-004 (2.5)
-            │                                          │
-Low Effort ───────────────────────────────────────────────────── High Effort
+            └──────────────────────────────────────────┘
+Low Effort                                      High Effort
 ```
 
-**Sweet spot (top-right quadrant):** Items #1, #2, #3, #5, #8 deliver the most value per unit effort.
-**Strategic investments (bottom-right):** Items #7, #10, #6 require significant effort but provide foundational improvements.
+**Sweet spot (top-left quadrant — Phase 1):** Items #1, #2, #3, #4, #5, #6, #7 deliver the most value per unit effort. All can be parallelized.
+**Strategic investments (bottom-right — Phase 3):** Items #8, #9, #10 require significant effort but provide foundational improvements that unlock everything else.
 
----
+## Quick Reference
+
+| Rank | ID | Title | V/E | Phase | Est. Time |
+|------|----|-------|-----|-------|-----------|
+| 1 | BUG-013 | Fix `status.py` uptime calculation | 5.0 | Week 1 | 15 min |
+| 2 | SEC-001 | Validate `http_callback` URL scheme | 7.5 | Week 1 | 30 min |
+| 3 | BUG-002 | Log notification/HTTP callback failures | 4.0 | Week 1 | 30 min |
+| 4 | CLEAN-005 | Add `console.error()` to empty `catch` blocks | 3.0 | Week 1 | 15 min |
+| 5 | BUG-008 | Validate CLI `--config` JSON keys | 3.0 | Week 1 | 30 min |
+| 6 | CI-CD-001 | Add coverage reporting to CI | 3.0 | Week 1 | 30 min |
+| 7 | SEC-005 | Add guardrails for `shell=True` error command | 3.0 | Week 2 | 1-2 hr |
+| 8 | FEAT-003 | Implement structured JSON logging | 1.6 | Week 2 | 4-6 hr |
+| 9 | TEST-003 | Cover critical modules (loop, cli, status) | 1.3 | Week 2-3 | 8-12 hr |
+| 10 | ARCH-001 | Decompose monolithic `run_loop()` | 1.0 | Week 3-6 | 3-5 days |
 
 ## Tracking
 

@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 # Default status file path (overridable via PI_LOOP_STATUS_FILE)
 STATUS_FILE_DEFAULT = os.environ.get("PI_LOOP_STATUS_FILE", os.path.join(_get_data_dir(), "loop-status.json"))
 
+# Process start time (monotonic clock) — used for accurate uptime calculation.
+# Set once at import time, which is effectively when the process starts.
+_process_start_time = time.monotonic()
+
 
 def write_status(
     status_path: str | None = None,
@@ -42,20 +46,9 @@ def write_status(
     if start_time is None:
         start_time = datetime.now(timezone.utc).isoformat()
 
-    if uptime_seconds is None and pid is not None:
-        # Approximate uptime from process start time
-        try:
-            with open(f"/proc/{pid}/stat") as f:
-                parts = f.read().split()
-                # starttime is field 21 (0-indexed: 21), in clock ticks
-                clock_ticks = os.sysconf(os.sysconf_names["SC_CLK_TCK"])
-                start_ticks = int(parts[21])
-                boot_time = time.monotonic() - (time.time() - time.monotonic())  # rough
-                uptime_seconds = time.time() - (
-                    (start_ticks / clock_ticks) + boot_time + 0  # approximate
-                )
-        except (OSError, IndexError, ValueError, KeyError):
-            uptime_seconds = 0.0
+    if uptime_seconds is None:
+        # Use monotonic clock from process start — accurate, portable, simple.
+        uptime_seconds = time.monotonic() - _process_start_time
 
     data: dict[str, Any] = {
         "running": running,

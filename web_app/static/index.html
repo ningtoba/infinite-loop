@@ -195,7 +195,24 @@
           <!-- Error Breakdown -->
           <div class="section" id="error-section" style="display: none">
             <h3>Error Breakdown</h3>
-            <div class="error-grid" id="error-grid"></div>
+            <div class="error-grid" id="error-grid">
+              <div class="error-card etimeout" id="err-card-timeout">
+                <span class="ecount">0</span>
+                <span>Timeout</span>
+              </div>
+              <div class="error-card enetwork" id="err-card-network">
+                <span class="ecount">0</span>
+                <span>Network</span>
+              </div>
+              <div class="error-card eschema" id="err-card-schema">
+                <span class="ecount">0</span>
+                <span>Schema</span>
+              </div>
+              <div class="error-card eunknown" id="err-card-unknown">
+                <span class="ecount">0</span>
+                <span>Unknown</span>
+              </div>
+            </div>
           </div>
 
           <!-- Mitigations -->

@@ -616,6 +616,7 @@ async def _sse_stream_impl(request: Request):
 
 
 @app.get("/api/live")
+@app.get("/api/sse/stream")
 async def sse_stream_api(request: Request):
     """SSE endpoint for live updates (canonical path under /api)."""
     return await _sse_stream_impl(request)

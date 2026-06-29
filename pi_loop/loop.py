@@ -104,6 +104,11 @@ def _execute_task(
                 raise RuntimeError("pi subprocess has no stdout pipe")
 
             for raw_line in proc.stdout:
+                # Enforce session timeout between stdout lines
+                if time.time() - attempt_start > session_timeout:
+                    proc.kill()
+                    raise subprocess.TimeoutExpired(cmd, session_timeout)
+
                 line = raw_line.rstrip("\n").rstrip("\r")
                 attempt_raw_lines.append(line)
                 if not line:
@@ -187,7 +192,6 @@ def _execute_task(
                         if isinstance(block, dict) and block.get("type") == "text":
                             attempt_final_text_parts.append(block.get("text", ""))
 
-            proc.wait(timeout=session_timeout)
             duration = time.time() - attempt_start
             stdout_text = "\n".join(attempt_raw_lines)
 

@@ -9,9 +9,12 @@ build/
 *.egg
 
 # Environment
-# .env (removed - config_file used instead)
-# .env.local (removed - config_file used instead)
-# daemon.env (removed - config_file used instead)
+# Note: JSON config (config_file.json) is the recommended format.
+# .env/.env.local are git-ignored as defense-in-depth against accidental
+# secret commits, even though the project uses JSON config by default.
+.env
+.env.local
+.env.*
 
 # OS
 .DS_Store

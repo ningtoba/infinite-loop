@@ -35,9 +35,32 @@ from .rate_limiter import SlidingWindowRateLimiter
 # Determine static directory
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
-# SSE client tracking
+# # SSE client tracking
 _sse_clients: list[asyncio.Queue] = []
 _sse_clients_lock = asyncio.Lock()
+
+# Server start timestamp for uptime reporting
+_server_start_time: float = 0.0
+
+
+# ── Helpers ────────────────────────────────────────────────────────────────
+
+
+def _read_file(path: str) -> str:
+    """Read a text file — separated for use with asyncio.to_thread."""
+    try:
+        with open(path) as f:
+            return f.read()
+    except (OSError, UnicodeDecodeError) as e:
+        logger.warning("Failed to read file %s: %s", path, e)
+        raise
+
+
+# Module-level logger
+logger = logging.getLogger(__name__)
+
+
+# ── Rate limiters ──────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="pi-loop Web UI",
@@ -183,6 +206,37 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
+# ── Security Headers Middleware ───────────────────────────────────────────────
+# Registered after CORS (outermost) so it runs first in the middleware stack
+# and adds headers to ALL responses including 401/429 from inner middleware.
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Add defense-in-depth HTTP security headers.
+
+    Sets Content-Security-Policy, X-Frame-Options, X-Content-Type-Options,
+    and X-XSS-Protection on every response. Designed to mitigate XSS,
+    clickjacking, and MIME-sniffing attacks even if inner middleware
+    or endpoint code has a vulnerability.
+    """
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "0"  # Deprecated but suppresses legacy warnings
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self' ws: wss:; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'"
+    )
+    return response
+
+
 # Mount static files after app creation
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -194,13 +248,12 @@ async def index():
     index_path = os.path.join(STATIC_DIR, "index.html")
     exists = await asyncio.to_thread(os.path.exists, index_path)
     if exists:
-
-        def _read_index():
-            with open(index_path) as f:
-                return f.read()
-
-        content = await asyncio.to_thread(_read_index)
-        return HTMLResponse(content)
+        try:
+            content = await asyncio.to_thread(_read_file, index_path)
+            return HTMLResponse(content)
+        except OSError as e:
+            logger.warning("Failed to read static index.html: %s", e)
+            return HTMLResponse("<h1>pi-loop Web UI</h1><p>Static files not found.</p>")
     return HTMLResponse("<h1>pi-loop Web UI</h1><p>Static files not found.</p>")
 
 
@@ -369,8 +422,19 @@ async def get_logs(limit: int = 100):
 
 @app.get("/api/health")
 async def health():
-    """Health check endpoint."""
-    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
+    """Health check endpoint.
+
+    Returns basic service health, version, and uptime.
+    Exempt from API-key auth and rate limiting.
+    Designed for container orchestrators, load balancers,
+    and monitoring systems — always returns 200 when alive.
+    """
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "uptime_seconds": time.monotonic() - _server_start_time if _server_start_time > 0 else None,
+    }
 
 
 # ── System Resources ─────────────────────────────────────────────────────────
@@ -528,7 +592,11 @@ async def _sse_stream_impl(request: Request):
                     yield f"event: update\ndata: {data}\n\n"
                 except asyncio.TimeoutError:
                     # Send heartbeat
-                    yield f"event: heartbeat\ndata: {json.dumps({'type': 'heartbeat', 'time': datetime.now(timezone.utc).isoformat()})}\n\n"
+                    heartbeat = json.dumps(
+                        {"type": "heartbeat", "time": datetime.now(timezone.utc).isoformat()},
+                        default=str,
+                    )
+                    yield f"event: heartbeat\ndata: {heartbeat}\n\n"
         except asyncio.CancelledError:
             pass
         finally:
@@ -639,6 +707,8 @@ async def _status_poller():
 @app.on_event("startup")
 async def startup():
     """Start background tasks on server startup."""
+    global _server_start_time
+    _server_start_time = time.monotonic()
     asyncio.create_task(_status_poller())
 
 

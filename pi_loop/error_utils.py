@@ -9,7 +9,18 @@ def classify_error(error_str: str | None) -> str | None:
     if not error_str:
         return None
     error_lower = error_str.lower()
-    if any(kw in error_lower for kw in ["timeout", "timed out"]):
+    if any(
+        kw in error_lower
+        for kw in [
+            "timeout",
+            "timed out",
+            "timedout",
+            "time_out",
+            "read timed out",
+            "connection timed out",
+            "gateway timeout",  # also in network, but 504 is fundamentally a timeout
+        ]
+    ):
         return "timeout"
     if any(
         kw in error_lower
@@ -32,13 +43,23 @@ def classify_error(error_str: str | None) -> str | None:
             "too many requests",
             "service unavailable",
             "bad gateway",
-            "gateway timeout",
+            "name or service not known",
+            "temporary failure",
+            "name resolution",
+            "no address",
+            "protocol error",
+            "ssl_error",
+            "handshake failed",
             "server error",
             "internal server error",
             "503",
             "502",
             "504",
             "429",
+            "could not resolve",
+            "getaddrinfo",
+            "no route to host",
+            "network is unreachable",
             "econnrefused",
             "econnreset",
             "etimedout",

@@ -33,6 +33,17 @@ All configuration is done through the web UI — no `.env` files, no manual conf
 
 ---
 
+## Prerequisites
+
+- **Python 3.10+** (3.10–3.13 tested in CI)
+- **[pi coding agent](https://pi.ai)** — the binary (`pi`) must be on `$PATH` and licensed. Verify with:
+
+  ```bash
+  pi --version
+  ```
+
+- **Git** (optional, required for `--git` / `--git-commit` features)
+
 ## Quick Start
 
 ```bash
@@ -44,6 +55,8 @@ pi-loop-web
 
 # Open http://localhost:8090 in your browser
 ```
+
+The web UI includes a **Swagger API reference** at [http://localhost:8090/docs](http://localhost:8090/docs) — interactive documentation for all REST endpoints.
 
 From the web UI, configure your goal and settings, then hit **Start**.
 
@@ -73,6 +86,8 @@ pi-loop --status
 The web UI is a single-page application built with **FastAPI** on the backend and vanilla HTML/CSS/JS on the frontend — no framework dependencies.
 
 ![pi-loop Web UI](https://img.shields.io/badge/UI-Dark_Theme-09090b?style=flat-square)
+
+> 📸 A screenshot of the dashboard is coming soon.
 
 | Tab | Description |
 |-----|-------------|
@@ -295,4 +310,4 @@ pi-loop/
 
 ## License
 
-MIT
+[MIT](LICENSE)

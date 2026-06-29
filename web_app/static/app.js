@@ -168,6 +168,20 @@ function switchTab(tab) {
 }
 
 // ── SSE (push-based updates, no polling) ─────────────────────────────────
+let _sseRetryDelay = 1000; // initial reconnect delay (ms)
+const _sseMaxRetry = 30000; // cap at 30s
+function _sseResetRetry() {
+	_sseRetryDelay = 1000;
+}
+function _sseNextRetry() {
+	// Exponential backoff: 1s, 2s, 4s, 8s, 16s, …, capped at 30s.
+	// Add ±25% random jitter to prevent thundering herd on server restart.
+	const delay = Math.min(_sseRetryDelay, _sseMaxRetry);
+	const jitter = delay * 0.25 * (2 * Math.random() - 1);
+	_sseRetryDelay = Math.min(_sseRetryDelay * 2, _sseMaxRetry);
+	return Math.max(delay + jitter, 500); // floor at 500ms
+}
+
 function initSSE() {
 	if (sseSource) sseSource.close();
 	sseSource = new EventSource(API.live);
@@ -201,11 +215,14 @@ function initSSE() {
 	sseSource.addEventListener("heartbeat", () => {
 		updateConnectionStatus(true);
 	});
-	sseSource.onopen = () => updateConnectionStatus(true);
+	sseSource.onopen = () => {
+		updateConnectionStatus(true);
+		_sseResetRetry();
+	};
 	sseSource.onerror = () => {
 		updateConnectionStatus(false);
 		sseSource.close();
-		setTimeout(initSSE, 5000);
+		setTimeout(initSSE, _sseNextRetry());
 	};
 }
 

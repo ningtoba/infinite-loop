@@ -42,10 +42,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS — allow all origins for development convenience
+# CORS — restrict to localhost by default for security.
+# Override via PI_LOOP_CORS_ORIGINS env var (comma-separated) for
+# production deployments that need cross-origin access.
+_cors_origins = os.environ.get(
+    "PI_LOOP_CORS_ORIGINS",
+    "http://localhost:8090",
+).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -519,7 +525,7 @@ def main():
         default_port = 8090
 
     parser = argparse.ArgumentParser(description="pi-loop Web UI Server")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
     parser.add_argument(
         "--port",
         type=int,

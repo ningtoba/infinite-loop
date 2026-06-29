@@ -303,17 +303,23 @@ This means the web UI could validate against different limits than the CLI, and 
 - `pi_loop/env_utils.py` (remove duplicate defaults)
 - `web_app/config_manager.py` (import from config.py)
 
-### TECHDEPT-004 — Shared mutable state passed-by-reference: mitigations dict silently lost
+### TECHDEPT-004 — [DONE] Shared mutable state passed-by-reference: mitigations dict silently lost
 
 | Field | Value |
 |-------|-------|
-| **Title** | Shared mutable state passed-by-reference: mitigations dict mutations silently lost |
+| **Title** | [DONE] Shared mutable state passed-by-reference: mitigations dict silently lost |
 | **Category** | Technical Debt |
 | **Priority** | 🟡 P2 — Medium |
 | **Impact** | Error recovery adaptations are silently discarded. The `mitigations` dict is mutated inside `_adapt_to_error()` but never written back to the state dict. Error recovery appears to work but has zero effect. |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
+
+**Fix applied:** Added `state.setdefault("mitigations", {})` before `_adapt_to_error()` call in `loop.py:732` so the dict always exists and mutations persist. The call now passes `state["mitigations"]` directly.
+
+**Affected files:**
+
+- `pi_loop/loop.py` (lines ~732, ~742)
 
 **Reasoning:** In `loop.py:670-672`:
 
@@ -355,7 +361,7 @@ When `state["mitigations"]` doesn't exist, a new `{}` dict is created, passed to
 - `web_app/server.py` (SSE event generation)
 - `web_app/static/app.js` (SSE event handling)
 
-### SEC-002 — CORS allow_origins=['*'] in production configuration
+### SEC-002 — [DONE] CORS allow_origins=['*'] in production configuration
 
 | Field | Value |
 |-------|-------|
@@ -365,9 +371,12 @@ When `state["mitigations"]` doesn't exist, a new `{}` dict is created, passed to
 | **Impact** | Any website visited by the user while the daemon is running can make authenticated-adjacent requests to the daemon's API (though auth is also missing — see SEC-001). |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
-**Reasoning:** CORS is configured with `allow_origins=["*"]` which permits any origin to make API calls. For a local daemon tool this is acceptable for development convenience, but for any production-like deployment it should be restricted. Combined with the lack of authentication (SEC-001), this is a significant attack surface.
+**Fix applied:**
+
+1. CORS origins default to `http://localhost:8090`, configurable via `PI_LOOP_CORS_ORIGINS` env var (comma-separated)
+2. Default bind address changed from `0.0.0.0` to `127.0.0.1` (override via `--host` flag)
 
 **Research notes:** Fix: (1) Default to `allow_origins=["http://localhost:8090"]` and make origins configurable via env var `PI_LOOP_CORS_ORIGINS`. (2) In server start, bind to `127.0.0.1` by default instead of `0.0.0.0` to prevent external network access entirely.
 
@@ -513,7 +522,7 @@ Completed 2026-06-29.
 
 - `web_app/static/app.js` (entire file)
 
-### CLEANUP-001 — Duplicate worker_term append logic in loop_manager.py
+### CLEANUP-001 — [RESOLVED] Duplicate worker_term append logic in loop_manager.py
 
 | Field | Value |
 |-------|-------|
@@ -523,15 +532,13 @@ Completed 2026-06-29.
 | **Impact** | Terminal lines in the Workers tab appear twice — once with the `[TERM (worker #N)]` prefix, once without. UI is confusing and cluttered. |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
-**Reasoning:** `LoopManager._parse_daemon_line()` has two separate code paths that append to `self._worker_term[wid]`. The generic `TERM` regex fallthrough at one point appends the raw line (with `[TERM (worker #N)]` prefix), while an explicit `TERM` handler later strips the prefix and appends again. Result: each terminal line is stored twice with different formatting.
-
-**Research notes:** Fix: Consolidate into a single code path. The explicit handler should be the canonical one (it strips the prefix correctly). Remove the generic fallthrough append. This also affects the worker terminal content hash calculation (lines appear duplicated in the hash).
+**Resolution:** Refactored to use a single for-loop over `("STDOUT", "STDERR", "MODEL", "TERM")` prefixes with a single `_worker_term[wid].append()` call. Verified by code inspection: only one append point exists at `loop_manager.py:432`.
 
 **Affected files:**
 
-- `web_app/loop_manager.py` (lines ~169-175 and ~200-205)
+- `web_app/loop_manager.py` (lines ~415-434)
 
 ### CLEANUP-002 — Empty catch blocks swallow errors silently in app.js (5+ locations)
 

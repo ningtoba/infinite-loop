@@ -9,13 +9,13 @@
 
 | Severity | Count |
 |----------|-------|
-| 🔴 **P0 — Critical** | 1 |
+| 🔴 **P0 — Critical** | 0 |
 | 🟠 **P1 — High** | 4 |
 | 🟡 **P2 — Medium** | 12 |
 | 🔵 **P3 — Low** | 9 |
 | ⚪ **P4 — Wishlist** | 3 |
-| ✅ **Completed** | 36 |
-| **Total Active** | **29** |
+| ✅ **Completed** | 37 |
+| **Total Active** | **28** |
 
 | Category | Count |
 |----------|-------|
@@ -23,7 +23,7 @@
 | Technical Debt | 4 |
 | Architecture | 3 |
 | Performance | 2 |
-| Security | 2 |
+| Security | 0 |
 | Testing | 3 |
 | Documentation | 2 |
 | CI/CD | 1 |
@@ -86,15 +86,28 @@
 | **Impact** | `/api/loop/start` can be triggered by anyone, spawning arbitrary `pi` subprocesses with user-level system access. No rate limiting, no request IDs, no auth of any kind. |
 | **Effort** | Medium |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
-**Reasoning:** All FastAPI endpoints lack authentication, rate limiting, request timeouts, and request tracing. The `/api/loop/start` endpoint accepts a goal string and spawns a `pi -q <goal>` subprocess — an unauthenticated attacker could use this to execute arbitrary commands. CORS is wide open (`allow_origins=["*"]`). For a local daemon tool this is acceptable in dev, but production deployments need at minimum a simple token-based auth or bind-to-localhost-only enforcement.
+**Reasoning:** All FastAPI endpoints lacked authentication, rate limiting, request timeouts, and request tracing. The `/api/loop/start` endpoint accepted a goal string and spawned a `pi -q <goal>` subprocess — an unauthenticated attacker could use this to execute arbitrary commands. CORS was wide open (`allow_origins=["*"]`).
 
-**Research notes:** Consider implementing: (1) bind to `127.0.0.1` by default instead of `0.0.0.0`, (2) optional `PI_LOOP_API_KEY` env var for Bearer token auth, (3) rate limiting via middleware or Starlette's `Limiter`, (4) request IDs for tracing. CORS hardening should make origins configurable.
+**Fix applied:**
+
+1. **API-key authentication middleware** (`server.py:api_key_auth`): Reads `PI_LOOP_API_KEY` env var. When set, requires `Authorization: Bearer <key>` on all `/api/*` routes. Health check (`/api/health`) is exempt. When unset/empty, auth is disabled entirely (backward-compatible local-dev mode).
+
+2. **Sliding-window rate limiting** (`rate_limiter.py`): New `SlidingWindowRateLimiter` class with per-client-IP tracking. Control endpoints (POST /api/config, POST /api/loop/*): 30 req/min. Read-only endpoints (GET /api/*): 120 req/min. Exposed via `X-RateLimit-Limit` / `X-RateLimit-Remaining` response headers. RFC-compliant `Retry-After` header on 429 responses.
+
+3. **CORS hardening**: Default origins changed from `["*"]` to `http://localhost:8090`. Configurable via `PI_LOOP_CORS_ORIGINS` env var (comma-separated). `Authorization` header added to allowed headers. `allow_methods` explicitly set to `["GET", "POST"]`.
+
+4. **Default bind address**: Changed from `0.0.0.0` to `127.0.0.1` (configurable via `--host` flag), preventing external network access by default.
+
+5. **Tests**: Created `tests/test_auth.py` (20+ unit + integration tests covering disabled-auth mode, valid/invalid keys, health bypass, non-/api bypass, wrong schemes, whitespace handling, special characters, header preservation, rate-limiter interop). Added rate-limiter auth interop tests to `tests/test_server.py`.
 
 **Affected files:**
 
-- `web_app/server.py` (all endpoints, lines 39-42 for CORS)
+- `web_app/server.py` (auth middleware, CORS config, rate-limit middleware, default host)
+- `web_app/rate_limiter.py` (new — `SlidingWindowRateLimiter` class)
+- `tests/test_auth.py` (new — 20+ auth tests)
+- `tests/test_server.py` (rate-limiter + auth interop tests)
 
 ---
 

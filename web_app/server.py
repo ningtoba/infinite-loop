@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import (
     HTMLResponse,
+    JSONResponse,
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +30,7 @@ from .config_manager import (
     validate_config,
 )
 from .loop_manager import get_loop_manager
+from .rate_limiter import SlidingWindowRateLimiter
 
 # Determine static directory
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -42,6 +45,117 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
+# ── Rate limiters ──────────────────────────────────────────────────────────
+
+# Control endpoints (POST start/stop/pause/resume/reset/config-write): 30 req/min
+_control_limiter = SlidingWindowRateLimiter(max_requests=30, window_seconds=60.0)
+# Read-only endpoints (GET /api/*): 120 req/min
+_read_limiter = SlidingWindowRateLimiter(max_requests=120, window_seconds=60.0)
+
+
+# ── API-Key Authentication Middleware ─────────────────────────────────────
+
+
+@app.middleware("http")
+async def api_key_auth(request: Request, call_next):
+    """Validate `Authorization: Bearer <key>` on /api/* routes.
+
+    Skips the health-check endpoint (/api/health) and all non-/api paths.
+    Reads the expected key from the PI_LOOP_API_KEY environment variable.
+    When the env var is unset or empty, auth is disabled entirely, preserving
+    backward compat for local development.
+    """
+    api_key = os.environ.get("PI_LOOP_API_KEY", "")
+
+    if not api_key:
+        # No key configured — allow all requests (local-dev mode)
+        return await call_next(request)
+
+    path = request.url.path
+
+    # Only enforce on /api/* routes
+    if not path.startswith("/api/"):
+        return await call_next(request)
+
+    # Always allow health checks
+    if path == "/api/health":
+        return await call_next(request)
+
+    auth_header = request.headers.get("Authorization", "")
+    expected = f"Bearer {api_key}"
+
+    if auth_header != expected:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Missing or invalid API key"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return await call_next(request)
+
+
+# ── Rate-Limiting Middleware ──────────────────────────────────────────────────
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Apply sliding-window rate limits to /api/* routes.
+
+    Control endpoints (POST /api/config, /api/loop/*): 30 req/min.
+    Read-only endpoints (GET /api/*): 120 req/min.
+    Exempt: /api/health, all non-/api paths.
+
+    Rate limiting uses a sliding window per client IP and is independent
+    of authentication — it applies even when PI_LOOP_API_KEY is unset.
+    """
+    path = request.url.path
+
+    # Only enforce on /api/* routes
+    if not path.startswith("/api/"):
+        return await call_next(request)
+
+    # Always allow health checks
+    if path == "/api/health":
+        return await call_next(request)
+
+    # Classify the endpoint and pick the right limiter
+    method = request.method
+
+    # Control: POST /api/config or POST /api/loop/*
+    is_control = method == "POST" and (path == "/api/config" or path.startswith("/api/loop/"))
+    # Read: GET any /api/* path
+    is_read = method == "GET"
+
+    if is_control:
+        limiter = _control_limiter
+        limit_count = 30
+    elif is_read:
+        limiter = _read_limiter
+        limit_count = 120
+    else:
+        # Unclassified method/path combination — let it through
+        return await call_next(request)
+
+    # Determine client IP
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    client_ip = forwarded.split(",")[0].strip() if forwarded else request.client.host if request.client else "127.0.0.1"
+
+    if not await limiter.check(client_ip):
+        retry_after = 60  # window_seconds is always 60 for both limiters
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Try again later."},
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    remaining = await limiter.remaining(client_ip)
+    response = await call_next(request)
+    response.headers["X-RateLimit-Limit"] = str(limit_count)
+    response.headers["X-RateLimit-Remaining"] = str(remaining)
+    return response
+
+
 # CORS — restrict to localhost by default for security.
 # Override via PI_LOOP_CORS_ORIGINS env var (comma-separated) for
 # production deployments that need cross-origin access.
@@ -49,11 +163,24 @@ _cors_origins = os.environ.get(
     "PI_LOOP_CORS_ORIGINS",
     "http://localhost:8090",
 ).split(",")
+logger = logging.getLogger(__name__)
+
+# Validate CORS origins — reject wildcard "*" in production, warn for permissive values.
+_cleaned_origins: list[str] = []
+for origin in _cors_origins:
+    stripped = origin.strip()
+    if stripped == "*":
+        logger.warning(
+            "CORS origin '*' is permissive and should not be used in production. "
+            "Set PI_LOOP_CORS_ORIGINS to a comma-separated list of explicit origins."
+        )
+    _cleaned_origins.append(stripped)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cleaned_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Mount static files after app creation

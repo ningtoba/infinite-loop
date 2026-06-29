@@ -103,6 +103,72 @@ pi-loop-web --host 127.0.0.1 --port 8080
 
 ---
 
+## Authentication & Security
+
+pi-loop provides several layers of security for production deployments, all optional and backward-compatible for local development.
+
+### API-Key Authentication
+
+Set the `PI_LOOP_API_KEY` environment variable to enable Bearer-token authentication on all `/api/*` routes:
+
+```bash
+export PI_LOOP_API_KEY="your-secret-key"
+pi-loop-web
+```
+
+With the key set, every API request must include:
+
+```
+Authorization: Bearer your-secret-key
+```
+
+- Requests without a valid `Authorization` header receive `401 Unauthorized` with a `WWW-Authenticate: Bearer` response header.
+- The `/api/health` endpoint is always exempt (required for load-balancer health checks).
+- Non-`/api/*` paths (static assets, the main HTML page) are also exempt.
+- When `PI_LOOP_API_KEY` is unset or empty, authentication is **disabled** — all requests pass through (local-dev mode).
+
+### Rate Limiting
+
+All `/api/*` routes are protected by a sliding-window rate limiter keyed by client IP:
+
+| Endpoint Type          | Limit       | Window |
+|------------------------|-------------|--------|
+| Control (POST /api/config, POST /api/loop/*) | 30 requests | 60 seconds |
+| Read-only (GET /api/*) | 120 requests | 60 seconds |
+
+- Rate-limited requests receive `429 Too Many Requests` with a `Retry-After` header.
+- Every response includes `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers.
+- Rate limiting operates independently of authentication — it applies even when `PI_LOOP_API_KEY` is unset.
+
+### CORS
+
+By default, the server only accepts cross-origin requests from `http://localhost:8090`. Override via the `PI_LOOP_CORS_ORIGINS` environment variable (comma-separated):
+
+```bash
+export PI_LOOP_CORS_ORIGINS="http://localhost:8090,https://my-dashboard.example.com"
+```
+
+Using `*` as an origin is allowed but emits a warning. In production, always specify explicit origins.
+
+### Network Binding
+
+The web server binds to `127.0.0.1` (localhost only) by default, preventing external network access. Override with the `--host` flag:
+
+```bash
+pi-loop-web --host 0.0.0.0  # Bind to all interfaces (production with firewall)
+```
+
+### Security Summary
+
+| Setting | Default | Override |
+|---------|---------|----------|
+| API key auth | Disabled (no key) | `PI_LOOP_API_KEY` env var |
+| Rate limiting | Control: 30 req/min, Read: 120 req/min | (hardcoded) |
+| CORS origins | `http://localhost:8090` | `PI_LOOP_CORS_ORIGINS` env var |
+| Bind address | `127.0.0.1` | `--host` flag |
+
+---
+
 ## CLI Usage
 
 ```

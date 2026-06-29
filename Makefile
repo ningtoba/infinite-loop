@@ -1,4 +1,4 @@
-.PHONY: install install-dev lint format test lint-all mypy pre-commit pre-commit-run clean help web web-dev
+.PHONY: install install-dev lint format test lint-all mypy pre-commit pre-commit-run clean help web web-dev update-lock verify-lock
 
 PYTHON := python3
 
@@ -10,6 +10,8 @@ help:
 	@echo "TARGETS:"
 	@echo "  install       Install pi-loop as a system command via pip install -e ."
 	@echo "  install-dev   Install with dev/test dependencies"
+	@echo "  update-lock   Re-generate requirements.txt + requirements-dev.txt"
+	@echo "  verify-lock   Verify lock files are up to date with pyproject.toml"
 	@echo "  lint          Run ruff check on pi_loop/ and web_app/"
 	@echo "  format        Run ruff format (in-place) on pi_loop/ and web_app/"
 	@echo "  lint-all      Full CI check: lint + format check (no write)"
@@ -25,6 +27,19 @@ install:
 
 install-dev:
 	pip install -e ".[test,dev]"
+
+update-lock:
+	pip install pip-tools
+	pip-compile pyproject.toml --output-file requirements.txt --quiet
+	pip-compile pyproject.toml --output-file requirements-dev.txt --extra test --extra dev --quiet
+
+verify-lock:
+	pip install pip-tools
+	pip-compile pyproject.toml --output-file /tmp/pi-loop-reqs.txt --quiet
+	pip-compile pyproject.toml --output-file /tmp/pi-loop-reqs-dev.txt --extra test --extra dev --quiet
+	cmp requirements.txt /tmp/pi-loop-reqs.txt || { echo "LOCK OUTDATED: re-run 'make update-lock'"; exit 1; }
+	cmp requirements-dev.txt /tmp/pi-loop-reqs-dev.txt || { echo "LOCK OUTDATED: re-run 'make update-lock'"; exit 1; }
+	rm -f /tmp/pi-loop-reqs.txt /tmp/pi-loop-reqs-dev.txt
 
 lint:
 	ruff check pi_loop/ web_app/

@@ -436,7 +436,6 @@ def run_loop(
     goals_index = 0
     state["goals_specs"] = goals_tuples
 
-    write_status_file(status_file, state, iteration_count, "running")
     _write_status_file(status_file, running=True, iteration_count=iteration_count, version=VERSION)
 
     _log_startup_banner(
@@ -653,7 +652,6 @@ def run_loop(
         _recalc_stats(state)
 
         write_ledger(state)
-        write_status_file(status_file, state, iteration_count, "running")
         _write_status_file(
             status_file,
             running=True,

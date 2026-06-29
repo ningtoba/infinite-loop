@@ -161,7 +161,7 @@
 
 **Fix applied:** Extracted `_shutdown()` helper — single call site per exit path. Net: -134 lines. Completed 2026-06-29.
 
-### HIGH-004 — Circular import: cli.py ↔ help_topics.py
+### HIGH-004 — Circular import: cli.py ↔ help_topics.py ✅
 
 | Field | Value |
 |-------|-------|
@@ -170,14 +170,17 @@
 | **Impact** | Brittle imports; will break if import order changes |
 | **Effort** | Medium |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
-**Reasoning:** `cli.py` imports `show_help_topics` from `help_topics.py`, and `help_topics.py` imports `build_parser` from `cli.py`. This works only because both are lazily called (inside `main()` and `show_help_topics`), but it is fragile and confuses static analysis.
+**Reasoning:** Originally `cli.py` imported `show_help_topics` from `help_topics.py`, and `help_topics.py` imported `build_parser` from `cli.py`.
+
+**Fix applied:** `_create_parser` was extracted into a standalone `pi_loop/parser.py` module. Both `cli.py` and `help_topics.py` now import from `.parser` instead of each other. Verified by code audit on 2026-06-30 — no circular import exists.
 
 **Affected files:**
 
 - `pi_loop/cli.py`
 - `pi_loop/help_topics.py`
+- `pi_loop/parser.py`
 
 ### HIGH-005 — Silent exception swallowing (bare except: pass) ✅
 
@@ -833,6 +836,24 @@
 **Affected files:**
 
 - `web_app/static/index.html`
+
+---
+
+### LOW-013 — Duplicate `write_status_file()` calls immediately overwritten ✅
+
+| Field | Value |
+|-------|-------|
+| **Category** | Code Cleanup |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ✅ Done |
+| **Affected Files** | `pi_loop/loop.py` |
+
+**Reasoning:** In `run_loop()`, `write_status_file()` (lightweight) is called immediately before `_write_status_file()` (comprehensive) — both writing to the same status file path. The second call overwrites the first, wasting serialization + I/O.
+
+**Fix applied (2026-06-30):** Removed the two redundant `write_status_file()` calls at per-iteration and startup locations. Import retained for `_shutdown()` usage.
 
 ---
 

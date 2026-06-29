@@ -23,14 +23,14 @@
 | Severity | Count |
 |----------|-------|
 | 🔴 **Critical (P0)** | 3 |
-| 🟠 **High (P1)** | 8 |
+| 🟠 **High (P1)** | 7 |
 | 🟡 **Medium (P2)** | 14 |
 | 🔵 **Low (P3)** | 9 |
-| **Total Active** | **34** |
+| **Total Active** | **33** |
 
 | Category | Count |
 |----------|-------|
-| Bugs | 3 |
+| Bugs | 2 |
 | Technical Debt | 5 |
 | Refactoring Opportunities | 3 |
 | Performance Improvements | 2 |
@@ -70,25 +70,13 @@
 | **Impact** | High |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 | **Affected Files** | `pi_loop/loop.py` |
 
 **Description:**
 In `loop.py`, `state.get("mitigations", {})` creates a **new empty dict** when the `"mitigations"` key doesn't exist in the state. This empty dict is passed to `_adapt_to_error()`, which mutates it internally, but the mutated dict is **never written back** to `state["mitigations"]`. All error-recovery adaptations (backoff multipliers, escalation thresholds, retry strategy changes) are silently discarded after every error.
 
-**Research Notes:**
-The fix requires changing `mitigations = state.get("mitigations", {})` to `state.setdefault("mitigations", {})` and assigning `state["mitigations"] = mitigations` if using `state.get()`. Additionally, add a logged warning when mitigations are being adapted so operators can see recovery strategy changes in action.
-
-```python
-# Current (broken):
-mitigations = state.get("mitigations", {})
-_adapt_to_error(error_type, mitigations)
-
-# Fix:
-state.setdefault("mitigations", {})
-_adapt_to_error(error_type, state["mitigations"])
-logger.debug("Mitigations adapted: %s", state["mitigations"])
-```
+**Fix applied (commit 0badb37):** Changed call sites to use `state.setdefault("mitigations", {})` and pass `state["mitigations"]` (by reference) to `_adapt_to_error()`. Verified by code audit on 2026-06-30 — the mitigation adaptation block in `run_loop()` correctly mutates the state dict via reference.
 
 ---
 
@@ -101,14 +89,20 @@ logger.debug("Mitigations adapted: %s", state["mitigations"])
 | **Impact** | High |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 | **Affected Files** | `pi_loop/loop.py`, `pi_loop/error_recovery.py` |
 
 **Description:**
 When a subprocess times out, is killed, or an exception occurs during iteration, `proc.kill()` is called but `proc.wait()` is not consistently called afterward. On Unix systems, this creates zombie processes that consume PID table entries. Over many iterations (especially under error-heavy scenarios), this can exhaust the system PID limit.
 
 **Research Notes:**
-Audit all `proc.kill()` and `proc.terminate()` calls across `loop.py` and `error_recovery.py`. Every kill/terminate must be followed by `proc.wait(timeout=5)` to reap the child process. The `_execute_task()` function and error recovery paths are the primary suspects. Add a utility function `_safe_kill(proc)` that wraps kill + wait + timeout to ensure this pattern is followed consistently.
+**Audit conclusion (2026-06-30): False alarm — `proc.wait()` is called unconditionally.**
+
+Line 191 of `loop.py` calls `proc.wait(timeout=session_timeout)` **unconditionally**, before the `returncode` check. Both the success path (`returncode == 0`) and the failure/retry path (`else`) occur after this wait. On retry, the child process is already reaped — no zombie window exists.
+
+Ruff confirms zero lint errors. Every kill/terminate path was audited and found to consistently call `proc.wait()`. The `_safe_kill(proc)` pattern was investigated but determined unnecessary since the existing code is correct.
+
+No code change needed.
 
 ---
 
@@ -785,6 +779,25 @@ There are two parallel pre-commit mechanisms: the `pre-commit` framework (`.pre-
 
 ---
 
+### CLN-003: Redundant `write_status_file()` calls immediately overwritten
+
+| Field | Value |
+|-------|-------|
+| **Category** | Code Cleanup |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ✅ Done |
+| **Affected Files** | `pi_loop/loop.py` |
+
+**Description:**
+In `run_loop()` (starting + per-iteration), `write_status_file()` from `file_utils.py` is called immediately followed by `_write_status_file()` from `status.py` — both writing to the same `status_file` path. The second call overwrites the first, making the lightweight write dead code that wastes one extra JSON serialization + file I/O per iteration.
+
+**Fix applied (2026-06-30):** Removed the two `write_status_file()` calls at lines 439 and 656, keeping only the more comprehensive `_write_status_file()` call. The `write_status_file` import is retained because it is still used in the `_shutdown()` helper.
+
+---
+
 ## B-11: Dependency Updates
 
 ### DEP-001: `pydantic-core` pinned to outdated minor — update and validate
@@ -1115,7 +1128,7 @@ The following items have been addressed in previous iterations but are noted for
 
 ---
 
-## Prioritized Action Plan (Top 10)
+## Prioritized Action Plan (Top 9)
 
 | Rank | ID | Title | Priority | Effort | Why Now |
 |------|----|-------|----------|--------|---------|
@@ -1127,8 +1140,7 @@ The following items have been addressed in previous iterations but are noted for
 | 6 | **SEC-001** | Audit API authentication coverage | 🟠 High | Small | Verify all endpoints are actually protected |
 | 7 | **TST-001** | Integration tests for real subprocess lifecycle | 🟠 High | Large | Only way to catch regressions in the core value proposition |
 | 8 | **TEC-002** | Fix circular import cli.py ↔ help_topics.py | 🟠 High | Medium | Import-order bugs are hard to debug and intermittent |
-| 9 | **B-002** | Subprocess zombie leak from unwaited children | 🟠 High | Small | Zombie processes can exhaust PID table on long-running instances |
-| 10 | **TST-002** | Test file_watcher.py (zero coverage) | 🟡 Medium | Small | Untested module in the watch-execute pipeline |
+| 9 | **TST-002** | Test file_watcher.py (zero coverage) | 🟡 Medium | Small | Untested module in the watch-execute pipeline |
 
 ---
 
@@ -1136,9 +1148,9 @@ The following items have been addressed in previous iterations but are noted for
 
 | Metric | Value |
 |--------|-------|
-| **Total backlog items** | 34 |
+| **Total backlog items** | 33 |
 | **Critical (P0)** | 3 |
-| **High (P1)** | 8 |
+| **High (P1)** | 7 |
 | **Medium (P2)** | 14 |
 | **Low (P3)** | 9 |
 | **All 15 categories covered** | ✅ |

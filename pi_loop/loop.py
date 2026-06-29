@@ -38,6 +38,35 @@ from .stats import _recalc_stats
 from .status import write_status as _write_status_file
 from .system_utils import get_system_usage, get_system_usage_diff
 
+
+# ── Security guardrails ───────────────────────────────────▸
+def _validate_on_error_cmd(cmd: str, allow_metachars: bool = False) -> tuple[bool, str]:
+    """Validate an on_error_cmd before execution with shell=True.
+
+    Returns (is_valid, reason) tuple. When invalid, the caller should
+    skip execution and log the reason.
+    """
+    if not cmd or not cmd.strip():
+        return False, "Command is empty"
+    if len(cmd) > 500:
+        return False, f"Command exceeds 500 character limit ({len(cmd)} chars)"
+    if not allow_metachars:
+        # Reject shell metacharacters that enable multi-command / injection
+        dangerous = {
+            ";": "semicolon (multi-command)",
+            "|": "pipe (chained command)",
+            "`": "backtick (command substitution)",
+            "$": "dollar sign (variable expansion)",
+            "&": "ampersand (backgrounding)",
+            "\n": "newline (multi-line command)",
+            "\r": "carriage return",
+        }
+        for char, desc in dangerous.items():
+            if char in cmd:
+                return False, f"Shell metacharacter '{desc}' found in command (use --allow-error-metachars to override)"
+    return True, "OK"
+
+
 # Module-level shutdown flag (threading.Event for safe signal-handler access)
 _shutdown_requested = threading.Event()
 
@@ -477,6 +506,14 @@ def run_loop(
         quiet=quiet,
     )
 
+    if on_error_cmd:
+        _log(f"[WARNING] on_error_cmd is configured: {on_error_cmd[:120]}{'...' if len(on_error_cmd) > 120 else ''}")
+        _log(
+            "[WARNING] on_error_cmd runs with shell=True. "
+            "Review SECURITY implications. Use --allow-error-metachars "
+            "only if your command requires shell metacharacters."
+        )
+
     if startup_delay > 0 and iteration_count == 0:
         _log(f"[DAEMON] Startup delay: {startup_delay}s before first iteration")
         time.sleep(startup_delay)
@@ -730,12 +767,17 @@ def run_loop(
                 except (ImportError, OSError, ValueError, json.JSONDecodeError) as e:
                     _log(f"[HTTP-CALLBACK] Failed: {e}")
 
-        # On-error command
+        # On-error command (with security guardrails)
         if combined_error and on_error_cmd:
-            try:
-                subprocess.run(on_error_cmd, shell=True, timeout=30)
-            except (OSError, subprocess.TimeoutExpired) as e:
-                _log(f"[ERROR-CMD] Failed: {e}")
+            _log(f"[ERROR-CMD] Running: {on_error_cmd}")
+            is_valid, reason = _validate_on_error_cmd(on_error_cmd, allow_metachars=cfg.allow_error_metachars)
+            if not is_valid:
+                _log(f"[ERROR-CMD] WARNING: Skipped — {reason}")
+            else:
+                try:
+                    subprocess.run(on_error_cmd, shell=True, timeout=30)
+                except (OSError, subprocess.TimeoutExpired) as e:
+                    _log(f"[ERROR-CMD] Failed: {e}")
 
         # Cooldown
         _handle_cooldown(cooldown, cooldown_mode, None, "generic", shutdown_event=_shutdown_requested)

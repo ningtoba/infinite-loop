@@ -173,6 +173,19 @@ The web server binds to `127.0.0.1` (localhost only) by default, preventing exte
 pi-loop-web --host 0.0.0.0  # Bind to all interfaces (production with firewall)
 ```
 
+### On-Error Command Security
+
+`--on-error-cmd` runs arbitrary shell commands via `subprocess.run(..., shell=True)` when an iteration
+errors. This is inherently risky:
+
+- **Command injection**: If an attacker gains write access to `~/.config/pi-loop/config.json`, they
+  can execute arbitrary commands on the host system.
+- **Audit logging**: Every `on_error_cmd` invocation is logged with the full command text.
+- **Character restrictions**: By default, shell metacharacters (`;`, `|`, `` ` ``, `$`, `&`, `>`, `<`)
+  are **rejected** unless you pass `--allow-error-metachars`. Only enable this flag when your
+  command genuinely requires shell features like piping or variable expansion.
+- **Length limit**: Commands are limited to 500 characters.
+
 ### Security Summary
 
 | Setting | Default | Override |

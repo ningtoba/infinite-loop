@@ -377,6 +377,7 @@ class LoopConfig:
     # ── Notifications & Callbacks ───────────────────────────
     notify_cmd: str | None = None
     on_error_cmd: str | None = None
+    allow_error_metachars: bool = False
     notify_desktop: bool = False
     notify_on_completion: bool = False
     notify_pushbullet: str = ""

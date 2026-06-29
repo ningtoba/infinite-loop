@@ -235,6 +235,7 @@ def main() -> None:
         cfg.workdir = args.workdir or None
         cfg.notify_cmd = args.notify_cmd or None
         cfg.on_error_cmd = args.on_error_cmd or None
+        cfg.allow_error_metachars = args.allow_error_metachars
         cfg.auto_toolsets = not args.no_auto_toolsets
         cfg.failure_learning = not args.no_failure_learning
         cfg.html_dashboard = args.status_html

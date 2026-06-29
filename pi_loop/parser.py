@@ -216,6 +216,12 @@ See 'pi-loop --examples' for more usage patterns.
         help="Shell command to run on iteration error",
     )
     notif.add_argument(
+        "--allow-error-metachars",
+        action="store_true",
+        default=False,
+        help="Allow shell metacharacters (; | ` $ & > <) in --on-error-cmd (security risk)",
+    )
+    notif.add_argument(
         "--notify-pushbullet",
         type=str,
         default="",

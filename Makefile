@@ -23,20 +23,20 @@ help:
 	@echo ""
 
 install:
-	pip install -e .
+	pip install -e . 2>/dev/null || pip install -e . --break-system-packages
 
 install-dev:
-	pip install -e ".[test,dev]"
+	pip install -e ".[test,dev]" 2>/dev/null || pip install -e ".[test,dev]" --break-system-packages
 
 update-lock:
-	pip install pip-tools
-	pip-compile pyproject.toml --output-file requirements.txt --quiet
-	pip-compile pyproject.toml --output-file requirements-dev.txt --extra test --extra dev --quiet
+	pip install pip-tools 2>/dev/null || pip install pip-tools --break-system-packages
+	pip-compile pyproject.toml --output-file requirements.txt --quiet --strip-extras
+	pip-compile pyproject.toml --output-file requirements-dev.txt --extra test --extra dev --quiet --strip-extras
 
 verify-lock:
-	pip install pip-tools
-	pip-compile pyproject.toml --output-file /tmp/pi-loop-reqs.txt --quiet
-	pip-compile pyproject.toml --output-file /tmp/pi-loop-reqs-dev.txt --extra test --extra dev --quiet
+	pip install pip-tools 2>/dev/null || pip install pip-tools --break-system-packages
+	pip-compile pyproject.toml --output-file /tmp/pi-loop-reqs.txt --quiet --strip-extras
+	pip-compile pyproject.toml --output-file /tmp/pi-loop-reqs-dev.txt --extra test --extra dev --quiet --strip-extras
 	cmp requirements.txt /tmp/pi-loop-reqs.txt || { echo "LOCK OUTDATED: re-run 'make update-lock'"; exit 1; }
 	cmp requirements-dev.txt /tmp/pi-loop-reqs-dev.txt || { echo "LOCK OUTDATED: re-run 'make update-lock'"; exit 1; }
 	rm -f /tmp/pi-loop-reqs.txt /tmp/pi-loop-reqs-dev.txt

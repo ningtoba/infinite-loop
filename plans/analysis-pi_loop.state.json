@@ -1,0 +1,22 @@
+{
+  "classes": [],
+  "functions": ["_version_detail", "load_or_create_ledger"],
+  "imports": [
+    "import os",
+    "import time",
+    "from datetime import datetime, timezone",
+    "from .config import VERSION",
+    "from .file_utils import _log, read_ledger, write_ledger",
+    "from .stats import _recalc_stats"
+  ],
+  "async": [],
+  "subprocess": [],
+  "file_io": [
+    {"line": 15, "pattern": "os.path.exists(sentinel_path)"},
+    {"line": 17, "pattern": "os.remove(sentinel_path)"},
+    {"line": 5, "pattern": "from .file_utils import ... read_ledger, write_ledger", "note": "file I/O delegated to read_ledger/write_ledger helpers"}
+  ],
+  "network": [],
+  "file_length": 122,
+  "summary": "This module provides a single function, load_or_create_ledger, which is responsible for loading an existing Hermes loop execution ledger from disk or creating a fresh one. It handles resumption of interrupted runs by recovering stale pending iterations (timed out after 300s), optionally resets completed goals, and initialises error-tracking and mitigation-state dictionaries in the ledger dict. All actual file I/O is delegated to the read_ledger and write_ledger helpers imported from .file_utils."
+}

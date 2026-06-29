@@ -1,877 +1,671 @@
 # Engineering Backlog
 
-## How to Use This Backlog
+> Living document — comprehensive engineering backlog for the pi-loop autonomous task automation daemon.
+> Last updated: 2026-06-30
+> Version: 14.39.0
 
-This backlog consolidates all engineering concerns discovered during the comprehensive codebase audit of **pi-loop v14.39.0**. Each item is actionable, specific, and references actual source locations.
+---
 
-**Organization**: Items are sorted by priority (critical → high → medium → low), and within each priority tier by impact (critical impact first).
+## Project Overview
 
-**Status lifecycle**: `backlog` → `researching` → `in-progress` → `completed`
+**pi-loop** is a self-contained Python daemon that runs tasks iteratively in a loop, tracks progress in a JSON ledger, and surfaces everything through a dark-theme web dashboard. It delegates each iteration to the [pi coding agent](https://pi.ai) and handles orchestration — convergence detection, error recovery, cooldown management, git auto-commit, multi-worker parallelism, and real-time monitoring via SSE.
 
-**Maintenance**: When starting work on an item, move it to `in-progress`. When adding new discoveries, insert them at the correct priority/impact position and renumber all subsequent B-IDs. Keep descriptions crisp — 2–4 sentences plus the suggested approach. Archive completed items to a `## Completed` section at the bottom.
+### Architecture & Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Language** | Python ≥3.10, JavaScript (vanilla SPA) |
+| **Web framework** | FastAPI 0.138.1 + Starlette 1.3.1 |
+| **Server** | uvicorn 0.49.0 (with httptools, uvloop) |
+| **Validation** | Pydantic 2.13.4 |
+| **Frontend** | Vanilla HTML/CSS/JS (no framework), xterm.js for terminal, SSE for live updates |
+| **Testing** | pytest 9.1, pytest-asyncio, pytest-cov, pytest-timeout (440+ tests across 25+ files) |
+| **Linting** | Ruff 0.15.20 |
+| **Type checking** | mypy 2.1.0 |
+| **CI/CD** | GitHub Actions (Python 3.10–3.13 matrix) |
+| **Worktrees** | 3 active feature worktrees (`bd038f68`, `edaf42c8`, `d19eb158`) plus extensive research/design docs |
+
+### Structure
+
+```
+pi_loop/       → Core daemon package (cli, loop engine, config, error recovery, git utils, heartbeat)
+web_app/       → FastAPI web server + SPA frontend (server.py, loop_manager.py, config_manager.py, static/)
+tests/         → 25+ test files covering pi_loop and web_app modules
+```
+
+### Current State
+
+- **440+ tests** across 19 test modules (up from 0 in prior iteration)
+- **CI fully operational** with Python matrix, lint, type-check, verify-lock
+- **5 bugs fixed** (subprocess zombie leaks, race conditions in loop_manager)
+- **Security baseline**: dashboard XSS fixed, `validate_config()` wired into API, silent I/O suppression replaced with logging
+- **Major remaining debt**: monolithic `run_loop()` (300+ lines, 60+ locals), `LoopConfig` god dataclass (63 fields), no release workflow, no CHANGELOG, DOM XSS in frontend, no security scanning in CI, `/proc`-only system monitoring
+
+---
+
+## Quick Reference
+
+| Priority | Count |
+|----------|-------|
+| 🔴 **P0 — Critical** | 5 |
+| 🟠 **P1 — High** | 9 |
+| 🟡 **P2 — Medium** | 11 |
+| 🔵 **P3 — Low** | 6 |
+| ⚪ **P4 — Wishlist** | 4 |
+| **Total Active** | **35** |
+
+| Category | Count |
+|----------|-------|
+| Security | 2 |
+| Architecture | 4 |
+| Tech Debt | 4 |
+| Reliability | 4 |
+| CI/CD | 4 |
+| Performance | 3 |
+| Testing | 2 |
+| Documentation | 2 |
+| Frontend/CSS | 4 |
+| DevX | 2 |
+| Observability | 1 |
+| Feature | 1 |
+| Automation | 1 |
+| Dependency | 1 |
+
+---
+
+## Top 5 — Immediate Action Items
+
+| Rank | ID | Title | Priority | Effort | Category |
+|------|-----|-------|----------|--------|----------|
+| 1 | **BACKLOG-001** | Fix DOM XSS in web app frontend (app.js) | P0 🔴 | Small | Security |
+| 2 | **BACKLOG-002** | Consolidate hardcoded `/tmp` paths under `PI_LOOP_DATA_DIR` | P0 🔴 | Medium | Reliability |
+| 3 | **BACKLOG-003** | Wire mypy to actually fail CI (remove `|| true`) | P0 🔴 | Small | CI/CD |
+| 4 | **BACKLOG-004** | Automate security scanning in CI (bandit + safety) | P1 🟠 | Small | CI/CD |
+| 5 | **BACKLOG-005** | Implement structured logging with correlation IDs | P1 🟠 | Medium | Observability |
 
 ---
 
 ## Backlog Items
 
-### B-001 | Escape HTML in dashboard HTML generation
+### P0 — Critical
+
+---
+
+### BACKLOG-001 — Fix DOM XSS in web app frontend (app.js)
 
 | Field | Value |
-|---|---|
+|-------|-------|
 | **Category** | security |
-| **Priority** | critical |
-| **Impact** | critical |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/loop.py` |
-
-**Description**: `_build_dashboard_html()` in `loop.py` interpolates iteration summaries directly into HTML via f-strings without escaping. If a pi session outputs `<script>alert('XSS')</script>`, it will execute when the dashboard is viewed. This is a reflected XSS vulnerability.
-
-**Suggested Approach**: Wrap all interpolated values (`summary`, `status`, `duration`, etc.) with `html.escape()` before inserting into HTML template strings. Validate that the dashboard HTML generation uses consistent escaping for every interpolated variable.
-
----
-
-### B-002 | Escape HTML in web SPA frontend
-
-| Field | Value |
-|---|---|
-| **Category** | security |
-| **Priority** | critical |
-| **Impact** | critical |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `web_app/static/app.js` |
-
-**Description**: Multiple locations in `app.js` use `insertAdjacentHTML` and `innerHTML` with template-literal string interpolation (iteration rows, error rows, worker output). The `escapeHtml()` helper exists but is used inconsistently — many template interpolations bypass it, creating client-side XSS vectors.
-
-**Suggested Approach**: Audit every `innerHTML` / `insertAdjacentHTML` call in `app.js`. Apply `escapeHtml()` to all user-controlled data at every interpolation point. Consider migrating to `textContent` + DOM element creation for high-risk areas.
-
----
-
-### B-003 | Silent I/O failure swallowing in config, git, and status writers
-
-| Field | Value |
-|---|---|
-| **Category** | tech-debt |
-| **Priority** | critical |
-| **Impact** | high |
-| **Effort** | medium |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/config_file.py:49`, `pi_loop/git_utils.py:22,35`, `pi_loop/status.py:58`, `pi_loop/heartbeat.py:37,40,57` |
-
-**Description**: At least 6 locations across 4 modules catch OSError or generic exceptions and silently `pass`, swallowing I/O failures. This includes config file writes, git operations, status file writes, and heartbeat touches. Silent failures make debugging production issues extremely difficult — a config change that fails to persist or a git commit that silently fails will go undetected.
-
-**Suggested Approach**: Replace bare `pass` with `logger.warning("...")` calls that include the exception message. For non-fatal failures, still log at warning level. For git operations, consider a `_safe_git_call()` wrapper that always logs on failure. Use `logger.exception()` at debug level when re-raising is inappropriate.
-
----
-
-### B-004 | Mutable module-level global state across multiple modules
-
-| Field | Value |
-|---|---|
-| **Category** | architecture |
-| **Priority** | critical |
-| **Impact** | high |
-| **Effort** | medium |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/error_recovery.py:14-18`, `pi_loop/functions.py:15-20`, `pi_loop/heartbeat.py:23`, `pi_loop/file_utils.py:20`, `web_app/server.py` (multiple) |
-
-**Description**: Five modules use mutable module-level globals (`_ORIGINAL_*`, `_max_output_chars_global`, `_shutdown_requested`, `_daemon_logger`, `_last_cpu_*`) that are mutated at runtime. Module-level mutable state makes testing (state leaks between tests), concurrent access, and reasoning about data flow unpredictable.
-
-**Suggested Approach**: Encapsulate each set of related globals into a class or dataclass instance. Use dependency injection where appropriate (pass `daemon_logger` to `FileLock` constructor, pass `max_output_chars` as a parameter). For `error_recovery.py`, turn `_ORIGINAL_*` into instance attributes of an `ErrorRecoveryStrategy` class.
-
----
-
-### B-005 | LoopConfig god dataclass with 50+ fields
-
-| Field | Value |
-|---|---|
-| **Category** | architecture |
-| **Priority** | critical |
-| **Impact** | high |
-| **Effort** | medium |
-| **Dependencies** | B-001 (indirect — large refactors should follow XSS fixes) |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/config.py:68-179` |
-
-**Description**: `LoopConfig` is a single dataclass with 50+ fields covering iteration control, workers, git, notifications, archiving, logging, safety, and advanced options. It violates the Single Responsibility Principle. The `from_args()` method imports `dataclasses._MISSING_TYPE` — a private API that could break between Python versions.
-
-**Suggested Approach**: Split into focused config dataclasses: `IterationConfig`, `WorkerConfig`, `GitConfig`, `NotificationConfig`, `ArchiveConfig`, `SafetyConfig`, `LoggingConfig`. Compose them in a top-level `AppConfig` container. Replace the `_MISSING_TYPE` import with a sentinel value defined in the project.
-
----
-
-### B-006 | Monolithic run_loop function in loop.py (300+ lines)
-
-| Field | Value |
-|---|---|
-| **Category** | architecture |
-| **Priority** | critical |
-| **Impact** | high |
-| **Effort** | large |
-| **Dependencies** | B-005 (LoopConfig extraction enables cleaner parameter passing) |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/loop.py` |
-
-**Description**: The `run_loop()` function is a 300+ line monolithic function that handles worker spawning, iteration lifecycle, error classification, notification dispatch, dashboard HTML generation, goal evolution, convergence detection, heartbeat management, cooldown handling, and ledger pruning. This makes it extremely difficult to test, debug, or modify individual concerns.
-
-**Suggested Approach**: Extract distinct concerns into dedicated classes: `IterationEngine` (iteration lifecycle), `WorkerPool` (subprocess management), `NotificationDispatcher` (desktop/callback/ntfy), `DashboardBuilder` (HTML generation), `ConvergenceDetector` (idle/converged logic). Each class should have a single responsibility and be independently testable.
-
----
-
-### B-007 | Potential XSS via http-callback-secret leaking into logs
-
-| Field | Value |
-|---|---|
-| **Category** | security |
-| **Priority** | critical |
+| **Priority** | 🔴 P0 Critical |
 | **Impact** | high |
 | **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/parser.py:207`, `pi_loop/loop.py` |
-
-**Description**: The `--http-callback-secret` flag allows passing a secret that gets printed in verbose logging. If the secret ends up in log files or the JSON ledger, it creates a credential exposure risk. Additionally, the secret is stored in the config file unencrypted.
-
-**Suggested Approach**: Mask the secret value in log output (show only first/last 2 characters with `****` in between). Add a note in docs about secure storage of the callback secret. Consider supporting file-based secrets (`--http-callback-secret-file`) that are read from a restricted-permissions file.
+| **Reasoning** | `escapeHtml()` helper exists in `app.js` but is used inconsistently. Three template-literal interpolations (`w.id`, `branch`) in `onclick` handlers create DOM-based XSS vectors. An attacker who controls worker IDs or branch names (via loop_manager API) can execute arbitrary JavaScript in the dashboard browser session. |
+| **Affected files** | `web_app/static/app.js` |
 
 ---
 
-### B-008 | No automated security scanning in CI
+### BACKLOG-002 — Consolidate hardcoded `/tmp` paths under `PI_LOOP_DATA_DIR`
 
 | Field | Value |
-|---|---|
-| **Category** | ci-cd |
-| **Priority** | high |
-| **Impact** | critical |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `.github/workflows/ci.yml`, `pyproject.toml` |
-
-**Description**: There is no security scanning in CI — no `bandit` for static analysis, no `safety`/`pip-audit` for dependency vulnerability scanning, no codeql or semgrep. Given that the project handles secrets (API keys, callback secrets) and has already addressed a starlette CVE, baseline scanning should be automatic.
-
-**Suggested Approach**: Add `bandit` and `safety` to `requirements-dev.txt` (or use `pip-audit` which is built-in via `pip install pip-audit`). Add a `make security` target. Add a `security` job to `.github/workflows/ci.yml` that runs bandit on `pi_loop/` and `web_app/`, and safety on `requirements.txt`.
-
----
-
-### B-009 | No version tags or release workflow
-
-| Field | Value |
-|---|---|
-| **Category** | ci-cd |
-| **Priority** | high |
-| **Impact** | critical |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pyproject.toml`, `.github/workflows/` |
-
-**Description**: Despite mentioning v14.39.0 everywhere in the codebase, there are zero git tags and no release workflow. There is no way to `git checkout v14.4.0` or identify which commit corresponds to a given version. No CI job publishes to PyPI or creates GitHub releases.
-
-**Suggested Approach**: Create a `release.yml` GitHub Actions workflow that runs on tag push (`v*`). The workflow should run tests, build the package, create a GitHub release with auto-generated changelog, and optionally publish to PyPI. Add a `make release` target that tags and pushes.
-
----
-
-### B-010 | /proc filesystem dependency makes project Linux-only
-
-| Field | Value |
-|---|---|
-| **Category** | architecture |
-| **Priority** | high |
-| **Impact** | high |
-| **Effort** | medium |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/system_utils.py`, `web_app/server.py:166-199`, `pi_loop/status.py:39` |
-
-**Description**: CPU/memory monitoring in `system_utils.py` reads `/proc/[pid]/status` and `/proc/stat`. The web app's `_get_cpu_percent()` reads `/proc/stat` and `/proc/meminfo`. `status.py` uses `os.sysconf_names["SC_CLK_TCK"]`. These assumptions prevent the project from running on macOS/BSD without crashing on system monitoring features.
-
-**Suggested Approach**: Create a `SystemResourceProvider` abstract base class with methods `get_cpu_percent()`, `get_memory_info()`, `get_process_usage()`. Implement `LinuxProvider` (current `/proc` logic) and `NoopProvider` (returns 0/empty dict with a warning log). Auto-detect OS at import time and choose the appropriate provider.
-
----
-
-### B-011 | JSON extraction performs two full scans of output
-
-| Field | Value |
-|---|---|
-| **Category** | performance |
-| **Priority** | high |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/file_utils.py` (JSON extraction logic, ~line 120) |
-
-**Description**: The `extract_json_from_output()` function performs two full scans of the output text (backward and forward) searching for balanced braces to extract JSON objects. For large outputs, this doubles the work. Additionally, the function uses naive brace counting that can break on strings containing braces.
-
-**Suggested Approach**: Implement a single-pass parser that tracks brace depth while accounting for string literals (skip braces inside `"..."`). Use a stack-based approach: push on `{`, pop on `}`, and record string start/end positions. This is O(n) single-pass and correctly handles braces in strings.
-
----
-
-### B-012 | Busy-wait with no backoff in file lock
-
-| Field | Value |
-|---|---|
-| **Category** | performance |
-| **Priority** | high |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/file_utils.py:45-46` |
-
-**Description**: The `FileLock.__enter__()` busy-waits with a fixed 100ms sleep interval until the timeout is reached. Under contention (two pi-loop instances, or pi-loop + web UI simultaneously), this creates unnecessary wakeups and CPU usage. No exponential backoff is used.
-
-**Suggested Approach**: Replace the fixed `time.sleep(0.1)` with exponential backoff: start at 10ms, double up to ~1s max, cap at remaining timeout. Use `min(backoff, remaining)` to avoid overshooting the deadline.
-
----
-
-### B-013 | Cooldown implementation blocks with synchronous sleep
-
-| Field | Value |
-|---|---|
-| **Category** | performance |
-| **Priority** | high |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/functions.py:104-107` |
-
-**Description**: The cooldown handler in `_handle_cooldown()` uses `time.sleep(1)` in a loop until the cooldown elapses. This blocks the main thread for seconds at a time and prevents clean cancellation (SIGTERM/SIGINT won't interrupt `time.sleep` until it wakes).
-
-**Suggested Approach**: Replace `time.sleep(1)` with `_shutdown_event.wait(timeout=1)`. This allows immediate cancellation when the shutdown event is set while still ticking at 1-second intervals. The shutdown event comes from `heartbeat.py`'s `_shutdown_requested` — ensure it's passed into the cooldown function.
-
----
-
-### B-014 | No testing documentation despite 25+ test files
-
-| Field | Value |
-|---|---|
-| **Category** | docs |
-| **Priority** | high |
-| **Impact** | high |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `README.md`, `tests/` (all) |
-
-**Description**: The project has 25+ test files with 481 tests, but there is zero documentation on how to run, write, or understand tests. No explanation of the `smoke` marker, no guidance on using `conftest.py` fixtures, no testing conventions, no coverage thresholds or expectations.
-
-**Suggested Approach**: Add a "Testing" section to `README.md` or create `CONTRIBUTING.md` with: how to run specific test subsets (`pytest tests/test_loop.py`), what `smoke` tests are and when to run them (`pytest -m smoke`), how to use shared fixtures from `conftest.py`, and coverage expectations. Document the `@pytest.mark.smoke` practice.
-
----
-
-### B-015 | No CONTRIBUTING.md for new developers
-
-| Field | Value |
-|---|---|
-| **Category** | docs |
-| **Priority** | high |
-| **Impact** | high |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | (new file) |
-
-**Description**: There is no contributor guide. A new developer cloning the repo has no guidance on: how to set up the dev environment, commit message conventions (though the project uses Conventional Commits), PR workflow, code review expectations, or testing requirements.
-
-**Suggested Approach**: Create `CONTRIBUTING.md` covering: development setup (`. venv/bin/activate && make install-dev`), commit message format (Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`, `perf:`, `test:`), pre-commit hooks setup, how to run lint/format/test, and PR checklist. Reference the existing `Makefile` targets.
-
----
-
-### B-016 | No CHANGELOG.md or release history
-
-| Field | Value |
-|---|---|
-| **Category** | docs |
-| **Priority** | high |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | B-009 (tagging should precede changelog generation) |
-| **Status** | backlog |
-| **Affected Files** | (new file) |
-
-**Description**: Version 14.39.0 exists in `__init__.py` and commit messages, but there is no changelog. A user or developer cannot determine what changed between versions, what features were added, what bugs were fixed, or whether upgrading introduces breaking changes.
-
-**Suggested Approach**: Create `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/) format. Populate initial entries from git history (commit messages with `feat:`, `fix:`, `perf:`, `refactor:` prefixes). Add a `make changelog` target for auto-generation. Consider using `git-cliff` or a similar tool for structured changelog generation.
-
----
-
-### B-017 | No deployment documentation (Docker, systemd, reverse proxy)
-
-| Field | Value |
-|---|---|
-| **Category** | docs |
-| **Priority** | high |
-| **Impact** | medium |
-| **Effort** | medium |
-| **Dependencies** | B-010 (/proc abstraction needed for cross-platform Docker images) |
-| **Status** | backlog |
-| **Affected Files** | `README.md`, (new files: `Dockerfile`, `docker-compose.yml`) |
-
-**Description**: The project implements security features (API keys, rate limiting, CORS) that anticipate production use, but there is no deployment guide. No Dockerfile, no docker-compose.yml, no systemd service file, no reverse proxy (nginx/Caddy) example config, no production-vs-development guidance.
-
-**Suggested Approach**: Create `Dockerfile` (multi-stage: build in one stage, run in a slimmer Python-slim stage). Create `docker-compose.yml` with service definition, volume mounts for config/ledger, env vars, and port mapping. Create a `deploy/` directory with systemd service file and example nginx config. Add a "Production Deployment" section to `README.md`.
-
----
-
-### B-018 | REST API has no documentation or OpenAPI spec
-
-| Field | Value |
-|---|---|
-| **Category** | docs |
-| **Priority** | high |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `web_app/server.py`, `README.md` |
-
-**Description**: The FastAPI server exposes 20+ REST endpoints (loop control, config CRUD, status, ledger, iterations, logs, system, SSE streams), but there is no API documentation anywhere. A developer cannot programmatically interact with the daemon without reading the source. FastAPI's automatic OpenAPI generation appears to be disabled or undocumented.
-
-**Suggested Approach**: Ensure FastAPI's automatic OpenAPI docs are accessible (route for `/docs` and `/openapi.json`). Add docstrings to every endpoint function in `server.py` describing purpose, request schema, response schema, and error codes. Add a "REST API" section to `README.md` with key endpoints and example `curl` commands.
-
----
-
-### B-019 | No standalone security documentation (SECURITY.md)
-
-| Field | Value |
-|---|---|
-| **Category** | docs |
-| **Priority** | high |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | (new file) |
-
-**Description**: The project has implemented security features (API-key auth middleware with timing-safe comparison, rate limiting, CORS hardening, localhost-only default binding), but there is no `SECURITY.md` to guide responsible disclosure or describe the security posture.
-
-**Suggested Approach**: Create `SECURITY.md` with: supported versions, how to report a vulnerability (email or GitHub private vulnerability reporting), current security controls (auth, rate limiting, CORS), and security recommendations for deployment (TLS termination at reverse proxy, API key management, binding to localhost + reverse proxy).
-
----
-
-### B-020 | No API endpoint reference in README or docs
-
-| Field | Value |
-|---|---|
-| **Category** | docs |
-| **Priority** | high |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | B-018 (API docs prerequisite) |
-| **Status** | backlog |
-| **Affected Files** | `README.md` |
-
-**Description**: The README has excellent sections for CLI usage and security, but there is no REST API endpoint reference. A developer integrating pi-loop into a larger system must reverse-engineer the endpoints from `server.py`.
-
-**Suggested Approach**: After adding FastAPI docstrings (B-018), create an API reference table in `README.md` with: method, path, description, auth required (yes/no), and key parameters. Include example `curl` commands for the most common operations (start loop, get status, update config, stream logs via SSE).
-
----
-
-### B-021 | No automated dependency vulnerability scanning
-
-| Field | Value |
-|---|---|
-| **Category** | dependency |
-| **Priority** | high |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `.github/workflows/ci.yml`, `requirements.txt` |
-
-**Description**: The project uses `pip-compile` for lock files and has Dependabot configured for weekly updates, but there is no automated vulnerability scanning. The prior starlette CVE was discovered and fixed manually. A `safety` or `pip-audit` scan in CI would catch newly discovered CVEs automatically.
-
-**Suggested Approach**: Add `pip-audit` (or `safety`) to dev dependencies. Add a `make audit` target that runs `pip-audit -r requirements.txt -r requirements-dev.txt`. Add an `audit` job to `.github/workflows/ci.yml`. Configure Dependabot to alert on security advisories (it does this by default for pip).
-
----
-
-### B-022 | Lock files stale — installed versions lag behind lockfile
-
-| Field | Value |
-|---|---|
-| **Category** | dependency |
-| **Priority** | high |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `requirements.txt`, `requirements-dev.txt` |
-
-**Description**: The installed packages in `.venv` lag behind the pinned lockfile versions (e.g., pydantic 2.12.5 installed vs 2.13.4 in lockfile). This suggests the last `pip install` used range resolution instead of the lockfile, or the lockfile was updated without re-installing. Lockfile drift can lead to inconsistent environments.
-
-**Suggested Approach**: Run `make update-lock` (which calls `pip-compile`) and then `pip install -e ".[test,dev]" --no-deps` to ensure only locked deps are installed. Add `make verify-install` that checks `pip list --format=columns --exclude-editable` against `requirements.txt` versions. Consider pinning pip-tools version in `requirements-dev.txt`.
-
----
-
-### B-023 | No pytype or pyright config — mypy is the sole type checker
-
-| Field | Value |
-|---|---|
-| **Category** | devx |
-| **Priority** | medium |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pyproject.toml` |
-
-**Description**: The project only runs `mypy` for type checking (configured in `pyproject.toml`). MyPy is configured with `ignore_missing_imports` which limits its usefulness. 15+ functions still lack type hints, and mypy doesn't catch all type errors that a stricter checker like `pyright` would.
-
-**Suggested Approach**: Add dedicated `mypy.ini` with stricter settings (remove `ignore_missing_imports`, enable `disallow_untyped_defs` in `pi_loop/` gradually). Consider adding `pyright` for an additional pass, or enable `--strict` mode incrementally using per-file-level config. Add a `make types` target.
-
----
-
-### B-024 | Missing type hints on ~15 functions in config_file.py and friends
-
-| Field | Value |
-|---|---|
-| **Category** | tech-debt |
-| **Priority** | medium |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/config_file.py`, `pi_loop/functions.py`, `pi_loop/cli.py` |
-
-**Description**: Approximately 15 functions across 3 files are missing return type annotations: `ensure_config_dir()`, `load_config()`, `save_config()`, `get()`, `get_bool()`, `apply_to_environ()`, `set_max_output_chars()`, `get_max_output_chars()`, `_dump_env()`, and others. This reduces IDE support quality and makes mypy less effective.
-
-**Suggested Approach**: Add return type annotations to all public and private functions. For `load_config()` return `dict | None`, for `save_config()` return `bool`, for `get()`/`get_bool()` return `Any`/`bool`, for `set_max_output_chars()` return `None`. Run `mypy --strict` on the patched files to verify.
-
----
-
-### B-025 | Unused dependency: python-dotenv pulled in by uvicorn[standard]
-
-| Field | Value |
-|---|---|
-| **Category** | dependency |
-| **Priority** | medium |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `requirements.txt`, `pyproject.toml` |
-
-**Description**: `python-dotenv` is pulled in as a transitive dependency of `uvicorn[standard]` but is never imported or used by pi-loop code. It adds ~5KB to the install size and one more dependency in the vulnerability surface for zero benefit.
-
-**Suggested Approach**: Either remove the `[standard]` extras from uvicorn and explicitly list the needed extras (`uvloop`, `httptools`, `websockets`), or document that `python-dotenv` is an unused transitive dep. Consider switching to `uvicorn[standard]` and adding a note in `DEPS.md` documenting intentional unused deps.
-
----
-
-### B-026 | No dotenv/secrets documentation for environment variables
-
-| Field | Value |
-|---|---|
-| **Category** | docs |
-| **Priority** | medium |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `README.md`, `pi_loop/env_utils.py` |
-
-**Description**: While `env_utils.py` has comprehensive environment variable handling (4-tier resolution, fuzzy typo detection), only `PI_LOOP_API_KEY` and `PI_LOOP_CORS_ORIGINS` are documented in the README. The ~120 known `INFINITE_LOOP_*` env vars are not documented anywhere users can find them.
-
-**Suggested Approach**: Add an "Environment Variables" section to `README.md` documenting all commonly used env vars: `PI_LOOP_API_KEY`, `PI_LOOP_CORS_ORIGINS`, `PI_LOOP_BIND`, `PI_LOOP_PORT`, `NO_COLOR`, `PI_LOOP_CONFIG_DIR`, `PI_LOOP_DATA_DIR`. Cross-reference the CLI flags table. Consider generating env var docs from the KNOWN_ENV_VARS list in `env_utils.py`.
-
----
-
-### B-027 | No .editorconfig for cross-editor consistency
-
-| Field | Value |
-|---|---|
-| **Category** | devx |
-| **Priority** | medium |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | (new file) |
-
-**Description**: There is no `.editorconfig` file to enforce consistent editor settings (indentation, line endings, charset, trailing whitespace) across different editors and IDEs. While ruff handles formatting, `.editorconfig` catches things at edit time that ruff fixes after-the-fact.
-
-**Suggested Approach**: Create `.editorconfig` with: `root = true`, `[*]` with `charset = utf-8`, `end_of_line = lf`, `insert_final_newline = true`, `trim_trailing_whitespace = true`, `[*.py]` with `indent_style = space`, `indent_size = 4`, `[Makefile]` with `indent_style = tab`.
-
----
-
-### B-028 | No `pip-tools` or `pre-commit` declared as dev dependencies
-
-| Field | Value |
-|---|---|
-| **Category** | dependency |
-| **Priority** | medium |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pyproject.toml`, `requirements-dev.txt` |
-
-**Description**: `pip-tools` is required for `make update-lock` and `make verify-lock`, and `pre-commit` is required for `make pre-commit` / `make pre-commit-run`. Neither is declared as a dependency in `pyproject.toml` or `requirements-dev.txt`. A new developer running `make install-dev` would get `make update-lock` failures.
-
-**Suggested Approach**: Add `pip-tools>=7.0.0` and `pre-commit>=3.0.0` to the `[project.optional-dependencies] dev` group in `pyproject.toml`. Re-run `pip-compile` to regenerate `requirements-dev.txt` with the new deps.
-
----
-
-### B-029 | Missing test for critical error recovery escalation path
-
-| Field | Value |
-|---|---|
-| **Category** | test |
-| **Priority** | medium |
-| **Impact** | high |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `tests/test_error_recovery.py`, `pi_loop/error_recovery.py` |
-
-**Description**: The error recovery module has 3-level mitigation escalation (mild → moderate → stop) with exponential backoff and success-based ramp-down. However, there is no test that verifies the full escalation chain: a test that feeds consecutive errors of the same type and asserts the correct progression through levels 1→2→3 with appropriate backoff values.
-
-**Suggested Approach**: Add a parametrized test that simulates 5+ consecutive errors of each type (timeout, network, schema, unknown) and asserts: level 1 after first error, level 2 after second, level 3 after third, and correct timeout/cooldown values at each level. Also test success-before-escalation resets to baseline.
-
----
-
-### B-030 | Missing test for ledger stale-iteration crash recovery
-
-| Field | Value |
-|---|---|
-| **Category** | test |
-| **Priority** | medium |
-| **Impact** | high |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `tests/test_state.py`, `pi_loop/state.py:31` |
-
-**Description**: `state.py` has crash recovery logic: if an iteration is pending/stuck and `elapsed >= 300` (5 minutes), it's considered a stale agent crash and recovered. There is no test for this critical recovery path — scenarios where the ledger has a pending iteration older than 300s, or iterations with different statuses that should/shouldn't trigger recovery.
-
-**Suggested Approach**: Add tests that create a ledger with a pending iteration timestamped 301+ seconds ago, call the recovery function, and verify the iteration is marked as failed/abandoned. Test boundary condition (299s should NOT trigger recovery). Test that already-completed iterations are untouched.
-
----
-
-### B-031 | Missing tests for git_utils auto-commit with edge cases
-
-| Field | Value |
-|---|---|
-| **Category** | test |
-| **Priority** | medium |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `tests/test_git_utils.py`, `pi_loop/git_utils.py` |
-
-**Description**: The git auto-commit logic (`_git_auto_commit`) handles git state capture, diff stat computation, and commit message construction. The existing tests may not cover edge cases: empty diffs (no changes), binary file changes, merge conflicts, large diffs exceeding 10KB cap, non-ASCII file names, `.gitignore`-excluded files appearing in `git add -A`.
-
-**Suggested Approach**: Add parameterized tests covering: empty diff (should skip commit), changes only in `.gitignore`-d files (should not commit), changes exceeding 10KB cap (should truncate diff output), binary file modification (should not crash on encoding), and git repo with no commits yet (initial state).
-
----
-
-### B-032 | Missing tests for SSE endpoint reconnection and event types
-
-| Field | Value |
-|---|---|
-| **Category** | test |
-| **Priority** | medium |
-| **Impact** | medium |
-| **Effort** | medium |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `tests/test_server.py`, `web_app/server.py` (SSE endpoints) |
-
-**Description**: The server implements SSE streaming with event types (status, iteration, log, heartbeat, keepalive), exponential backoff reconnection, and broadcast to multiple clients. The existing test suite may not cover: multiple simultaneous SSE connections, client disconnect handling, event ordering, keepalive on idle, and reconnection with `Last-Event-ID`.
-
-**Suggested Approach**: Add tests using httpx's async streaming client or an SSE client library: connect multiple clients, verify each receives the same events, disconnect one client (close stream), verify other clients unaffected, send events and verify correct `event:` and `data:` formatting.
-
----
-
-### B-033 | Missing performance benchmark tests
-
-| Field | Value |
-|---|---|
-| **Category** | test |
-| **Priority** | medium |
-| **Impact** | medium |
-| **Effort** | medium |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `tests/` (new benchmark test file) |
-
-**Description**: There are no performance benchmarks in the test suite. Key operations that should have regression-sensitive benchmarks: JSON extraction from large outputs, file lock acquisition under contention, JSON schema validation of large documents, stats recalculation with thousands of iterations, SSE broadcast to multiple clients.
-
-**Suggested Approach**: Create `tests/test_benchmarks.py` with `pytest-benchmark` (add to dev deps if needed) or simple time-based assertions. Target: JSON extraction of 1MB output under 100ms, file lock under 50ms (no contention), schema validation of 1MB document under 500ms. Run in CI as a non-blocking informational job.
-
----
-
-### B-034 | CSS and JS should be minified for production web UI
-
-| Field | Value |
-|---|---|
-| **Category** | performance |
-| **Priority** | medium |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `web_app/static/style.css`, `web_app/static/app.js` |
-
-**Description**: The web UI static assets serve un-minified CSS (12 KB) and JavaScript (25 KB) as-is. For a production daemon that may be accessed over a network, this adds unnecessary bandwidth. The files lack cache headers and ETags, so they're re-fetched on every page load.
-
-**Suggested Approach**: Add a `make build-web` target that minifies CSS (using `cssnano` or `clean-css`) and JS (using `terser` or `esbuild --minify`). Serve minified files in production mode (`--prod` flag or `PI_LOOP_WEB_PROD=1`). Add `Cache-Control: public, max-age=3600` headers for static assets in production mode.
-
----
-
-### B-035 | CORS configuration accepts wildcard in production mode
-
-| Field | Value |
-|---|---|
-| **Category** | security |
-| **Priority** | medium |
-| **Impact** | high |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `web_app/server.py` (CORS middleware config, ~line 100) |
-
-**Description**: The CORS configuration reads `PI_LOOP_CORS_ORIGINS` from the environment (default `http://localhost:8090`) and splits on comma. The error message warns about wildcard `*` but the implementation still accepts it. A misconfigured deployment could expose the API to any origin.
-
-**Suggested Approach**: Add explicit validation: if `*` is in the origins list, log a warning and reject it in production mode (or require `PI_LOOP_CORS_WILDCARD_ALLOW=1` to override). In production, default to the same origin (`localhost:8090`). Consider supporting regex patterns for subdomain matching.
-
----
-
-### B-036 | No `@atexit` or context manager cleanup for loop resources
-
-| Field | Value |
-|---|---|
-| **Category** | tech-debt |
-| **Priority** | medium |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/loop.py`, `pi_loop/heartbeat.py`, `web_app/loop_manager.py` |
-
-**Description**: Cleanup relies on `__del__` in `web_app/loop_manager.py` (unreliable in Python — may never be called or may fire during interpreter shutdown in unpredictable order). Heartbeat cleanup and sentinel removal are done in procedural code rather than through guaranteed cleanup paths.
-
-**Suggested Approach**: Register `atexit` handlers for critical cleanup (sentinel file removal, heartbeat file cleanup, subprocess termination). Use `contextlib.suppress` or `try/finally` blocks in main entry points. Replace `__del__` in `loop_manager.py` with explicit `close()` method called via `atexit` and documented as required cleanup.
-
----
-
-### B-037 | No integration test that runs the full loop end-to-end
-
-| Field | Value |
-|---|---|
-| **Category** | test |
-| **Priority** | medium |
-| **Impact** | high |
-| **Effort** | large |
-| **Dependencies** | B-004 (global state cleanup needed for clean test isolation) |
-| **Status** | backlog |
-| **Affected Files** | `tests/` (new integration test), `pi_loop/loop.py` |
-
-**Description**: The test suite has excellent unit coverage (481 tests) but no end-to-end integration test that starts the loop, runs a mock worker, checks ledger updates, and verifies convergence detection. The closest is `test_pi_smoke.py` which only checks that the `pi` binary exists on PATH.
-
-**Suggested Approach**: Create `tests/test_integration.py` with a fixture that starts `run_loop()` in a subprocess (or thread with controlled lifecycle). Use a mock goal file that completes in 1-2 iterations. Verify: ledger file is created, iterations increment, stats are computed, convergence is detected, heartbeat file is updated, sentinel file triggers clean shutdown. Mark as `@pytest.mark.slow` (not run by default).
-
----
-
-### B-038 | Rate limits hardcoded in web_app/server.py
-
-| Field | Value |
-|---|---|
-| **Category** | tech-debt |
-| **Priority** | low |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `web_app/server.py:51` |
-
-**Description**: Rate limits (30 req/min for general, 120 req/min for loop control) are hardcoded constants in `server.py`. They cannot be adjusted without modifying source code.
-
-**Suggested Approach**: Move rate limit configuration to environment variables: `PI_LOOP_RATE_LIMIT_GENERAL` (default 30), `PI_LOOP_RATE_LIMIT_CONTROL` (default 120). Add them to the web UI config panel. Document in README environment variables section.
-
----
-
-### B-039 | No health check endpoint returns comprehensive system status
-
-| Field | Value |
-|---|---|
-| **Category** | observability |
-| **Priority** | low |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `web_app/server.py` |
-
-**Description**: The `/health` endpoint exists but may not return comprehensive status: loop running state, last iteration age, disk space for ledger, memory usage, uptime, git state. A production deployment needs a richer health check for load balancer/monitoring integration.
-
-**Suggested Approach**: Enhance `/health` to return a JSON response with: `status` (ok/degraded/down), `loop_running` (bool), `last_iteration_seconds_ago` (int or null), `ledger_size_bytes`, `memory_mb`, `uptime_seconds`, `version`. Consider adding a `/ready` endpoint that returns 200 only when the loop is fully initialized. Add response time measurement.
-
----
-
-### B-040 | Colorize_log_tags applies 20+ regex substitutions per log call
-
-| Field | Value |
-|---|---|
-| **Category** | performance |
-| **Priority** | low |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/file_utils.py:31-62` |
-
-**Description**: Every `_log()` call applies 20+ separate `re.sub()` calls from `_tag_color_map` to the message. For high-frequency log messages (heartbeat ticks, SSE keepalives), this is wasteful CPU spent on terminal coloring.
-
-**Suggested Approach**: Compile all regexes at module load time (pre-compile `_tag_color_map` patterns). Consider a single-pass regex alternation (`pattern1|pattern2|...`) using a combined regex with a replacement function. Skip colorization altogether when output is not a TTY (`not sys.stderr.isatty()`).
-
----
-
-### B-041 | Magic numbers throughout error handling and recovery
-
-| Field | Value |
-|---|---|
-| **Category** | tech-debt |
-| **Priority** | low |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/error_recovery.py`, `pi_loop/state.py:31`, `pi_loop/functions.py:107` |
-
-**Description**: Multiple magic numbers appear throughout the codebase: `150 // 100` (effectively 1), `min(120, ...)` (max cooldown 120s), `min(1800, base * (2 ** min(count, 10)))` (max backoff 1800s), `if elapsed >= 300` (stale iteration 300s), `max(5, min(120, ...))` (cooldown bounds). These are undocumented and untestable.
-
-**Suggested Approach**: Extract all magic numbers into named constants at the top of each module or in a shared `constants.py`: `MAX_COOLDOWN_SECONDS = 120`, `STALE_ITERATION_THRESHOLD = 300`, `MAX_BACKOFF_SECONDS = 1800`, `MAX_BACKOFF_EXPONENT = 10`. Add docstrings explaining why each value was chosen.
-
----
-
-### B-042 | No backup/rotation strategy for JSON ledger
-
-| Field | Value |
-|---|---|
+|-------|-------|
 | **Category** | reliability |
-| **Priority** | low |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/state.py`, `pi_loop/config.py` |
-
-**Description**: The JSON ledger is the single source of truth for all iteration data. There is no backup mechanism, no automatic rotation, and no corruption recovery beyond the atomic `.tmp`→rename write. A bug in ledger write logic (or disk full) could silently truncate the file, losing all historical iteration data.
-
-**Suggested Approach**: Implement automatic ledger backup: rename previous ledger to `ledger.json.bak` before writing new one. Keep 3 rotating backups: `ledger.json.0`, `ledger.json.1`, `ledger.json.2`. Add a `--recover-ledger` CLI flag that reads the latest backup if the primary file is corrupt. Add a `max_ledger_size` config option that triggers archiving when exceeded.
+| **Priority** | 🔴 P0 Critical |
+| **Impact** | high |
+| **Effort** | medium |
+| **Reasoning** | `PI_LOOP_DATA_DIR` env var exists in `config.py` and drives ledger/lock/sentinel paths, but 5+ locations still hardcode `/tmp`: HTML dashboard suggestions (`loop.py`), help examples (`help_topics.py`), preflight disk check default (`preflight.py`), status file default (`status.py`). Breaks container deployments and multi-instance setups. |
+| **Affected files** | `pi_loop/loop.py` (~line 305), `pi_loop/help_topics.py` (lines 145–159), `pi_loop/preflight.py` (~line 35), `pi_loop/status.py` (~line 14) |
 
 ---
 
-### B-043 | Split dual backlog files into single source of truth
+### BACKLOG-003 — Wire mypy to actually fail CI (remove `|| true`)
 
 | Field | Value |
-|---|---|
-| **Category** | docs |
-| **Priority** | low |
-| **Impact** | medium |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | completed |
-| **Affected Files** | `BACKLOG.md`, `ENGINEERING_BACKLOG.md` |
-
-**Description**: The repository has two backlog files — `BACKLOG.md` (legacy, 36 KB, 36 items) and `ENGINEERING_BACKLOG.md` (consolidated). Maintaining two backlogs creates confusion about which is authoritative. The ENGINEERING_BACKLOG.md should become the single source of truth.
-
-**Suggested Approach**: ✅ Completed — this file (`ENGINEERING_BACKLOG.md`) is now the consolidated source of truth. `BACKLOG.md` can be deleted or renamed to `BACKLOG_ARCHIVE.md` once the migration is verified.
-
----
-
-### B-044 | Clean up stale hermes-era git branches and worktrees
-
-| Field | Value |
-|---|---|
-| **Category** | devx |
-| **Priority** | low |
-| **Impact** | low |
-| **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | git branches: `hermes/hermes-bd038f68`, `hermes/hermes-d19eb158`, `hermes/hermes-edaf42c8` |
-
-**Description**: Three stale local branches and `.worktrees/` directories remain from the hermes-agent era. They haven't been touched in ~30+ commits and their content has been carried forward into main. They create confusion during branch listing and waste disk space.
-
-**Suggested Approach**: If the worktree content exists on main: `git branch -d hermes/hermes-*` and `rm -rf .worktrees/`. If not, cherry-pick any useful remaining content (bounded-queue tests, config annotations) to main first, then delete. Add a `make clean-branches` target.
-
----
-
-### B-045 | Add `make security` target for bandit + safety scanning
-
-| Field | Value |
-|---|---|
-| **Category** | automation |
-| **Priority** | medium |
+|-------|-------|
+| **Category** | ci-cd |
+| **Priority** | 🔴 P0 Critical |
 | **Impact** | high |
 | **Effort** | small |
-| **Dependencies** | B-008 (depends on adding bandit/safety to deps) |
-| **Status** | backlog |
-| **Affected Files** | `Makefile` |
-
-**Description**: The Makefile has `install`, `lint`, `test`, `format`, `web`, `clean` targets but no security scanning target. Developers must manually run security tools.
-
-**Suggested Approach**: Add `make security` target that runs: `bandit -r pi_loop web_app -f json -o bandit-report.json` and `safety check -r requirements.txt -r requirements-dev.txt`. Add `make security-ci` that exits non-zero on any findings. Add help text comment above the target.
+| **Reasoning** | `make mypy` and `make lint-all` pipe mypy through `|| true` and `2>/dev/null; true`, silently ignoring all type errors. CI runs these targets so type errors pass unnoticed. Fix each discovered type error or suppress with precise`# type: ignore[code]` comments. |
+| **Affected files** | `Makefile`, `.github/workflows/ci.yml`, multiple `.py` files |
 
 ---
 
-### B-046 | Add automated lockfile freshness check to CI
+### BACKLOG-004 — Automate security scanning in CI (bandit + safety)
 
 | Field | Value |
-|---|---|
+|-------|-------|
 | **Category** | ci-cd |
-| **Priority** | medium |
-| **Impact** | low |
+| **Priority** | 🔴 P0 Critical |
+| **Impact** | high |
 | **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `.github/workflows/ci.yml`, `Makefile` |
-
-**Description**: The CI `lint` job already runs `make verify-lock` (which checks lockfile consistency via pip-compile comparison). This is good practice but should also check that the installed environment matches the lockfile (no drift). Additionally, `verify-lock` should run in the test job, not just lint.
-
-**Suggested Approach**: Add a `verify-install` Makefile target that compares `pip list --format=json` against the versions in `requirements.txt`. Add it to CI's test job. Ensure `make verify-lock` also produces clear output on failure (diff between current and expected requirements).
+| **Reasoning** | No automated security scanning exists despite the project handling API keys, callback secrets, and having addressed starlette CVEs. Add `bandit` for static analysis SAST, `safety` or `pip-audit` for dependency vulnerability scanning. Create a `make security` target and a CI job. |
+| **Affected files** | `Makefile`, `.github/workflows/ci.yml`, `requirements-dev.txt` |
 
 ---
 
-### B-047 | Log tag colorization should be skipped when not a TTY
+### BACKLOG-005 — Implement structured logging with correlation IDs
 
 | Field | Value |
-|---|---|
+|-------|-------|
+| **Category** | observability |
+| **Priority** | 🔴 P0 Critical |
+| **Impact** | high |
+| **Effort** | medium |
+| **Reasoning** | The codebase uses `print()` and `_log()` with no structured fields, no correlation IDs, no log levels for filtering. Production debugging requires manual log scraping. Adopt a structured approach (stdlib `logging` with JSON formatter or `structlog`) with `iteration_id`, `loop_id`, `duration_ms`, `event` fields. |
+| **Affected files** | `pi_loop/loop.py`, `pi_loop/error_recovery.py`, `pi_loop/git_utils.py`, `pi_loop/heartbeat.py`, `pi_loop/preflight.py`, `web_app/server.py` |
+
+---
+
+### P1 — High
+
+---
+
+### BACKLOG-006 — Split LoopConfig god dataclass into focused config classes
+
+| Field | Value |
+|-------|-------|
+| **Category** | architecture |
+| **Priority** | 🟠 P1 High |
+| **Impact** | high |
+| **Effort** | medium |
+| **Reasoning** | `LoopConfig` in `config.py` has 63 fields spanning iteration control, workers, git, notifications, archiving, logging, safety, and advanced options — violating SRP. The `from_args()` method imports `dataclasses._MISSING_TYPE` (private API that may break). Split into `IterationConfig`, `WorkerConfig`, `GitConfig`, `NotificationConfig`, `ArchiveConfig`, `SafetyConfig`, `LoggingConfig` composed in an `AppConfig` container. |
+| **Affected files** | `pi_loop/config.py`, `pi_loop/loop.py`, `pi_loop/functions.py` |
+
+---
+
+### BACKLOG-007 — Decompose monolithic `run_loop()` into focused modules
+
+| Field | Value |
+|-------|-------|
+| **Category** | architecture |
+| **Priority** | 🟠 P1 High |
+| **Impact** | high |
+| **Effort** | xlarge |
+| **Reasoning** | `run_loop()` is 300+ lines handling shutdown, git state capture, notification dispatch, error recovery adaptation, cooldown logic, dashboard HTML generation, HTTP callbacks, goal cycling, convergence detection, and heartbeat management. The function body is ~200 lines of mixed concerns with 60+ local variables. Extract into `IterationEngine`, `NotificationDispatcher`, `DashboardBuilder`, `ConvergenceDetector` classes. |
+| **Affected files** | `pi_loop/loop.py`, new `pi_loop/executor.py`, `pi_loop/orchestrator.py`, `pi_loop/reporter.py` |
+
+---
+
+### BACKLOG-008 — Add noop/fallback system monitoring for non-Linux platforms
+
+| Field | Value |
+|-------|-------|
+| **Category** | architecture |
+| **Priority** | 🟠 P1 High |
+| **Impact** | medium |
+| **Effort** | medium |
+| **Reasoning** | CPU/memory monitoring reads `/proc/[pid]/status`, `/proc/stat`, `/proc/meminfo`, and uses `os.sysconf_names["SC_CLK_TCK"]`. These are Linux-specific. On macOS/BSD the system monitoring endpoints crash with `FileNotFoundError`. Create an abstract `SystemResourceProvider` with `LinuxProvider` and `NoopProvider` (returns 0s with a warning). |
+| **Affected files** | `pi_loop/system_utils.py`, `web_app/server.py`, `pi_loop/status.py` |
+
+---
+
+### BACKLOG-009 — Fix SSE reconnect using exponential backoff
+
+| Field | Value |
+|-------|-------|
+| **Category** | reliability |
+| **Priority** | 🟠 P1 High |
+| **Impact** | medium |
+| **Effort** | small |
+| **Reasoning** | Frontend SSE reconnect uses a fixed 5s `setTimeout`. On server restart, all connected clients reconnect simultaneously (thundering herd). Replace with exponential backoff: 1s, 2s, 4s, 8s, max 30s, with ±25% random jitter. Reset to minimum on successful connection. |
+| **Affected files** | `web_app/static/app.js` (~lines 110–114) |
+
+---
+
+### BACKLOG-010 — Fix iterator-start detection failure on colorized output
+
+| Field | Value |
+|-------|-------|
+| **Category** | reliability |
+| **Priority** | 🟠 P1 High |
+| **Impact** | medium |
+| **Effort** | small |
+| **Reasoning** | `_parse_daemon_line` in `loop_manager.py` checks for `"[ITERATION"` but if daemon logs use ANSI color codes, the bracket prefix can be broken across color escape sequences. Parse with a regex that handles ANSI escapes, or strip ANSI before matching. |
+| **Affected files** | `web_app/loop_manager.py` |
+
+---
+
+### BACKLOG-011 — Make config writes atomic (write .tmp → rename)
+
+| Field | Value |
+|-------|-------|
+| **Category** | reliability |
+| **Priority** | 🟠 P1 High |
+| **Impact** | medium |
+| **Effort** | small |
+| **Reasoning** | Config files are written directly, risking partial/corrupt writes on crash or power loss. Use the atomic pattern: write to `.config.json.tmp`, then `os.rename()` (which is atomic on POSIX). Add corruption detection on read with automatic backup restoration. |
+| **Affected files** | `pi_loop/config_file.py`, `web_app/config_manager.py` |
+
+---
+
+### BACKLOG-012 — Add release workflow and version tags
+
+| Field | Value |
+|-------|-------|
+| **Category** | ci-cd |
+| **Priority** | 🟠 P1 High |
+| **Impact** | medium |
+| **Effort** | medium |
+| **Reasoning** | Despite version `14.39.0` appearing in `__init__.py` and commits, there are zero git tags and no release workflow. No `git checkout v14.4.0` possible. No CI publishes to PyPI or creates GitHub releases. Create `release.yml` triggered on `v*` tags: run tests, build package, create GitHub release with auto-changelog, optionally publish to PyPI. |
+| **Affected files** | `.github/workflows/release.yml` (new), `pyproject.toml` |
+
+---
+
+### BACKLOG-013 — Create integration test suite for subprocess lifecycle
+
+| Field | Value |
+|-------|-------|
+| **Category** | testing |
+| **Priority** | 🟠 P1 High |
+| **Impact** | high |
+| **Effort** | large |
+| **Reasoning** | The core value proposition (subprocess task execution via `pi`) has zero end-to-end verification. Create `tests/integration/` with `mock_pi.sh` emitting realistic NDJSON output. Test single iteration, convergence detection, error recovery with injected failures, sentinel stop/pause, and web UI daemon interaction. |
+| **Affected files** | `tests/integration/` (new dir), `tests/integration/mock_pi.sh`, `tests/integration/conftest.py` |
+
+---
+
+### BACKLOG-014 — Remove dead code: `validate_json_output()`, unused imports
+
+| Field | Value |
+|-------|-------|
+| **Category** | tech-debt |
+| **Priority** | 🟠 P1 High |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | `validate_json_output()` in `validation.py` is defined but never called anywhere. `cli.py` has unused imports (vestiges of hermes-to-pi migration). Dead code rots and distorts coverage metrics. Remove `validate_json_output()` and `_classify_progress()`, clean up `cli.py` imports. |
+| **Affected files** | `pi_loop/validation.py`, `pi_loop/loop.py`, `pi_loop/cli.py` |
+
+---
+
+### P2 — Medium
+
+---
+
+### BACKLOG-015 — Fix blocking cooldown: replace `time.sleep(1)` with event-based wait
+
+| Field | Value |
+|-------|-------|
 | **Category** | performance |
-| **Priority** | low |
-| **Impact** | low |
+| **Priority** | 🟡 P2 Medium |
+| **Impact** | medium |
 | **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `pi_loop/file_utils.py` (daemon logger), `pi_loop/color_utils.py` |
-
-**Description**: ANSI color codes in log output are stripped when writing to files (the log file on disk has ANSI noise), but the 20+ regex substitutions for tag colorization still run even when output is redirected to a file. This wastes CPU on coloring that's immediately discarded.
-
-**Suggested Approach**: Check `sys.stderr.isatty()` (or the configured `NO_COLOR`/`CLI_COLOR` mode) before applying tag colorization regexes. If output is not a TTY or color is disabled, skip all regex substitutions entirely. The `Colorizer` class already has mode support — use it earlier in the log pipeline.
+| **Reasoning** | Cooldown in `_handle_cooldown()` uses `time.sleep(1)` in a loop, blocking the main thread and preventing clean cancellation (SIGTERM won't interrupt `time.sleep`). Replace with `_shutdown_event.wait(timeout=1)` for immediate cancellation while still ticking at 1-second intervals. |
+| **Affected files** | `pi_loop/functions.py` (~lines 104–107) |
 
 ---
 
-### B-048 | Add `completed` status section for tracking resolved items
+### BACKLOG-016 — Replace busy-wait file lock with exponential backoff
 
 | Field | Value |
-|---|---|
-| **Category** | docs |
-| **Priority** | low |
+|-------|-------|
+| **Category** | performance |
+| **Priority** | 🟡 P2 Medium |
 | **Impact** | low |
 | **Effort** | small |
-| **Dependencies** | none |
-| **Status** | backlog |
-| **Affected Files** | `ENGINEERING_BACKLOG.md` |
+| **Reasoning** | `FileLock.__enter__()` busy-waits with fixed 100ms sleep until timeout. Under contention (two pi-loop instances or pi-loop + web UI), this creates unnecessary CPU wakeups. Use exponential backoff: 10ms → 20ms → 40ms → ... → ~1s max, capped at remaining timeout. |
+| **Affected files** | `pi_loop/file_utils.py` (~lines 45–46) |
 
-**Description**: When backlog items are completed, they should be moved to a `## Completed` section at the bottom of this file with the date and commit hash of completion. Currently there is no way to track what was resolved and when.
+---
 
-**Suggested Approach**: Add a `## Completed` section to this file. When moving an item to completed, append a line like `_Resolved in abc1234 on 2026-06-30_` to the item's description and move it below the `## Completed` header. Keep the original B-ID for traceability.
+### BACKLOG-017 — Make on-success/on-error commands non-blocking
+
+| Field | Value |
+|-------|-------|
+| **Category** | performance |
+| **Priority** | 🟡 P2 Medium |
+| **Impact** | medium |
+| **Effort** | medium |
+| **Reasoning** | `run_loop()` runs on-success/on-error commands via blocking `subprocess.call()`, delaying the next iteration until the command completes. For slow commands (e.g., deploying, syncing), this adds minutes to iteration time. Use `subprocess.Popen()` and continue the loop, tracking completions in a background thread. |
+| **Affected files** | `pi_loop/loop.py` (on-success/on-error sections) |
+
+---
+
+### BACKLOG-018 — Fix duplicate `content_block_stop` handler in `_execute_task`
+
+| Field | Value |
+|-------|-------|
+| **Category** | tech-debt |
+| **Priority** | 🟡 P2 Medium |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | `_execute_task` in `loop.py` has two separate `content_block_stop` handler blocks with overlapping logic. This could cause double-counting of tool calls and confusing output. Merge into a single handler. |
+| **Affected files** | `pi_loop/loop.py` (~lines 210–240) |
+
+---
+
+### BACKLOG-019 — Fix `_get_cpu_percent()` returning 0 on first call
+
+| Field | Value |
+|-------|-------|
+| **Category** | tech-debt |
+| **Priority** | 🟡 P2 Medium |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | `_get_cpu_percent()` returns 0 on the first call because `_prev_*` values haven't been set yet for delta calculation. This makes the first monitoring sample always show 0% CPU, confusing operators. Return `None` on first call instead and have callers handle it gracefully. |
+| **Affected files** | `pi_loop/system_utils.py` |
+
+---
+
+### BACKLOG-020 — Fix inconsistent HTTP status codes for logical errors
+
+| Field | Value |
+|-------|-------|
+| **Category** | tech-debt |
+| **Priority** | 🟡 P2 Medium |
+| **Impact** | medium |
+| **Effort** | medium |
+| **Reasoning** | Config save and loop control endpoints return HTTP 200 with `{"success": false}` for logical errors instead of proper 4xx status codes. Clients can't distinguish logical (422, 400, 409) from server (500) errors. Return appropriate HTTP status codes with structured error bodies. |
+| **Affected files** | `web_app/server.py` |
+
+---
+
+### BACKLOG-021 — Add OpenAPI documentation to all web endpoints
+
+| Field | Value |
+|-------|-------|
+| **Category** | documentation |
+| **Priority** | 🟡 P2 Medium |
+| **Impact** | medium |
+| **Effort** | medium |
+| **Reasoning** | The FastAPI app has no auto-generated docs beyond the minimal title/description. All endpoints need proper response models, docstrings, and OpenAPI metadata. FastAPI supports this natively — add Pydantic response models, operation IDs, and summary/description tags. |
+| **Affected files** | `web_app/server.py` |
+
+---
+
+### BACKLOG-022 — Create CHANGELOG.md and configure auto-generation
+
+| Field | Value |
+|-------|-------|
+| **Category** | documentation |
+| **Priority** | 🟡 P2 Medium |
+| **Impact** | medium |
+| **Effort** | small |
+| **Reasoning** | Version 14.39.0 exists but there is no changelog. Users cannot determine what changed between versions. Since the project uses Conventional Commits, auto-generate a CHANGELOG from git history via `git-cliff` or similar. Keep a manually curated `CHANGELOG.md` for the initial baseline. |
+| **Affected files** | `CHANGELOG.md` (new), `pyproject.toml` for cliff config |
+
+---
+
+### BACKLOG-023 — Migrate CSS to custom properties and remove dead toggle CSS
+
+| Field | Value |
+|-------|-------|
+| **Category** | frontend |
+| **Priority** | 🟡 P2 Medium |
+| **Impact** | low |
+| **Effort** | medium |
+| **Reasoning** | `style.css` has ~50+ hardcoded `#rrggbb` hex values and ~800 lines of nearly identical light/dark theme duplication. Migrate to CSS custom properties (`--color-bg`, `--color-text`, etc.) with a theme-switching class. Remove dead `.toggle` / `.toggle-slider` CSS (no corresponding HTML elements exist). |
+| **Affected files** | `web_app/static/style.css` |
+
+---
+
+### BACKLOG-024 — Add Dependabot/Renovate configuration
+
+| Field | Value |
+|-------|-------|
+| **Category** | ci-cd |
+| **Priority** | 🟡 P2 Medium |
+| **Impact** | medium |
+| **Effort** | small |
+| **Reasoning** | No automated dependency update configuration. FastAPI, uvicorn, pytest, ruff dependencies won't get automatic PRs for security updates. Configure Dependabot for `pip` ecosystem with weekly schedule. |
+| **Affected files** | `.github/dependabot.yml` (new) |
+
+---
+
+### BACKLOG-025 — Add coverage reporting to CI
+
+| Field | Value |
+|-------|-------|
+| **Category** | testing |
+| **Priority** | 🟡 P2 Medium |
+| **Impact** | medium |
+| **Effort** | small |
+| **Reasoning** | pytest-cov is installed but unused. Add `--cov=pi_loop --cov=web_app --cov-report=term-missing` to `make test`. Add coverage step to CI test job. Set minimum coverage threshold (e.g., 65%) to prevent regressions. |
+| **Affected files** | `Makefile`, `.github/workflows/ci.yml` |
+
+---
+
+### P3 — Low
+
+---
+
+### BACKLOG-026 — Remove redundant `pip install` in `make test`
+
+| Field | Value |
+|-------|-------|
+| **Category** | devx |
+| **Priority** | 🔵 P3 Low |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | `make test` runs `pip install -e ".[test]"` before every `pytest` invocation, wasting 2–3 seconds per local test run. The `install-dev` target already installs test deps. Remove the pip install from the test target. |
+| **Affected files** | `Makefile` |
+
+---
+
+### BACKLOG-027 — Add `[tool.ruff.lint]` section to `pyproject.toml`
+
+| Field | Value |
+|-------|-------|
+| **Category** | devx |
+| **Priority** | 🔵 P3 Low |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | While `[tool.ruff]` line-length config exists, there's no `[tool.ruff.lint]` section selecting specific rule sets. Default rules may be too permissive. Add explicit select (E, F, W, I, N, UP, B, SIM, ARG, RUF100 — already in ruff config). |
+| **Affected files** | `pyproject.toml` |
+
+---
+
+### BACKLOG-028 — Fix empty catch blocks in app.js
+
+| Field | Value |
+|-------|-------|
+| **Category** | frontend |
+| **Priority** | 🔵 P3 Low |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | 5+ empty `catch` blocks in `app.js` (lines 68–70, 255–257, 279–281, 499–506, 544–548) make frontend errors invisible. Add `console.error('Error [label]:', e)` to each. |
+| **Affected files** | `web_app/static/app.js` |
+
+---
+
+### BACKLOG-029 — Add keyboard-focus indicators and `aria-live` regions
+
+| Field | Value |
+|-------|-------|
+| **Category** | frontend |
+| **Priority** | 🔵 P3 Low |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | Buttons lack `:focus-visible` keyboard focus indicators. Dynamic content containers (log entries, status updates, iteration tables) lack `aria-live` attributes for screen readers. Add minimal accessibility improvements. |
+| **Affected files** | `web_app/static/style.css`, `web_app/static/index.html`, `web_app/static/app.js` |
+
+---
+
+### BACKLOG-030 — Add pi binary availability check to CI
+
+| Field | Value |
+|-------|-------|
+| **Category** | ci-cd |
+| **Priority** | 🔵 P3 Low |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | CI doesn't verify that the `pi` CLI is available. A `pi` API change (removed flag, different output format) could silently break the daemon. Add a CI step to check `pi --help` or `pi --version`. |
+| **Affected files** | `.github/workflows/ci.yml` |
+
+---
+
+### BACKLOG-031 — Downgrade expected-error log levels in daemon poll
+
+| Field | Value |
+|-------|-------|
+| **Category** | tech-debt |
+| **Priority** | 🔵 P3 Low |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | Logging at ERROR level for expected conditions — e.g., `Connection refused` during normal retry, or process-not-started-yet during heartbeat polling. These flood production logs. Downgrade to WARNING or INFO as appropriate. |
+| **Affected files** | `pi_loop/heartbeat.py`, `pi_loop/loop.py` |
+
+---
+
+### P4 — Wishlist
+
+---
+
+### BACKLOG-032 — Add HTTP callback secret masking in logs
+
+| Field | Value |
+|-------|-------|
+| **Category** | security |
+| **Priority** | ⚪ P4 Wishlist |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | `--http-callback-secret` is logged verbosely if debug logging is enabled. Mask to first/last 2 characters with `****` in between. Add support for `--http-callback-secret-file` (reads from a restricted-permissions file). |
+| **Affected files** | `pi_loop/parser.py`, `pi_loop/loop.py` |
+
+---
+
+### BACKLOG-033 — Add configurable static asset base path
+
+| Field | Value |
+|-------|-------|
+| **Category** | devx |
+| **Priority** | ⚪ P4 Wishlist |
+| **Impact** | low |
+| **Effort** | small |
+| **Reasoning** | Script/link tags in `index.html` hardcode `/static/app.js` and `/static/style.css`. Add a configurable base path or use a FastAPI template context so assets can be served from a CDN or different prefix. |
+| **Affected files** | `web_app/static/index.html`, `web_app/server.py` |
+
+---
+
+### BACKLOG-034 — Add heartbeat/runtime guard for hung iterations
+
+| Field | Value |
+|-------|-------|
+| **Category** | feature |
+| **Priority** | ⚪ P4 Wishlist |
+| **Impact** | medium |
+| **Effort** | medium |
+| **Reasoning** | A stuck pi subprocess can hang the daemon indefinitely with no recovery. Add a heartbeat/runtime guard to the main `while True` loop so that if an iteration exceeds `max_iteration_wall_time`, the daemon can self-recover by killing the subprocess and moving on. |
+| **Affected files** | `pi_loop/loop.py` (~line 310) |
+
+---
+
+### BACKLOG-035 — Implement JSON extraction as single-pass parser
+
+| Field | Value |
+|-------|-------|
+| **Category** | performance |
+| **Priority** | ⚪ P4 Wishlist |
+| **Impact** | low |
+| **Effort** | medium |
+| **Reasoning** | `extract_json_from_output()` does two full scans (backward and forward) with naive brace counting that breaks on strings containing braces. Implement a single-pass O(n) parser using a stack that tracks brace depth while accounting for string literals. |
+| **Affected files** | `pi_loop/file_utils.py` (~line 120) |
+
+---
+
+## Completed Items (prior sprint)
+
+| ID | Title | Category | Completed |
+|----|-------|----------|-----------|
+| | Subprocess zombie leak (timeout) — `proc.kill()` + `proc.wait()` | Bug | ✅ |
+| | Race condition in `loop_manager.stop()` — `self._lock` | Bug | ✅ |
+| | TOCTOU race in `loop_manager.stop()` — PID ownership check | Bug | ✅ |
+| | Race: status='running' set before monitors created | Bug | ✅ |
+| | Race: `_read_stream` AttributeError on stale `self._process` | Bug | ✅ |
+| | Silent error recovery mitigation loss (`state.get("mitigations", {})`) | Bug | ✅ |
+| | Duplicated shutdown logic (extracted `_shutdown()`, -134 lines) | Tech Debt | ✅ |
+| | Silent exception swallowing (bare `except: pass` everywhere) | Tech Debt | ✅ |
+| | Stored XSS in `_build_dashboard_html()` — `html.escape()` | Security | ✅ |
+| | `validate_config()` wired into `save_config_api()` | Security | ✅ |
+| | Config file corruption → graceful defaults instead of 500 | Reliability | ✅ |
+| | Silent I/O failure logging (config_file, git_utils, heartbeat, status) | Reliability | ✅ |
+| | Circular import `cli.py` ↔ `help_topics.py` (extracted `parser.py`) | Architecture | ✅ |
+| | Duplicate `worker_term` init in `_parse_daemon_line` | Cleanup | ✅ |
+| | `import urllib.request` inside function body → top of module | Cleanup | ✅ |
+| | Duplicate `write_status_file()` calls removed | Cleanup | ✅ |
+| | Downgraded heartbeat ERROR log levels for normal startup | Cleanup | ✅ |
+| | 440+ tests across 19 test files (was 0) | Testing | ✅ |
+| | CI pipeline with Python 3.10–3.13 matrix | CI/CD | ✅ |
+| | Pre-commit hook rewritten (ruff check + format) | CI/CD | ✅ |
+| | Dev/test dependencies in `pyproject.toml` | CI/CD | ✅ |
+| | mypy config in `pyproject.toml` | DX | ✅ |
+| | Ruff config in `pyproject.toml` | DX | ✅ |
+| | Worker terminal state persists across UI navigation | Feature | ✅ |
+
+---
+
+## File-by-File Issue Density
+
+| File | Active Issues |
+|------|---------------|
+| `pi_loop/loop.py` | 5 (BACKLOG-002, -007, -014, -018, -034) |
+| `pi_loop/help_topics.py` | 1 (BACKLOG-002) |
+| `pi_loop/preflight.py` | 1 (BACKLOG-002) |
+| `pi_loop/status.py` | 1 (BACKLOG-002) |
+| `pi_loop/cli.py` | 1 (BACKLOG-014) |
+| `pi_loop/validation.py` | 1 (BACKLOG-014) |
+| `pi_loop/config.py` | 1 (BACKLOG-006) |
+| `pi_loop/system_utils.py` | 2 (BACKLOG-008, -019) |
+| `pi_loop/functions.py` | 1 (BACKLOG-015) |
+| `pi_loop/file_utils.py` | 1 (BACKLOG-016), 1 (BACKLOG-035) |
+| `pi_loop/heartbeat.py` | 1 (BACKLOG-031) |
+| `pi_loop/config_file.py` | 1 (BACKLOG-011) |
+| `web_app/static/app.js` | 3 (BACKLOG-001, -009, -028) |
+| `web_app/server.py` | 2 (BACKLOG-020, -021) |
+| `web_app/loop_manager.py` | 1 (BACKLOG-010) |
+| `web_app/config_manager.py` | 1 (BACKLOG-011) |
+| `web_app/static/style.css` | 2 (BACKLOG-023, -029) |
+| `web_app/static/index.html` | 1 (BACKLOG-029, -033) |
+| `Makefile` | 3 (BACKLOG-003, -004, -025, -026) |
+| `.github/workflows/ci.yml` | 3 (BACKLOG-003, -004, -025, -030) |
+| `.github/` (dependabot, release) | 2 new files needed (BACKLOG-012, -024) |
+| `.github/workflows/release.yml` | 1 (BACKLOG-012) |
+| `pyproject.toml` | 1 (BACKLOG-027) |
+
+---
+
+## Effort Distribution
+
+| Effort | Count | Items |
+|--------|-------|-------|
+| **Small** | 20 | BACKLOG-001, -003, -004, -009, -010, -011, -014, -015, -016, -019, -022, -024, -025, -026, -027, -028, -029, -030, -031, -032, -033 |
+| **Medium** | 12 | BACKLOG-002, -005, -006, -008, -012, -017, -020, -021, -023, -034, -035 |
+| **Large** | 2 | BACKLOG-007, -013 |
+| **X-Large** | 1 | BACKLOG-007 internal note (project-wide decomposition) |
+
+---
+
+## Priority vs Effort Matrix
+
+```
+High Impact ─────────────────────────────────────────────────────
+            │                                          │
+            │  BACKLOG-001 (XSS fix)                   │  BACKLOG-007 (run_loop decomp)
+            │  BACKLOG-004 (security CI)               │  BACKLOG-013 (integration tests)
+            │  BACKLOG-005 (structured logging)        │
+            │  BACKLOG-006 (config split)              │
+            │  BACKLOG-002 (/tmp consolidation)        │
+            │                                          │
+            │  BACKLOG-009 (SSE backoff)               │  BACKLOG-012 (release workflow)
+            │  BACKLOG-011 (atomic config)             │  BACKLOG-015 (cooldown fix)
+            │  BACKLOG-010 (colorized parse)           │  BACKLOG-017 (non-blocking cmds)
+            │                                          │
+Low Effort ───────────────────────────────────────────────────── High Effort
+```
+
+**Sweet spot (top-left):** Highest value per unit effort — tackle BACKLOG-001, -003, -004, -011, -009, -010 first.
+**Strategic investments (bottom-right):** BACKLOG-007 and BACKLOG-013 require significant effort but provide foundational improvements.
+
+---
+
+## Execution Ripple Effects
+
+| Item | Blocks | Blocked By |
+|------|--------|------------|
+| BACKLOG-007 (run_loop decomp) | BACKLOG-013 (integration tests), BACKLOG-017 (non-blocking cmds) | BACKLOG-006 (config split — recommended) |
+| BACKLOG-023 (CSS custom props) | — | — (independent) |
+| BACKLOG-012 (release workflow) | BACKLOG-022 (CHANGELOG) | BACKLOG-003 (mypy CI — release should gate on clean CI) |
+| BACKLOG-011 (atomic config) | — | — (independent) |
+
+---
+
+*This backlog is a living document. Items should be re-prioritized quarterly. The top 5 (BACKLOG-001 through BACKLOG-005) represent the highest-value work for the next sprint.*

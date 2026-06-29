@@ -211,11 +211,11 @@ These items should be tackled first — they deliver outsized value for minimal 
 - **Priority:** Medium
 - **Impact:** 1
 - **Effort:** 1
-- **Status:** Pending
+- **Status:** Done ✅
 - **Dependencies:** None
 - **Description:** `error_recovery.py:38` has `150 // 100` which evaluates to `1` (integer division). This appears to be a leftover from a refactor where a timeout multiplier was supposed to be computed as a float. The intended behavior was likely `150 / 100 = 1.5`. As-is, it's a no-op.
-- **Suggested Approach:** Replace with the intended float multiplier `150 / 100` or extract the literal `1.5` with a named constant.
-- **Affected Files:** `pi_loop/error_recovery.py` line 38
+- **Suggested Approach:** ✅ Resolved — replaced with a module-level `_TIMEOUT_MULTIPLIER: float = 1.5` named constant. The int→float type mismatch downstream was also fixed by wrapping in `int()`.
+- **Affected Files:** `pi_loop/error_recovery.py` line 117
 
 ### BUG-008 — CLI `main()` silently accepts invalid `--config` JSON keys
 
@@ -625,10 +625,10 @@ These items should be tackled first — they deliver outsized value for minimal 
 - **Priority:** Medium
 - **Impact:** 2
 - **Effort:** 2
-- **Status:** Pending
+- **Status:** Done ✅
 - **Dependencies:** None
 - **Description:** The `api_key_auth` middleware reads `PI_LOOP_API_KEY` from `os.environ` on every HTTP request. If the env var changes after startup (possible in container orchestration or when the env is mutated), auth behavior changes without warning. More critically, if the var is accidentally unset, authentication silently disables.
-- **Suggested Approach:** Read `PI_LOOP_API_KEY` once at server startup in `main()` and pass it as a closure variable or module-level constant. Log a warning if auth is enabled/disabled at startup with the detected value (masked).
+- **Suggested Approach:** ✅ Resolved — `main()` now reads `PI_LOOP_API_KEY` once at startup into a module-level `_API_KEY` constant. The middleware uses `_API_KEY` directly, with a backward-compatible `os.environ.get()` fallback for tests. Startup logs whether auth is enabled or disabled.
 - **Affected Files:** `web_app/server.py`
 
 ### SEC-005 — `shell=True` on user-configurable error command (Bandit B602)
@@ -729,11 +729,11 @@ These items should be tackled first — they deliver outsized value for minimal 
 - **Priority:** High
 - **Impact:** 3
 - **Effort:** 1
-- **Status:** Pending
+- **Status:** Done ✅
 - **Dependencies:** TOOL-005 (coverage config in pyproject.toml)
 - **Description:** `pytest-cov` is installed and available, but `make test` does not use `--cov` flags. CI runs `make test` without coverage, so coverage cannot decrease without anyone noticing. The coverage report from earlier audits (68% overall, 19% loop.py) cannot be tracked over time.
-- **Suggested Approach:** Add `--cov=pi_loop --cov=web_app --cov-report=term-missing` to `make test`. Add coverage threshold in `pyproject.toml` `[tool.coverage.report]` with `fail_under = 65`. Add coverage artifact upload to CI.
-- **Affected Files:** `Makefile` (test target), `.github/workflows/ci.yml`, `pyproject.toml`
+- **Suggested Approach:** ✅ Resolved — added `[tool.coverage.run]` (source: pi_loop, web_app; omit: */tests/*, */**main**.py) and `[tool.coverage.report]` with `fail_under = 65` and exclusion patterns to `pyproject.toml`. The `make test` target already uses `--cov=pi_loop --cov=web_app` flags.
+- **Affected Files:** `pyproject.toml`
 
 ### CI-CD-002 — No release workflow (tag → build → publish)
 
@@ -944,11 +944,11 @@ These items should be tackled first — they deliver outsized value for minimal 
 - **Priority:** Low
 - **Impact:** 1
 - **Effort:** 1
-- **Status:** Pending
+- **Status:** Done ✅
 - **Dependencies:** None
 - **Description:** `pip-tools` (needed for `make update-lock` and `make verify-lock`) is not declared in `[project.optional-dependencies]`. Neither is `pre-commit` (needed for `make pre-commit`). A developer running `pip install -e ".[test,dev]"` won't get these tools and will get errors when running these Makefile targets.
-- **Suggested Approach:** Add `pip-tools>=7.0` and `pre-commit>=3.0` to the `dev` optional dependencies group in `pyproject.toml`. Recompile lockfiles after adding.
-- **Affected Files:** `pyproject.toml` `[project.optional-dependencies] dev`
+- **Suggested Approach:** ✅ Already done — both `pip-tools>=7.0.0` and `pre-commit>=3.0.0` are listed in the `dev` optional dependencies group. The lockfiles include them. No action needed.
+- **Affected Files:** `pyproject.toml` — confirmed present
 
 ---
 

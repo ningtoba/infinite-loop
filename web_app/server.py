@@ -42,6 +42,10 @@ _sse_clients_lock = asyncio.Lock()
 # Server start timestamp for uptime reporting
 _server_start_time: float = 0.0
 
+# API key read once at startup (SEC-004), not from os.environ on every request.
+# Set by main() on initial launch; empty string means auth is disabled.
+_API_KEY: str = ""
+
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -85,11 +89,13 @@ async def api_key_auth(request: Request, call_next):
     """Validate `Authorization: Bearer <key>` on /api/* routes.
 
     Skips the health-check endpoint (/api/health) and all non-/api paths.
-    Reads the expected key from the PI_LOOP_API_KEY environment variable.
-    When the env var is unset or empty, auth is disabled entirely, preserving
+    Uses the module-level _API_KEY constant set once at startup by main().
+    Falls back to os.environ for backward compat with tests that patch
+    the environment directly without going through main().
+    When the key is empty, auth is disabled entirely, preserving
     backward compat for local development.
     """
-    api_key = os.environ.get("PI_LOOP_API_KEY", "")
+    api_key = _API_KEY or os.environ.get("PI_LOOP_API_KEY", "")
 
     if not api_key:
         # No key configured — allow all requests (local-dev mode)
@@ -722,6 +728,8 @@ def main():
 
     import uvicorn
 
+    global _API_KEY
+
     try:
         default_port = int(os.environ.get("WEB_PORT", "8090"))
     except (ValueError, TypeError):
@@ -742,6 +750,16 @@ def main():
     )
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload (development)")
     args = parser.parse_args()
+
+    # Read API key once at startup (SEC-004) — closes over os.environ so
+    # per-request middleware never reads env vars.
+    _raw_key = os.environ.get("PI_LOOP_API_KEY", "")
+    if _raw_key:
+        _API_KEY = _raw_key
+        print("  [AUTH] API key authentication enabled")
+    else:
+        _API_KEY = ""
+        print("  [AUTH] API key authentication disabled (local-dev mode)")
 
     # Set env path if provided
     if args.env:

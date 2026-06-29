@@ -62,6 +62,20 @@ targets = ["pi_loop/", "web_app/"]
 skips = ["B101"]
 confidence = "high"
 
+[tool.coverage.run]
+source = ["pi_loop", "web_app"]
+omit = ["*/tests/*", "*/__main__.py"]
+
+[tool.coverage.report]
+fail_under = 65
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 addopts = "-v --tb=short --timeout=120"

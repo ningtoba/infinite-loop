@@ -12,6 +12,10 @@ _ORIGINAL_COOLDOWN: int = 0
 _ORIGINAL_USE_LIBRARY: bool = False
 _ORIGINAL_WORKERS: int = 1
 
+# Timeout multiplier applied at mitigation level 1 for timeout errors.
+# Evaluates to 1.5 (float), not 1 (integer).
+_TIMEOUT_MULTIPLIER: float = 1.5
+
 
 def _set_originals(session_timeout: int, cooldown: int, use_library: bool, workers: int) -> None:
     """Set original baseline values from run_loop for mitigation comparisons."""
@@ -114,7 +118,7 @@ def _adapt_to_error(
 
     if new_level >= 1 and level_before < 1:
         if error_type == "timeout":
-            new_timeout = min(600, int(session_timeout or 0) * 150 // 100)
+            new_timeout = int(min(600, int(session_timeout or 0) * _TIMEOUT_MULTIPLIER))
             actions.append(f"[MITIGATION] Timeout errors: increased timeout to {new_timeout}s")
         elif error_type == "network":
             # Exponential backoff: cooldown = base * 2^count, capped at 30 min.

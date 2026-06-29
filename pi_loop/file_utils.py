@@ -38,9 +38,7 @@ class FileLock:
             except OSError:
                 if time.monotonic() >= deadline:
                     os.close(fd)
-                    raise TimeoutError(
-                        f"Could not acquire lock on {self.path} within {self.timeout}s"
-                    ) from None
+                    raise TimeoutError(f"Could not acquire lock on {self.path} within {self.timeout}s") from None
                 time.sleep(0.1)
 
     def __exit__(self, *args):
@@ -113,9 +111,7 @@ def _init_logger(log_file: str, max_mb: int = 10) -> logging.Logger:
     """Initialize a file logger with size-based rotation."""
     logger = logging.getLogger("infinite-loop")
     logger.setLevel(logging.DEBUG)
-    handler = logging.handlers.RotatingFileHandler(
-        log_file, maxBytes=max_mb * 1024 * 1024, backupCount=1
-    )
+    handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=max_mb * 1024 * 1024, backupCount=1)
     handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
     logger.addHandler(handler)
     return logger
@@ -165,9 +161,7 @@ def read_ledger() -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-def write_status_file(
-    status_path: str, state: dict, iteration: int = 0, status: str = "running"
-) -> None:
+def write_status_file(status_path: str, state: dict, iteration: int = 0, status: str = "running") -> None:
     """Write a lightweight one-line status file for external monitoring."""
     if not status_path:
         return
@@ -179,9 +173,7 @@ def write_status_file(
                 "iteration": iteration,
                 "status": status,
                 "total_iterations": state.get("total_iterations", 0),
-                "total_duration_seconds": state.get("stats", {}).get(
-                    "total_duration_seconds", 0
-                ),
+                "total_duration_seconds": state.get("stats", {}).get("total_duration_seconds", 0),
                 "last_updated": datetime.now(timezone.utc).isoformat(),
             }
         )

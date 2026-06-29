@@ -10,15 +10,10 @@ from .stats import _recalc_stats
 
 
 def _version_detail() -> str:
-    return (
-        f"v{VERSION} -- WebUI dashboard, SSE live updates, "
-        "iterative task execution, error recovery, goal tracking."
-    )
+    return f"v{VERSION} -- WebUI dashboard, SSE live updates, iterative task execution, error recovery, goal tracking."
 
 
-def load_or_create_ledger(
-    goal: str, context: str, sentinel_path: str = "", reset_goals: bool = False
-) -> dict:
+def load_or_create_ledger(goal: str, context: str, sentinel_path: str = "", reset_goals: bool = False) -> dict:
     existing = read_ledger()
 
     if sentinel_path and os.path.exists(sentinel_path):
@@ -30,9 +25,7 @@ def load_or_create_ledger(
 
     if existing is not None:
         if existing.get("initial_command") == goal:
-            _log(
-                f"[INFO] Resuming from existing ledger ({existing['total_iterations']} iterations done)"
-            )
+            _log(f"[INFO] Resuming from existing ledger ({existing['total_iterations']} iterations done)")
             existing["status"] = "running"
             existing["last_updated"] = datetime.now(timezone.utc).isoformat()
             if "goals_completed" not in existing:
@@ -52,9 +45,7 @@ def load_or_create_ledger(
                     started_ts = 0
                 elapsed = time.time() - started_ts
                 if elapsed >= 300:
-                    _log(
-                        f"[RECOVER] Stale pending iteration #{pending.get('n')} ({elapsed:.0f}s old)"
-                    )
+                    _log(f"[RECOVER] Stale pending iteration #{pending.get('n')} ({elapsed:.0f}s old)")
                     record = {
                         "n": pending.get("n"),
                         "started_at": started_at,

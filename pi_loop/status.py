@@ -59,9 +59,7 @@ def write_status(
         "iteration_count": iteration_count,
         "last_error": last_error,
         "version": version or "unknown",
-        "uptime_seconds": round(uptime_seconds or 0, 1)
-        if uptime_seconds is not None
-        else 0,
+        "uptime_seconds": round(uptime_seconds or 0, 1) if uptime_seconds is not None else 0,
         "last_updated": datetime.now(timezone.utc).isoformat(),
     }
 

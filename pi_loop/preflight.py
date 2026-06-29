@@ -206,8 +206,6 @@ class PreflightChecker:
         if all_pass:
             lines.append("  All checks passed.")
         else:
-            lines.append(
-                f"  {sum(1 for r in results if not r['passed'])} check(s) failed."
-            )
+            lines.append(f"  {sum(1 for r in results if not r['passed'])} check(s) failed.")
         lines.append("")
         return "\n".join(lines)

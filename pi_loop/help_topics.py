@@ -78,12 +78,8 @@ def _list_flags(show_help: bool = True, parser=None) -> None:
         print()
     else:
         for group_name, entries in group_map.items():
-            print(
-                f"  {colorizer.group_title(f'[{group_name}]')}  {colorizer.dim(f'({len(entries)} flags)')}"
-            )
-        print(
-            f"  {colorizer.group_title('[Introspection]')}  {colorizer.dim(f'({len(iflags)} flags)')}"
-        )
+            print(f"  {colorizer.group_title(f'[{group_name}]')}  {colorizer.dim(f'({len(entries)} flags)')}")
+        print(f"  {colorizer.group_title('[Introspection]')}  {colorizer.dim(f'({len(iflags)} flags)')}")
 
 
 def _list_examples() -> None:
@@ -120,9 +116,7 @@ def _list_examples() -> None:
     _cmd('pi-loop --goal "Fix lint errors" --git --git-commit --run')
     print()
     _comment("Stop once all changes are made")
-    _cmd(
-        'pi-loop --goal "Clean up warnings" --git --git-commit --convergence-stop --run'
-    )
+    _cmd('pi-loop --goal "Clean up warnings" --git --git-commit --convergence-stop --run')
     print()
 
     _section("Batch / Goals-File Processing")
@@ -141,9 +135,7 @@ def _list_examples() -> None:
     _cmd('pi-loop --goal "Run tests" --notify-ntfy my-alerts --run')
     print()
     _comment("Real-time HTML dashboard + JSON status file")
-    _cmd(
-        'pi-loop --goal "Refactor" --status-html /tmp/dash.html --status-file /tmp/status.json --run'
-    )
+    _cmd('pi-loop --goal "Refactor" --status-html /tmp/dash.html --status-file /tmp/status.json --run')
     print()
 
     _section("Monitoring & Control")
@@ -251,12 +243,8 @@ def _run_healthcheck() -> None:
         {
             "name": "json_extraction",
             "status": "healthy" if extraction_ok else "degraded",
-            "detail": "JSON extraction works"
-            if extraction_ok
-            else "JSON extraction failed",
-            "suggestion": ""
-            if extraction_ok
-            else "Check file_utils.extract_json_from_output",
+            "detail": "JSON extraction works" if extraction_ok else "JSON extraction failed",
+            "suggestion": "" if extraction_ok else "Check file_utils.extract_json_from_output",
         }
     )
 
@@ -281,9 +269,7 @@ def _run_healthcheck() -> None:
             "name": "git_availability",
             "status": "healthy" if git_bin else "degraded",
             "detail": f"Found at {git_bin}" if git_bin else "git not on PATH",
-            "suggestion": "Install git from your package manager"
-            if not git_bin
-            else "",
+            "suggestion": "Install git from your package manager" if not git_bin else "",
         }
     )
 
@@ -325,9 +311,7 @@ def _run_doctor() -> None:
     # Python
     v = sys.version_info
     py_ok = v >= (3, 10)
-    print(
-        f"  {c.value('Python:')}      {c.tag_ok() if py_ok else c.tag_fail()} {v.major}.{v.minor}.{v.micro}"
-    )
+    print(f"  {c.value('Python:')}      {c.tag_ok() if py_ok else c.tag_fail()} {v.major}.{v.minor}.{v.micro}")
     if not py_ok:
         print(f"    {c.dim('Need Python >= 3.10')}")
 
@@ -335,9 +319,7 @@ def _run_doctor() -> None:
     pi_bin = shutil.which("pi")
     if pi_bin:
         try:
-            r = subprocess.run(
-                [pi_bin, "--version"], capture_output=True, text=True, timeout=10
-            )
+            r = subprocess.run([pi_bin, "--version"], capture_output=True, text=True, timeout=10)
             pi_ver = (r.stdout or "").strip()[:80]
         except Exception:
             pi_ver = pi_bin
@@ -359,12 +341,8 @@ def _run_doctor() -> None:
     git_bin = shutil.which("git")
     if git_bin:
         try:
-            r = subprocess.run(
-                [git_bin, "--version"], capture_output=True, text=True, timeout=5
-            )
-            print(
-                f"  {c.value('git:'):10s} {c.tag_ok()} {(r.stdout or '').strip()[:60]}"
-            )
+            r = subprocess.run([git_bin, "--version"], capture_output=True, text=True, timeout=5)
+            print(f"  {c.value('git:'):10s} {c.tag_ok()} {(r.stdout or '').strip()[:60]}")
         except Exception:
             print(f"  {c.value('git:'):10s} {c.tag_ok()} {git_bin}")
     else:
@@ -378,11 +356,7 @@ def _run_doctor() -> None:
         print(f"  {c.value('Ledger:'):10s} {c.dim('Not found (daemon not running)')}")
 
     # Environment
-    dotted_envars = sorted(
-        k
-        for k in os.environ
-        if k.startswith("INFINITE_LOOP_") or k.startswith("PI_LOOP_")
-    )
+    dotted_envars = sorted(k for k in os.environ if k.startswith("INFINITE_LOOP_") or k.startswith("PI_LOOP_"))
     if dotted_envars:
         print(f"  {c.value('Env vars:'):10s} {c.dim(str(len(dotted_envars)))} set")
         for ev in dotted_envars:
@@ -408,13 +382,10 @@ def _explain_flag(flag_name: str, parser=None) -> None:
         matches = [
             o
             for o in action.option_strings
-            if o in alt_names
-            or o.lstrip("-").replace("-", "_") == flag_name.replace("-", "_")
+            if o in alt_names or o.lstrip("-").replace("-", "_") == flag_name.replace("-", "_")
         ]
         if matches:
-            print(
-                f"\n  {colorizer.colorize('Flag:', 'bold')}  {colorizer.flag(matches[0])}"
-            )
+            print(f"\n  {colorizer.colorize('Flag:', 'bold')}  {colorizer.flag(matches[0])}")
             if len(action.option_strings) > 1:
                 print(
                     f"  {colorizer.colorize('Aliases:', 'bold')} {', '.join(colorizer.dim(a) for a in action.option_strings)}"
@@ -422,13 +393,9 @@ def _explain_flag(flag_name: str, parser=None) -> None:
             if action.help:
                 print(f"  {colorizer.colorize('Help:', 'bold')}   {action.help}")
             if action.default is not None and action.default is not argparse.SUPPRESS:
-                print(
-                    f"  {colorizer.colorize('Default:', 'bold')} {colorizer.dim(str(action.default))}"
-                )
+                print(f"  {colorizer.colorize('Default:', 'bold')} {colorizer.dim(str(action.default))}")
             if action.choices:
-                print(
-                    f"  {colorizer.colorize('Choices:', 'bold')} {', '.join(action.choices)}"
-                )
+                print(f"  {colorizer.colorize('Choices:', 'bold')} {', '.join(action.choices)}")
             print()
             return
 
@@ -499,9 +466,7 @@ def _render_status(state: dict) -> None:
 
     last = iters[-1] if iters else None
     if last:
-        print(
-            f"  {c.value('Last:')}         #{last.get('n', '?')} — {(last.get('summary') or '')[:80]}"
-        )
+        print(f"  {c.value('Last:')}         #{last.get('n', '?')} — {(last.get('summary') or '')[:80]}")
 
     errors = sum(1 for it in iters if it.get("error"))
     if errors:

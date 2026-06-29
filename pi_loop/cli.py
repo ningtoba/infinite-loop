@@ -61,12 +61,8 @@ See 'pi-loop --examples' for more usage patterns.
         default="",
         help="The task goal string for each spawned worker",
     )
-    core.add_argument(
-        "--context", type=str, default="", help="Context/instructions for the worker"
-    )
-    core.add_argument(
-        "--context-file", type=str, default="", help="File to read context from"
-    )
+    core.add_argument("--context", type=str, default="", help="Context/instructions for the worker")
+    core.add_argument("--context-file", type=str, default="", help="File to read context from")
     core.add_argument(
         "--goals-file",
         type=str,
@@ -124,27 +120,17 @@ See 'pi-loop --examples' for more usage patterns.
 
     # ── Parallel & Timeout ─────────────────────────────────
     parallel = parser.add_argument_group("Parallel & Timeout")
-    parallel.add_argument(
-        "--workers", type=int, default=1, help="Number of parallel workers (default: 1)"
-    )
+    parallel.add_argument("--workers", type=int, default=1, help="Number of parallel workers (default: 1)")
     parallel.add_argument(
         "--session-timeout",
         type=int,
         default=7200,
         help="Worker timeout in seconds (default: 7200)",
     )
-    parallel.add_argument(
-        "--max-turns", type=int, default=500, help="Max turns per worker (default: 500)"
-    )
-    parallel.add_argument(
-        "--max-retries", type=int, default=0, help="Retry count on worker failure"
-    )
-    parallel.add_argument(
-        "--retry-delay", type=int, default=5, help="Delay between retries in seconds"
-    )
-    parallel.add_argument(
-        "--cooldown", type=int, default=0, help="Cooldown between iterations in seconds"
-    )
+    parallel.add_argument("--max-turns", type=int, default=500, help="Max turns per worker (default: 500)")
+    parallel.add_argument("--max-retries", type=int, default=0, help="Retry count on worker failure")
+    parallel.add_argument("--retry-delay", type=int, default=5, help="Delay between retries in seconds")
+    parallel.add_argument("--cooldown", type=int, default=0, help="Cooldown between iterations in seconds")
     parallel.add_argument(
         "--cooldown-mode",
         type=str,
@@ -170,18 +156,14 @@ See 'pi-loop --examples' for more usage patterns.
         default=BASE_TOOLSETS,
         help=f"Comma-separated toolsets (default: {BASE_TOOLSETS})",
     )
-    worker.add_argument(
-        "--no-auto-toolsets", action="store_true", help="Disable auto toolset detection"
-    )
+    worker.add_argument("--no-auto-toolsets", action="store_true", help="Disable auto toolset detection")
     worker.add_argument(
         "--prompt-suffix",
         type=str,
         default="",
         help="Suffix appended to every worker prompt",
     )
-    worker.add_argument(
-        "--skills", type=str, default="", help="Skills to enable for workers"
-    )
+    worker.add_argument("--skills", type=str, default="", help="Skills to enable for workers")
     worker.add_argument(
         "--max-output-chars",
         type=int,
@@ -194,17 +176,13 @@ See 'pi-loop --examples' for more usage patterns.
         default="",
         help="JSON schema to validate worker output",
     )
-    worker.add_argument(
-        "--output-schema-file", type=str, default="", help="File containing JSON schema"
-    )
+    worker.add_argument("--output-schema-file", type=str, default="", help="File containing JSON schema")
     worker.add_argument(
         "--pass-session-id",
         action="store_true",
         help="Pass session ID between iterations",
     )
-    worker.add_argument(
-        "--resume", action="store_true", help="Resume a chained session"
-    )
+    worker.add_argument("--resume", action="store_true", help="Resume a chained session")
     worker.add_argument(
         "--continue-session",
         action="store_true",
@@ -218,24 +196,12 @@ See 'pi-loop --examples' for more usage patterns.
 
     # ── Git & File Tracking ────────────────────────────────
     git_group = parser.add_argument_group("Git & File Tracking")
-    git_group.add_argument(
-        "--git", action="store_true", help="Track git diff stats in the ledger"
-    )
-    git_group.add_argument(
-        "--git-commit", action="store_true", help="Auto-commit after each iteration"
-    )
-    git_group.add_argument(
-        "--store-git-diff", action="store_true", help="Store full git diff in ledger"
-    )
-    git_group.add_argument(
-        "--worktree", action="store_true", help="Use git worktrees for parallel workers"
-    )
-    git_group.add_argument(
-        "--workdir", type=str, default="", help="Working directory for workers"
-    )
-    git_group.add_argument(
-        "--watch-dir", type=str, default="", help="Directory to watch for file changes"
-    )
+    git_group.add_argument("--git", action="store_true", help="Track git diff stats in the ledger")
+    git_group.add_argument("--git-commit", action="store_true", help="Auto-commit after each iteration")
+    git_group.add_argument("--store-git-diff", action="store_true", help="Store full git diff in ledger")
+    git_group.add_argument("--worktree", action="store_true", help="Use git worktrees for parallel workers")
+    git_group.add_argument("--workdir", type=str, default="", help="Working directory for workers")
+    git_group.add_argument("--watch-dir", type=str, default="", help="Directory to watch for file changes")
     git_group.add_argument(
         "--watch-poll",
         type=float,
@@ -288,12 +254,8 @@ See 'pi-loop --examples' for more usage patterns.
 
     # ── Dashboard & Status ─────────────────────────────────
     dash = parser.add_argument_group("Dashboard & Status")
-    dash.add_argument(
-        "--status-html", type=str, default="", help="Path for live HTML dashboard file"
-    )
-    dash.add_argument(
-        "--status-file", type=str, default="", help="Path for JSON status file"
-    )
+    dash.add_argument("--status-html", type=str, default="", help="Path for live HTML dashboard file")
+    dash.add_argument("--status-file", type=str, default="", help="Path for JSON status file")
     dash.add_argument(
         "--webhook-port",
         type=int,
@@ -303,9 +265,7 @@ See 'pi-loop --examples' for more usage patterns.
 
     # ── HTTP Callbacks ─────────────────────────────────────
     http = parser.add_argument_group("HTTP Callbacks")
-    http.add_argument(
-        "--http-callback", type=str, default="", help="URL to POST iteration results to"
-    )
+    http.add_argument("--http-callback", type=str, default="", help="URL to POST iteration results to")
     http.add_argument(
         "--http-callback-secret",
         type=str,
@@ -321,9 +281,7 @@ See 'pi-loop --examples' for more usage patterns.
         default=0,
         help="Keep only last N iterations in ledger (0=keep all)",
     )
-    archive.add_argument(
-        "--archive-dir", type=str, default="", help="Directory for archived iterations"
-    )
+    archive.add_argument("--archive-dir", type=str, default="", help="Directory for archived iterations")
     archive.add_argument(
         "--archive-retention",
         type=int,
@@ -339,21 +297,15 @@ See 'pi-loop --examples' for more usage patterns.
 
     # ── Logging ────────────────────────────────────────────
     log_group = parser.add_argument_group("Logging")
-    log_group.add_argument(
-        "--log-file", type=str, default="", help="Path for daemon log file"
-    )
+    log_group.add_argument("--log-file", type=str, default="", help="Path for daemon log file")
     log_group.add_argument(
         "--log-max-mb",
         type=int,
         default=10,
         help="Max log file size in MB before rotation",
     )
-    log_group.add_argument(
-        "--json-logs", action="store_true", help="Output structured JSON logs to stdout"
-    )
-    log_group.add_argument(
-        "--quiet", action="store_true", help="Minimal log output during loop"
-    )
+    log_group.add_argument("--json-logs", action="store_true", help="Output structured JSON logs to stdout")
+    log_group.add_argument("--quiet", action="store_true", help="Minimal log output during loop")
     log_group.add_argument(
         "--color",
         type=str,
@@ -371,9 +323,7 @@ See 'pi-loop --examples' for more usage patterns.
     )
     safety.add_argument("--yolo", action="store_true", help="Bypass all safety prompts")
     safety.add_argument("--ignore-rules", action="store_true", help="Skip rules file")
-    safety.add_argument(
-        "--ignore-user-config", action="store_true", help="Skip user config"
-    )
+    safety.add_argument("--ignore-user-config", action="store_true", help="Skip user config")
     safety.add_argument(
         "--no-failure-learning",
         action="store_true",
@@ -384,12 +334,8 @@ See 'pi-loop --examples' for more usage patterns.
         action="store_true",
         help="Track completed goals to skip on restart",
     )
-    safety.add_argument(
-        "--reset-goals", action="store_true", help="Reset goals_completed tracking"
-    )
-    safety.add_argument(
-        "--no-tool-shortcut", action="store_true", help="Disable tool shortcuts"
-    )
+    safety.add_argument("--reset-goals", action="store_true", help="Reset goals_completed tracking")
+    safety.add_argument("--no-tool-shortcut", action="store_true", help="Disable tool shortcuts")
     safety.add_argument(
         "--heartbeat-timeout",
         type=int,
@@ -428,9 +374,7 @@ See 'pi-loop --examples' for more usage patterns.
         default=SENTINEL_PATH_DEFAULT,
         help=f"Sentinel file path (default: {SENTINEL_PATH_DEFAULT})",
     )
-    run.add_argument(
-        "--config", type=str, default="", help="Load config from JSON file"
-    )
+    run.add_argument("--config", type=str, default="", help="Load config from JSON file")
     run.add_argument(
         "--save-config",
         type=str,
@@ -440,20 +384,14 @@ See 'pi-loop --examples' for more usage patterns.
 
     # ── Introspection (handled before --goal check) ─────────
     intro = parser.add_argument_group("Introspection")
-    intro.add_argument(
-        "--version", action="store_true", help="Print daemon version and exit"
-    )
-    intro.add_argument(
-        "--list-flags", action="store_true", help="Print all flags organized by group"
-    )
+    intro.add_argument("--version", action="store_true", help="Print daemon version and exit")
+    intro.add_argument("--list-flags", action="store_true", help="Print all flags organized by group")
     intro.add_argument(
         "--list-groups",
         action="store_true",
         help="Print compact group names with flag counts",
     )
-    intro.add_argument(
-        "--examples", action="store_true", help="Print categorized usage examples"
-    )
+    intro.add_argument("--examples", action="store_true", help="Print categorized usage examples")
     intro.add_argument(
         "--explain",
         type=str,
@@ -470,12 +408,8 @@ See 'pi-loop --examples' for more usage patterns.
         const="introspection",
         help="Show all flags in a single argument group",
     )
-    intro.add_argument(
-        "--preflight", action="store_true", help="Run environment health checks"
-    )
-    intro.add_argument(
-        "--doctor", action="store_true", help="Run comprehensive self-diagnosis"
-    )
+    intro.add_argument("--preflight", action="store_true", help="Run environment health checks")
+    intro.add_argument("--doctor", action="store_true", help="Run comprehensive self-diagnosis")
     intro.add_argument(
         "--healthcheck",
         action="store_true",
@@ -486,9 +420,7 @@ See 'pi-loop --examples' for more usage patterns.
         action="store_true",
         help="Show loop status from ledger (no --goal required)",
     )
-    intro.add_argument(
-        "--dump-env", action="store_true", help="Print all known env vars with defaults"
-    )
+    intro.add_argument("--dump-env", action="store_true", help="Print all known env vars with defaults")
     intro.add_argument(
         "--check-env",
         action="store_true",
@@ -590,9 +522,7 @@ def main() -> None:
             sys.exit(1)
 
     # ── Resolve toolsets ───────────────────────────────────
-    toolsets_list = [
-        t.strip() for t in (args.toolsets or BASE_TOOLSETS).split(",") if t.strip()
-    ]
+    toolsets_list = [t.strip() for t in (args.toolsets or BASE_TOOLSETS).split(",") if t.strip()]
 
     # ── Clean stale heartbeats ─────────────────────────────
     _cleanup_stale_heartbeats()
@@ -663,11 +593,7 @@ def main() -> None:
     # Save config and exit
     if args.save_config:
         config_path = os.path.expanduser(args.save_config)
-        config_dict = {
-            key: val
-            for key, val in vars(args).items()
-            if val not in (None, "") and not key.startswith("_")
-        }
+        config_dict = {key: val for key, val in vars(args).items() if val not in (None, "") and not key.startswith("_")}
         config_dict["version"] = VERSION
         os.makedirs(os.path.dirname(config_path) or ".", exist_ok=True)
         with open(config_path, "w") as f:
@@ -726,14 +652,8 @@ def main() -> None:
             cooldown=args.cooldown,
             goals_file=args.goals_file,
             stop_at_goals_end=args.stop_at_goals_end,
-            output_schema=(
-                json.loads(args.output_schema) if args.output_schema else None
-            )
-            or (
-                load_json_schema(args.output_schema_file)
-                if args.output_schema_file
-                else None
-            ),
+            output_schema=(json.loads(args.output_schema) if args.output_schema else None)
+            or (load_json_schema(args.output_schema_file) if args.output_schema_file else None),
             cooldown_mode=args.cooldown_mode,
             convergence_threshold=args.convergence_threshold,
             convergence_window=args.convergence_window,
@@ -799,10 +719,7 @@ complete -F _pi_loop_completions pi-loop
         # Compute separator outside the f-string to avoid SyntaxError
         # on Python <3.12 (backslash \ in f-string expression parts).
         _zsh_sep = chr(92) + chr(10) + "        "
-        _zsh_flags = _zsh_sep.join(
-            f"--{f}" for f in sorted(flag_names)
-            if not f.startswith("--") and f != "--help"
-        )
+        _zsh_flags = _zsh_sep.join(f"--{f}" for f in sorted(flag_names) if not f.startswith("--") and f != "--help")
         print(f"""#compdef pi-loop
 compdef _pi_loop pi-loop
 function _pi_loop() {{

@@ -51,9 +51,7 @@ def validate_json_output(output: dict, schema: dict) -> tuple[bool, str]:
         _seen: set | None = None,
     ) -> str | None:
         if _depth > _MAX_VALIDATION_DEPTH:
-            return (
-                f"{path}: maximum validation depth ({_MAX_VALIDATION_DEPTH}) exceeded"
-            )
+            return f"{path}: maximum validation depth ({_MAX_VALIDATION_DEPTH}) exceeded"
 
         # Cycle detection: track (schema_node, obj) identity pairs.
         # A well-formed schema won't revisit the same (schema, value) pair
@@ -64,10 +62,7 @@ def validate_json_output(output: dict, schema: dict) -> tuple[bool, str]:
         # Only track for non-trivial objects (dicts/lists that can nest)
         if isinstance(obj, (dict, list)):
             if pair_id in _seen:
-                return (
-                    f"{path}: circular reference detected "
-                    f"(schema id={id(schema_node)}, obj id={id(obj)})"
-                )
+                return f"{path}: circular reference detected (schema id={id(schema_node)}, obj id={id(obj)})"
             _seen.add(pair_id)
 
         required = schema_node.get("required", [])

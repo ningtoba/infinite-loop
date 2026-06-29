@@ -70,17 +70,14 @@ def _classify_progress(
     # NOTE: Only classify as regression for hard errors.  Soft errors (exit-code
     # noise from subprocess) with meaningful output should not trigger regression.
     _is_exit_code_noise = error and (
-        error.lower().strip().startswith("exit code")
-        or error.lower().strip().startswith("process exit")
+        error.lower().strip().startswith("exit code") or error.lower().strip().startswith("process exit")
     )
     if error and not has_git_changes and not _is_exit_code_noise:
         return "regression"
 
     # --- Rule: stuck (no changes + short summary or repetitive failure language) ---
     stuck_failure_keywords = ["still working", "cannot", "unable", "failed to"]
-    if not has_git_changes and (
-        summary_len < 30 or any(kw in summary_lower for kw in stuck_failure_keywords)
-    ):
+    if not has_git_changes and (summary_len < 30 or any(kw in summary_lower for kw in stuck_failure_keywords)):
         return "stuck"
 
     # --- Rule: progress (has git changes + positive language) ---
@@ -109,9 +106,7 @@ def _classify_progress(
         "todo",
         "left to do",
     ]
-    if has_git_changes and (
-        error or any(kw in summary_lower for kw in remaining_keywords)
-    ):
+    if has_git_changes and (error or any(kw in summary_lower for kw in remaining_keywords)):
         return "partial"
 
     # --- Fallback ---
@@ -181,11 +176,7 @@ def _suggest_actionable_fix(
     # ── High consecutive errors (3+) — most actionable warning ──────────────
     # Check BEFORE error-type handlers so repeated failures get the escalation
     # treatment rather than a generic per-type message.
-    if (
-        consecutive_errors >= 3
-        and error_type is not None
-        and classification in ("stuck", "unknown", "regression")
-    ):
+    if consecutive_errors >= 3 and error_type is not None and classification in ("stuck", "unknown", "regression"):
         return (
             "Suggestions:"
             "\n  • Run with --preflight to check the environment before the loop"
@@ -200,20 +191,12 @@ def _suggest_actionable_fix(
             "Suggestions:",
         ]
         if workers > 1 and not use_library:
-            tips.append(
-                "  • Set --workers 1 to isolate the issue (concurrent sessions may interfere)"
-            )
+            tips.append("  • Set --workers 1 to isolate the issue (concurrent sessions may interfere)")
         if not use_library:
-            tips.append(
-                "  • Try --use-library for in-process execution (bypasses subprocess issues)"
-            )
-        tips.append(
-            "  • Add --evolve to let iterations self-direct when stuck in a loop"
-        )
+            tips.append("  • Try --use-library for in-process execution (bypasses subprocess issues)")
+        tips.append("  • Add --evolve to let iterations self-direct when stuck in a loop")
         if "convergence" in goal_lower or "similar" in goal_lower:
-            tips.append(
-                "  • Adjust --convergence-threshold (lower = less sensitive) or --convergence-window"
-            )
+            tips.append("  • Adjust --convergence-threshold (lower = less sensitive) or --convergence-window")
         return "\n".join(tips)
 
     if classification == "regression":
@@ -221,23 +204,17 @@ def _suggest_actionable_fix(
             "Suggestions:",
         ]
         if git:
-            tips.append(
-                "  • Previous changes may have broken something — review the git diff"
-            )
+            tips.append("  • Previous changes may have broken something — review the git diff")
         else:
             tips.append("  • Add --git to track file changes across iterations")
         if not force_reset:
             tips.append("  • Run with --force-reset to start with a clean ledger")
         if not git_commit:
-            tips.append(
-                "  • Add --git-commit so each iteration is a revert-able commit"
-            )
+            tips.append("  • Add --git-commit so each iteration is a revert-able commit")
         if not tips[1:]:  # only "Suggestions:" header, nothing useful
             return None
         # If the only tip is a review note (not an actionable flag change), skip it
-        no_op_tip = (
-            "  • Previous changes may have broken something — review the git diff"
-        )
+        no_op_tip = "  • Previous changes may have broken something — review the git diff"
         if len(tips) == 2 and tips[1] == no_op_tip:
             return None
         return "\n".join(tips)

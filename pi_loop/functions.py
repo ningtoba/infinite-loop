@@ -128,9 +128,7 @@ def _log_startup_banner(
         parts.append("track-goals")
     if convergence_stop:
         parts.append(f"converge({convergence_window}x{convergence_threshold})")
-    _log(
-        f"[DAEMON]   Iteration: {' | '.join(parts) if parts else '(unlimited, no auto-stop)'}"
-    )
+    _log(f"[DAEMON]   Iteration: {' | '.join(parts) if parts else '(unlimited, no auto-stop)'}")
 
     # ── Category: Parallel ───────────────────────────────────────────────────
     parts = [f"workers={workers}", f"timeout={session_timeout}s"]
@@ -150,9 +148,7 @@ def _log_startup_banner(
         parts.append("session-id")
     if checkpoints:
         parts.append("checkpoints")
-    _log(
-        f"[DAEMON]   Sessions:   {' | '.join(parts) if parts else '(direct subprocess)'}"
-    )
+    _log(f"[DAEMON]   Sessions:   {' | '.join(parts) if parts else '(direct subprocess)'}")
 
     # ── Category: Spawn ──────────────────────────────────────────────────────
     parts = []
@@ -160,9 +156,7 @@ def _log_startup_banner(
         parts.append(f"profile={profile}")
     if model:
         parts.append(f"model={model}")
-    _log(
-        f"[DAEMON]   Spawn:      profile={profile or '(default)'}, model={model or '(default)'}"
-    )
+    _log(f"[DAEMON]   Spawn:      profile={profile or '(default)'}, model={model or '(default)'}")
 
     # ── Category: Git ────────────────────────────────────────────────────────
     if git:
@@ -176,18 +170,13 @@ def _log_startup_banner(
         _log("[DAEMON]   Git:        (flags set but --git not enabled — ignored)")
 
     # ── Category: Output ─────────────────────────────────────────────────────
-    _log(
-        f"[DAEMON]   Output:     max-chars={get_max_output_chars()}, schema={'yes' if output_schema else 'no'}"
-    )
+    _log(f"[DAEMON]   Output:     max-chars={get_max_output_chars()}, schema={'yes' if output_schema else 'no'}")
     _log("[DAEMON] ══════════════════════════════════════════════════")
     _log(f"[DAEMON] Goal: {goal}")
     _log(f"[DAEMON] Toolsets: {toolsets}")
     _log(f"[DAEMON] Task type: {task_type} ({task_type_desc})")
     if track_goals:
-        _log(
-            f"[DAEMON] Goal tracking: enabled (reset={reset_goals}) — "
-            "completed goals will be skipped on restart"
-        )
+        _log(f"[DAEMON] Goal tracking: enabled (reset={reset_goals}) — completed goals will be skipped on restart")
     if heartbeat_timeout > 0:
         _log(
             f"[DAEMON] Heartbeat: enabled (timeout={heartbeat_timeout}s, "
@@ -196,9 +185,7 @@ def _log_startup_banner(
     _log("")
 
 
-def _cycle_goal(
-    goals_list: list, goals_index: int, stop_at_goals_end: bool
-) -> tuple[str, bool]:
+def _cycle_goal(goals_list: list, goals_index: int, stop_at_goals_end: bool) -> tuple[str, bool]:
     """Cycle to next goal from multi-goal list.
 
     Returns (current_goal_text_or_empty_string, should_stop).
@@ -246,19 +233,11 @@ def _handle_cooldown(
         return
     effective_cooldown = cooldown
     if cooldown_mode == "adaptive":
-        avg_dur = (
-            eta_tracker.avg_duration(task_type)
-            if hasattr(eta_tracker, "avg_duration")
-            else None
-        )
+        avg_dur = eta_tracker.avg_duration(task_type) if hasattr(eta_tracker, "avg_duration") else None
         # Simple adaptive: 10% of average duration, min 5s, max 120s
-        effective_cooldown = (
-            max(5, min(120, int((avg_dur or 0) * 0.1))) if avg_dur else cooldown
-        )
+        effective_cooldown = max(5, min(120, int((avg_dur or 0) * 0.1))) if avg_dur else cooldown
         if effective_cooldown != cooldown:
-            _log(
-                f"[COOLDOWN] Adaptive: {effective_cooldown}s (avg iter={avg_dur:.0f}s)"
-            )
+            _log(f"[COOLDOWN] Adaptive: {effective_cooldown}s (avg iter={avg_dur:.0f}s)")
     if effective_cooldown > 0:
         _log(f"[COOLDOWN] Waiting {effective_cooldown}s before next iteration...")
         elapsed_cd = 0

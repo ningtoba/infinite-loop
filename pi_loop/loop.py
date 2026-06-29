@@ -49,6 +49,7 @@ def _execute_task(
     max_turns: int = 500,
     max_retries: int = 0,
     retry_delay: int = 5,
+    worker_id: int = 1,
 ) -> dict:
     """Execute a single task via pi subprocess with --mode json.
 
@@ -62,7 +63,7 @@ def _execute_task(
     if context:
         cmd.extend(["--append-system-prompt", context])
 
-    print(f"[SPAWN (worker #1)] pi --mode json -- {goal[:60]}")
+    print(f"[SPAWN (worker #{worker_id})] pi --mode json -- {goal[:60]}")
     sys.stdout.flush()
 
     start_time = time.time()
@@ -73,7 +74,7 @@ def _execute_task(
     proc = None
 
     def _term(line: str) -> None:
-        sys.stdout.write(f"[TERM (worker #1)] {line}\n")
+        sys.stdout.write(f"[TERM (worker #{worker_id})] {line}\n")
         sys.stdout.flush()
 
     while attempts < max_attempts:
@@ -116,19 +117,6 @@ def _execute_task(
 
                     # Skip noisy thinking deltas (token-by-token)
                     if ame_type == "thinking_delta":
-                        continue
-
-                    # Tool result
-                    if ame_type == "content_block_stop":
-                        delta = ame.get("delta", {})
-                        if isinstance(delta, dict) and delta.get("type") == "tool_result":
-                            result_content = delta.get("content", "")
-                            if isinstance(result_content, list):
-                                for cb in result_content:
-                                    if isinstance(cb, dict) and cb.get("type") == "text":
-                                        _term(f"[Result: {cb.get('text', '')[:200]}]")
-                            elif isinstance(result_content, str):
-                                _term(f"[Result: {result_content[:200]}]")
                         continue
 
                     # Text output delta — accumulate chars, emit on line break
@@ -201,7 +189,7 @@ def _execute_task(
                 stderr_text = proc.stderr.read()
 
             print(
-                f"[WORKER (worker #1)] Response in {duration:.1f}s (status={'ok' if proc.returncode == 0 else 'failed'})"
+                f"[WORKER (worker #{worker_id})] Response in {duration:.1f}s (status={'ok' if proc.returncode == 0 else 'failed'})"
             )
             sys.stdout.flush()
 

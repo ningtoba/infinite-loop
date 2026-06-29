@@ -48,6 +48,8 @@ class FileWatcherTrigger:
     def format_changed(self) -> str:
         """Human-readable list of changed files since last scan."""
         current = self._scan()
+        if self._last_state is None:
+            return ""
         changed = []
         for path, mtime in current.items():
             old = self._last_state.get(path)

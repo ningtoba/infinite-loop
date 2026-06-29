@@ -241,7 +241,7 @@ def _dump_env() -> None:
 def _generate_completion(shell: str) -> None:
     """Generate shell completion script."""
     parser = _create_parser(for_introspection=True)
-    flag_names = []
+    flag_names: list[str] = []
     for action in parser._actions:
         if action.option_strings:
             flag_names.extend(action.option_strings)

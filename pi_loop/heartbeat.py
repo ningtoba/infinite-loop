@@ -7,6 +7,7 @@ import os
 import subprocess
 import threading
 import time
+from typing import Any, cast
 
 from .config import (
     HEARTBEAT_DIR,
@@ -30,7 +31,7 @@ def _read_heartbeat(heartbeat_file: str) -> dict | None:
     """Read and parse a heartbeat file. Returns None on any error."""
     try:
         with open(heartbeat_file) as f:
-            return json.load(f)
+            return cast(dict, json.load(f))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return None
 
@@ -105,7 +106,7 @@ def _monitor_heartbeat(
         if age is None:
             elapsed = time.time() - session_start
             if elapsed > timeout + grace_period:
-                _log(f"[HEARTBEAT] Lost — never appeared after {elapsed:.0f}s")
+                _log(f"[HEARTBEAT] Lost — never appeared after {elapsed:.0f}s", level="WARNING")
                 return {
                     "status": "lost",
                     "age_seconds": elapsed,
@@ -113,7 +114,7 @@ def _monitor_heartbeat(
                 }
         elif age > timeout:
             if age > timeout + grace_period:
-                _log(f"[HEARTBEAT] DEAD — last heartbeat {age:.0f}s ago (> {timeout + grace_period}s)")
+                _log(f"[HEARTBEAT] DEAD — last heartbeat {age:.0f}s ago (> {timeout + grace_period}s)", level="WARNING")
                 return {
                     "status": "expired",
                     "age_seconds": age,
@@ -145,7 +146,7 @@ def _run_heartbeat_monitor(
     it kills the subprocess directly — the caller is typically blocked on
     stdout.readline() and cannot act on the return value.
     """
-    result_container: dict = {}
+    result_container: dict[str, Any] = {}
 
     def _monitor_wrapper():
         result_container["result"] = _monitor_heartbeat(heartbeat_file, timeout, session_start, proc)
@@ -168,11 +169,14 @@ def _run_heartbeat_monitor(
     status = result.get("status", "alive")
     if status in ("lost", "expired"):
         pid_str = str(proc.pid) if (proc and proc.pid) else "unknown"
-        _log(f"[HEARTBEAT] Session {status} — killing process {pid_str} (age={result.get('age_seconds', 0):.0f}s)")
+        _log(
+            f"[HEARTBEAT] Session {status} — killing process {pid_str} (age={result.get('age_seconds', 0):.0f}s)",
+            level="WARNING",
+        )
         if proc is not None and proc.poll() is None:
             _kill_session(proc, pid_str)
 
-    return result
+    return cast(dict, result)
 
 
 def _kill_session(proc: subprocess.Popen | None, session_id: str) -> None:
@@ -201,7 +205,7 @@ def _cleanup_stale_heartbeats() -> None:
         except OSError:
             pass
     if removed > 0:
-        _log(f"[HEARTBEAT] Cleaned up {removed} stale heartbeat file(s)")
+        _log(f"[HEARTBEAT] Cleaned up {removed} stale heartbeat file(s)", level="DEBUG")
 
 
 def _request_shutdown() -> None:

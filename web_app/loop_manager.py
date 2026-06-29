@@ -371,8 +371,6 @@ class LoopManager:
                     self._worker_logs[wid] = []
                 # Store raw terminal output for xterm.js rendering
                 if prefix == "TERM":
-                    if wid not in self._worker_term:
-                        self._worker_term[wid] = []
                     # Extract just the terminal content (strip the [TERM (worker #N)] prefix)
                     term_content = re.sub(
                         rf"\[TERM\s*\(worker\s+#{re.escape(wid)}\)\]\s*",

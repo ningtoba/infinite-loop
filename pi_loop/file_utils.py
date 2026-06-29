@@ -8,6 +8,7 @@ import os
 import re
 import time
 from datetime import datetime, timezone
+from typing import cast
 
 from .color_utils import colorizer as _cu
 from .config import LEDGER_PATH, LOCK_PATH, LOG_DATE_FORMAT, LOG_FORMAT
@@ -94,7 +95,7 @@ def _colorize_log_tags(msg: str) -> str:
             # tag helpers take no text arg — replace the entire match
             msg = re.sub(pattern, formatter(), msg)
         else:
-            msg = re.sub(pattern, lambda m, f=formatter: f(m.group(0)), msg)
+            msg = re.sub(pattern, lambda m, f=formatter: f(m.group(0)), msg)  # type: ignore[misc]
     return msg
 
 
@@ -151,7 +152,7 @@ def read_ledger() -> dict | None:
         return None
     try:
         with FileLock(), open(LEDGER_PATH) as f:
-            return json.load(f)
+            return cast(dict, json.load(f))
     except (json.JSONDecodeError, FileNotFoundError, TimeoutError):
         return None
 
@@ -229,7 +230,7 @@ def extract_json_from_output(stdout: str) -> dict | None:
     # Strategy 1: Scan backwards looking for the LAST JSON object
     brace_depth = 0
     in_json = False
-    json_chars = []
+    json_chars: list[str] = []
     for ch in reversed(text):
         if ch == "}":
             brace_depth += 1
@@ -242,7 +243,7 @@ def extract_json_from_output(stdout: str) -> dict | None:
             if brace_depth == 0:
                 candidate = "".join(json_chars)
                 try:
-                    return json.loads(candidate)
+                    return cast(dict, json.loads(candidate))
                 except json.JSONDecodeError:
                     pass
                 in_json = False
@@ -281,6 +282,6 @@ def extract_json_from_output(stdout: str) -> dict | None:
             i = start + 1
 
     if json_objects:
-        return json_objects[-1]
+        return cast(dict, json_objects[-1])
 
     return None

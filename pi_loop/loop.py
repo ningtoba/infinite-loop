@@ -15,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 from contextlib import suppress
 from datetime import datetime, timezone
 
@@ -445,8 +446,8 @@ def run_loop(
         model=model,
         max_iterations=max_iterations,
         max_retries=max_retries,
-        max_turns=max_turns,
-        tag=tag,
+        _max_turns=max_turns,
+        _tag=tag,
         goal=goal,
         toolsets=[],
         evolve=evolve,
@@ -455,7 +456,7 @@ def run_loop(
         workers=workers,
         session_timeout=session_timeout,
         notify_cmd=notify_cmd,
-        use_library=use_library,
+        _use_library=use_library,
         pass_session_id=pass_session_id,
         checkpoints=checkpoints,
         output_schema=output_schema,
@@ -704,8 +705,6 @@ def run_loop(
 
         if http_callback:
             try:
-                import urllib.request
-
                 data = json.dumps(record).encode()
                 req = urllib.request.Request(
                     http_callback,
@@ -730,6 +729,7 @@ def run_loop(
 
         # Error recovery adaptation
         if primary_error_type:
+            state.setdefault("mitigations", {})
             (
                 session_timeout,
                 cooldown,
@@ -739,7 +739,7 @@ def run_loop(
                 adapt_actions,
             ) = _adapt_to_error(
                 error_type=primary_error_type,
-                mitigations=state.get("mitigations", {}),
+                mitigations=state["mitigations"],
                 consecutive_successes=consecutive_successes,
                 error_type_counts=state.get("error_type_counts", {}),
                 session_timeout=session_timeout,

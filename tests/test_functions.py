@@ -29,7 +29,8 @@ class TestLoadGoalsFile:
     def test_no_file_returns_singleton(self):
         """_load_goals_file with no goals_file returns singleton with original goal."""
         result = _load_goals_file("", "original goal")
-        assert result == [("original goal", "", "", "")]
+        expected = [("original goal", "", "", "")]
+        assert result == expected
 
     def test_parses_pipe_delimited_goals(self, tmp_path):
         """_load_goals_file parses pipe-delimited GoalSpec goals."""
@@ -38,8 +39,12 @@ class TestLoadGoalsFile:
         result = _load_goals_file(str(gf), "fallback")
         assert len(result) == 3
         assert result[0] == ("goal1", "profile1", "model1", "provider1")
-        assert result[1] == ("goal2", "profile2", "model2", "")
-        assert result[2] == ("goal3", "", "", "")
+        e1 = ("goal1", "profile1", "model1", "provider1")
+        e2 = ("goal2", "profile2", "model2", "")
+        e3 = ("goal3", "", "", "")
+        assert result[0] == e1
+        assert result[1] == e2
+        assert result[2] == e3
 
     def test_skips_comments_and_blanks(self, tmp_path):
         """_load_goals_file skips comments and blank lines."""
@@ -52,7 +57,8 @@ class TestLoadGoalsFile:
     def test_missing_file_falls_back(self):
         """_load_goals_file uses fallback when file doesn't exist."""
         result = _load_goals_file("/nonexistent/goals.txt", "fallback goal")
-        assert result == [("fallback goal", "", "", "")]
+        expected = [("fallback goal", "", "", "")]
+        assert result == expected
 
 
 class TestCycleGoal:
@@ -60,18 +66,18 @@ class TestCycleGoal:
         """_cycle_goal with single goal returns ('', False)."""
         goal_text, should_stop = _cycle_goal(["only goal"], 0, False)
         assert goal_text == ""
-        assert should_stop == False
+        assert not should_stop
 
     def test_cycles_through_multi_goal_list(self):
         """_cycle_goal cycles through multi-goal list."""
         goals = [("goal1", "p1", "m1", "pr1"), ("goal2", "", "", "")]
         goal_text, should_stop = _cycle_goal(goals, 0, False)
         assert goal_text == "goal1"
-        assert should_stop == False
+        assert not should_stop
 
         goal_text2, should_stop2 = _cycle_goal(goals, 1, False)
         assert goal_text2 == "goal2"
-        assert should_stop2 == False
+        assert not should_stop2
 
     def test_stop_at_goals_end(self):
         """_cycle_goal with stop_at_goals_end=True stops when index >= len(list)."""
@@ -85,7 +91,7 @@ class TestCycleGoal:
         goals = ["goal1", "goal2"]
         result, should_stop = _cycle_goal(goals, 0, False)
         assert result == "goal1"
-        assert should_stop == False
+        assert not should_stop
 
 
 class TestBuildProgressiveContext:
@@ -139,8 +145,8 @@ class TestLogStartupBanner:
         "model": "",
         "max_iterations": 10,
         "max_retries": 0,
-        "max_turns": 500,
-        "tag": "",
+        "_max_turns": 500,
+        "_tag": "",
         "goal": "test goal",
         "toolsets": [],
         "evolve": False,
@@ -149,7 +155,7 @@ class TestLogStartupBanner:
         "workers": 1,
         "session_timeout": 600,
         "notify_cmd": None,
-        "use_library": True,
+        "_use_library": True,
         "pass_session_id": False,
         "checkpoints": False,
         "output_schema": None,

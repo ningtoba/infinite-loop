@@ -62,7 +62,7 @@ _ERROR_SEVERITY = {
     "heartbeat": 5,
 }
 
-_ERROR_THRESHOLDS = {
+_ERROR_THRESHOLDS: dict[str, dict[str, int | None]] = {
     "timeout": {"mild": 3, "moderate": 5, "stop": 8},
     "network": {"mild": 2, "moderate": 4, "stop": 6},
     "schema": {"mild": 3, "moderate": None, "stop": 5},  # None = skip moderate level

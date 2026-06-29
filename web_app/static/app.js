@@ -134,7 +134,9 @@ window.addEventListener("resize", () => {
 		Object.values(_workerTerminals).forEach((t) => {
 			try {
 				t.fit.fit();
-			} catch (_e) {}
+			} catch (_e) {
+				console.warn("xterm fit failed", _e);
+			}
 		});
 	}, 250);
 });
@@ -175,7 +177,9 @@ function initSSE() {
 			const d = JSON.parse(e.data);
 			updateConnectionStatus(true);
 			if (d.data) updateDashboard(d.data);
-		} catch (err) {}
+		} catch (err) {
+			console.warn("SSE init parse failed", err);
+		}
 	});
 
 	sseSource.addEventListener("update", (e) => {
@@ -189,10 +193,14 @@ function initSSE() {
 			}
 			// Log entries pushed from server
 			if (d.type === "log_entry" && d.entry) appendLog(d.entry);
-		} catch (err) {}
+		} catch (err) {
+			console.warn("SSE update parse failed", err);
+		}
 	});
 
-	sseSource.addEventListener("heartbeat", () => {});
+	sseSource.addEventListener("heartbeat", () => {
+		updateConnectionStatus(true);
+	});
 	sseSource.onopen = () => updateConnectionStatus(true);
 	sseSource.onerror = () => {
 		updateConnectionStatus(false);
@@ -206,7 +214,9 @@ async function fetchStatus() {
 	try {
 		const res = await fetch(API.status);
 		updateDashboard(await res.json());
-	} catch (err) {}
+	} catch (err) {
+		console.warn("fetchStatus failed", err);
+	}
 }
 
 function updateDashboard(data) {
@@ -409,7 +419,7 @@ function updateRecentIterations(data) {
 					_lastSeenIterationCount = result.total;
 				}
 			})
-			.catch(() => {});
+			.catch((err) => console.warn("iteration fetch failed", err));
 	}
 }
 
@@ -424,7 +434,9 @@ function _fetchAndAppendMissingIterations(tbody, seenNs) {
 				_lastSeenIterationCount = result.total;
 			}
 		})
-		.catch(() => {});
+		.catch((err) =>
+			console.warn("fetchAndAppendMissingIterations failed", err),
+		);
 }
 
 // ── Helper: append new iteration rows preserving newest-first order ─────
@@ -917,7 +929,11 @@ function renderWorkers(data) {
 		allWorkers
 			.map((w) => {
 				const cls =
-					w.status === "ok" || w.status === "done" ? "ok" : w.status === "error" ? "error" : "running";
+					w.status === "ok" || w.status === "done"
+						? "ok"
+						: w.status === "error"
+							? "error"
+							: "running";
 				const dur = w.duration_seconds
 					? w.duration_seconds.toFixed(0) + "s"
 					: "";
@@ -961,7 +977,9 @@ function showWorkerCards() {
 	Object.values(_workerTerminals).forEach((t) => {
 		try {
 			t.term.dispose();
-		} catch (e) {}
+		} catch (e) {
+			console.warn("showWorkerCards dispose failed", e);
+		}
 	});
 	_workerTerminals = {};
 	document.getElementById("workers-cards-view").style.display = "";
@@ -1031,7 +1049,9 @@ async function fetchSystem() {
 		);
 		const disk = data.disk || {};
 		setText("sys-disk", (disk.percent || 0).toFixed(1) + "%");
-	} catch (err) {}
+	} catch (err) {
+		console.warn("system data failed", err);
+	}
 }
 
 async function fetchCliPreview() {
@@ -1042,7 +1062,9 @@ async function fetchCliPreview() {
 		if (el)
 			el.textContent =
 				data.command || (data.args || []).join(" ") || "No config set";
-	} catch (err) {}
+	} catch (err) {
+		console.warn("cli preview failed", err);
+	}
 }
 
 function formatBytes(bytes) {
@@ -1060,7 +1082,9 @@ async function copyCliPreview() {
 		const orig = el.textContent;
 		el.textContent = "Copied!";
 		setTimeout(() => (el.textContent = orig), 1500);
-	} catch (err) {}
+	} catch (err) {
+		console.warn("copyCliPreview failed", err);
+	}
 }
 
 function toggleTheme() {

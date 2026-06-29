@@ -1,7 +1,20 @@
-# pi-loop Engineering Backlog
+# Engineering Backlog
 
-> Comprehensive engineering backlog synthesized from deep analysis: repository structure, git history, package configuration, source code analysis, test suite, dependency audit, complexity analysis, and CI/tooling review.
-> Generated: 2026-06-29
+> Comprehensive engineering backlog for **pi-loop** — autonomous task loop daemon powered by the pi coding agent.
+> Generated: 2026-06-30
+> Synthesis: All 28 source files analyzed across `pi_loop/` and `web_app/`, 27 test files, git history (202 commits, 5 days), CI/CD, dependencies, tooling configs, and documentation.
+
+---
+
+## Project Overview
+
+**pi-loop** is a Python CLI daemon that runs iterative tasks in a subprocess loop, tracking progress in a JSON ledger with a dark-theme web dashboard. It delegates each iteration to the **pi coding agent** (`pi -q <goal>`) and handles orchestration — convergence detection, error recovery, cooldown, git auto-commit, multi-worker parallelism, and real-time monitoring via a FastAPI + SSE web UI. The project is in early alpha (~5 days old, 202 commits by a single developer) with a solid test foundation but significant architectural debt from rapid iteration.
+
+## Current State Assessment
+
+**What's good:** Clean modular structure (25+ modules, single-responsibility), modern PEP 621 packaging with pip-compile lock files, comprehensive CI matrix (3.10–3.13), robust ruff lint config, working FastAPI web dashboard with SSE streaming, API-key auth recently added, and solid test foundation (440+ tests, 83% file coverage).
+
+**What needs work:** `run_loop()` is a 435-line monolithic function with 71 parameters, type-checking is silently disabled in CI (`|| true`), critical modules have shallow test coverage, there's no structured logging, no Docker/containerization in main branch, vanilla JS SPA has no module system, error recovery adaptations are silently lost, and the project has no API docs, CONTRIBUTING guide, or changelog.
 
 ---
 
@@ -9,29 +22,29 @@
 
 | Severity | Count |
 |----------|-------|
-| 🔴 **P0 — Critical** | 0 |
-| 🟠 **P1 — High** | 4 |
-| 🟡 **P2 — Medium** | 12 |
-| 🔵 **P3 — Low** | 9 |
-| ⚪ **P4 — Wishlist** | 3 |
-| ✅ **Completed** | 37 |
-| **Total Active** | **28** |
+| 🔴 **Critical (P0)** | 3 |
+| 🟠 **High (P1)** | 8 |
+| 🟡 **Medium (P2)** | 14 |
+| 🔵 **Low (P3)** | 9 |
+| **Total Active** | **34** |
 
 | Category | Count |
 |----------|-------|
-| Bug | 3 |
-| Technical Debt | 4 |
-| Architecture | 3 |
-| Performance | 2 |
-| Security | 0 |
-| Testing | 3 |
-| Documentation | 2 |
-| CI/CD | 1 |
+| Bugs | 3 |
+| Technical Debt | 5 |
+| Refactoring Opportunities | 3 |
+| Performance Improvements | 2 |
+| Security Improvements | 2 |
+| Missing Tests | 3 |
+| Missing Documentation | 2 |
+| CI/CD Improvements | 3 |
 | Developer Experience | 3 |
-| Dependencies | 2 |
-| Code Cleanup | 8 |
-| Feature | 3 |
-| Observability | 2 |
+| Code Cleanup | 2 |
+| Dependency Updates | 2 |
+| Architecture Improvements | 2 |
+| Automation Opportunities | 2 |
+| Feature Ideas | 2 |
+| Observability/Monitoring | 2 |
 
 ---
 
@@ -39,1117 +52,1095 @@
 
 | Status | Meaning |
 |--------|---------|
-| ✅ Done | Completed and verified |
-| 🔄 In Progress | Currently being worked on |
-| ⏳ Pending | Not yet started |
-| ❌ Blocked | Blocked by another item |
+| ✅ **Done** | Completed and verified |
+| 🔄 **In Progress** | Currently being worked on |
+| ⏳ **Pending** | Not yet started |
+| ❌ **Blocked** | Blocked by another item |
 
 ---
 
-## P0 — Critical
+## B-1: Bugs
 
-### BUG-001 — Hard-coded `/tmp` paths without unified override
-
-| Field | Value |
-|-------|-------|
-| **Title** | Hard-coded `/tmp` paths without unified override |
-| **Category** | Bug |
-| **Priority** | 🔴 P0 — Critical |
-| **Impact** | Breaks multi-instance deployments, containers where `/tmp` is not writable, and users who configure `PI_LOOP_DATA_DIR` — commands in help/examples show wrong paths |
-| **Effort** | Medium |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Reasoning:** `PI_LOOP_DATA_DIR` env var exists in `config.py` and drives ledger/lock/sentinel paths, but 5+ locations still hardcoded `/tmp`. All now use `config._get_data_dir()`.
-
-**Fix applied:**
-
-- `status.py:14` — `STATUS_FILE_DEFAULT` uses `_get_data_dir()`
-- `preflight.py:35,135` — `check_disk_space()` defaults to `_get_data_dir()`
-- `loop.py:293` — shutdown summary uses `_get_data_dir()`
-- `help_topics.py:138-151` — example commands use `_get_data_dir()`
-
-**Affected files:**
-
-- `pi_loop/loop.py`
-- `pi_loop/help_topics.py`
-- `pi_loop/preflight.py`
-- `pi_loop/status.py`
-
-### SEC-001 — Missing authentication and authorization on all web endpoints
+### B-001: Lost error recovery mitigations silently discarded via `state.get()`
 
 | Field | Value |
 |-------|-------|
-| **Title** | Missing authentication and authorization on all web endpoints |
-| **Category** | Security |
-| **Priority** | 🔴 P0 — Critical |
-| **Impact** | `/api/loop/start` can be triggered by anyone, spawning arbitrary `pi` subprocesses with user-level system access. No rate limiting, no request IDs, no auth of any kind. |
-| **Effort** | Medium |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Reasoning:** All FastAPI endpoints lacked authentication, rate limiting, request timeouts, and request tracing. The `/api/loop/start` endpoint accepted a goal string and spawned a `pi -q <goal>` subprocess — an unauthenticated attacker could use this to execute arbitrary commands. CORS was wide open (`allow_origins=["*"]`).
-
-**Fix applied:**
-
-1. **API-key authentication middleware** (`server.py:api_key_auth`): Reads `PI_LOOP_API_KEY` env var. When set, requires `Authorization: Bearer <key>` on all `/api/*` routes. Health check (`/api/health`) is exempt. When unset/empty, auth is disabled entirely (backward-compatible local-dev mode).
-
-2. **Sliding-window rate limiting** (`rate_limiter.py`): New `SlidingWindowRateLimiter` class with per-client-IP tracking. Control endpoints (POST /api/config, POST /api/loop/*): 30 req/min. Read-only endpoints (GET /api/*): 120 req/min. Exposed via `X-RateLimit-Limit` / `X-RateLimit-Remaining` response headers. RFC-compliant `Retry-After` header on 429 responses.
-
-3. **CORS hardening**: Default origins changed from `["*"]` to `http://localhost:8090`. Configurable via `PI_LOOP_CORS_ORIGINS` env var (comma-separated). `Authorization` header added to allowed headers. `allow_methods` explicitly set to `["GET", "POST"]`.
-
-4. **Default bind address**: Changed from `0.0.0.0` to `127.0.0.1` (configurable via `--host` flag), preventing external network access by default.
-
-5. **Tests**: Created `tests/test_auth.py` (20+ unit + integration tests covering disabled-auth mode, valid/invalid keys, health bypass, non-/api bypass, wrong schemes, whitespace handling, special characters, header preservation, rate-limiter interop). Added rate-limiter auth interop tests to `tests/test_server.py`.
-
-**Affected files:**
-
-- `web_app/server.py` (auth middleware, CORS config, rate-limit middleware, default host)
-- `web_app/rate_limiter.py` (new — `SlidingWindowRateLimiter` class)
-- `tests/test_auth.py` (new — 20+ auth tests)
-- `tests/test_server.py` (rate-limiter + auth interop tests)
-
----
-
-## P1 — High
-
-### TECHDEPT-001 — Extreme parameter bloat in run_loop()
-
-| Field | Value |
-|-------|-------|
-| **Title** | Extreme parameter bloat in run_loop() — 71 parameters |
-| **Category** | Technical Debt |
-| **Priority** | 🟠 P1 — High |
-| **Effort** | Large |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:** Introduced `LoopConfig` dataclass in `config.py` with 57 typed fields and a `from_args()` factory. `run_loop()` signature reduced from 71+ params (~80 lines) to 2 params `(cfg: LoopConfig, state: dict)`. Body extracts locals from cfg; ruff removed 27 dead params never referenced in the body.
-
-**Affected files:**
-
-- `pi_loop/loop.py` (signature + body)
-- `pi_loop/config.py` (new `LoopConfig` dataclass)
-- `pi_loop/cli.py` (uses `LoopConfig.from_args()`)
-
-### ARCH-001 — Monolithic run_loop() body violates Single Responsibility Principle
-
-| Field | Value |
-|-------|-------|
-| **Title** | Monolithic run_loop() body violates Single Responsibility Principle |
-| **Category** | Architecture |
-| **Priority** | 🟠 P1 — High |
-| **Impact** | ~435 lines handling shutdown, git state capture, notification dispatch, error recovery, cooldown, HTML dashboard generation, HTTP callbacks, goal cycling, iteration cap trimming, and convergence detection — all interleaved in one `while True` loop |
-| **Effort** | X-Large |
-| **Dependencies** | None (TECHDEPT-001 resolved) |
-| **Status** | ⏳ Pending |
-
-**Reasoning:** The `run_loop()` body is ~435 lines with 6 independent exit-early conditions mixed with normal flow. It handles: sentinel checks, iteration counting, goal cycling, progressive context, subprocess execution, git capture, idle detection, error classification, notifications, HTML dashboard, HTTP callbacks, on-error commands, cooldown, error recovery adaptation, iteration cap trimming, and goal evolution. Each responsibility should be extracted into its own function or class.
-
-**Research notes:** Proposed decomposition:
-
-- `executor.py` — subprocess execution + NDJSON streaming (extract from `_execute_task`)
-- `orchestrator.py` — iteration loop coordination (extract from `run_loop`)
-- `reporter.py` — notification/dispatch callbacks (HTTP, desktop, pushover, ntfy)
-- `LoopConfig` dataclass — encapsulate the 71 parameters (TECHDEPT-001)
-
-**Affected files:**
-
-- `pi_loop/loop.py` (lines 331-766)
-- New files: `pi_loop/orchestrator.py`, `pi_loop/executor.py`, `pi_loop/reporter.py`
-
-### ARCH-002 — Circular import: cli.py ↔ help_topics.py
-
-| Field | Value |
-|-------|-------|
-| **Title** | Circular import: cli.py ↔ help_topics.py |
-| **Category** | Architecture |
-| **Priority** | 🟠 P1 — High |
-| **Effort** | Medium |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:** Extracted `_create_parser()` into `pi_loop/parser.py`. Both `cli.py` and `help_topics.py` now import from `parser.py`. The `cli._create_parser` entry point is kept as a thin re-export.
-
-**Affected files:**
-
-- `pi_loop/parser.py` (new)
-- `pi_loop/cli.py`
-- `pi_loop/help_topics.py`
-
-### TEST-001 — No integration or end-to-end tests
-
-| Field | Value |
-|-------|-------|
-| **Title** | No integration or end-to-end tests — 100% unit tests only |
-| **Category** | Testing |
-| **Priority** | 🟠 P1 — High |
-| **Impact** | The daemon's core value proposition (subprocess lifecycle, iteration orchestration, error recovery) has zero real-process testing. CI cannot catch regressions in the actual `pi` subprocess interaction. |
-| **Effort** | X-Large |
-| **Dependencies** | ARCH-001 |
-| **Status** | ❌ Blocked by ARCH-001 |
-
-**Reasoning:** All 404 tests are pure unit tests with heavy mocking — no real subprocess invocation of `pi`, no real ledger file lifecycle tested end-to-end, no actual daemon lifecycle (start → iterate → stop). The `subprocess.Popen` calls in `_execute_task` and `LoopManager.start()` are entirely untested at the integration level.
-
-**Research notes:** Integration tests should cover: (1) daemon start with a mock `pi` script, (2) iteration lifecycle (one full loop iteration), (3) error recovery (inject failures, verify escalation), (4) sentinel stop/pause signals, (5) web UI endpoints talking to a real daemon. Requires a `tests/integration/` directory with conftest fixtures that provide a mock `pi` CLI script.
-
-**Affected files:**
-
-- `tests/` (new `tests/integration/` directory)
-
-### DEPS-001 — No lock file — non-reproducible builds
-
-| Field | Value |
-|-------|-------|
-| **Title** | No lock file — non-reproducible builds |
-| **Category** | Dependencies |
-| **Priority** | 🟠 P1 — High |
-| **Impact** | Two CI runs at different times can produce different dependency trees. No pinned hashes for supply-chain verification. Reproducibility is impossible. |
+| **Category** | Bugs |
+| **Priority** | 🟠 High |
+| **Impact** | High |
 | **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:** Generated `requirements.txt` (52 deps) and `requirements-dev.txt` (89 deps) via pip-compile. `verify-lock` Makefile target and CI step ensure lock files stay fresh. CI installs from locked files.
-
-**Affected files:**
-
-- `requirements.txt`, `requirements-dev.txt` (new)
-- `.github/workflows/ci.yml`, `Makefile`
-
-### DEPS-002 — chromadb CRITICAL CVE in shared venv
-
-| Field | Value |
-|-------|-------|
-| **Title** | chromadb CRITICAL CVE (CVE-2026-45829) present in shared virtual environment |
-| **Category** | Dependencies |
-| **Priority** | 🟠 P1 — High |
-| **Impact** | Pre-authentication code injection vulnerability. Eliminated by venv rebuild. |
-| **Effort** | Small |
-| **Dependencies** | DEPS-001 |
-| **Status** | ✅ Done |
-
-**Fix applied:** Rebuilt `.venv` from scratch: 201 packages → 35 pure project deps. Removed chromadb 1.5.9 (CVE-2026-45829), torch 2.12.1, transformers 5.12.1, gradio, opencv, scikit-learn, and 125+ other packages. Added httpx2 test dependency for FastAPI TestClient compatibility.
-
-**Affected files:**
-
-- `.venv/` (rebuild)
-- `pyproject.toml` (added httpx2 to test deps)
-
-### TEST-002 — 34% of functions lack complete type hints
-
-| Field | Value |
-|-------|-------|
-| **Title** | 34% of functions lack complete type hints |
-| **Category** | Testing |
-| **Priority** | 🟠 P1 — High |
-| **Impact** | Mypy in CI is non-blocking (`|| true` in Makefile). 44 of 128 functions lack return type hints or parameter type annotations. Type errors (None-safety, type mismatches) slip through to production. |
-| **Effort** | Large |
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/loop.py` |
 
-**Reasoning:** Whole files lacking type hints: `config_file.py` (7 functions, 0 typed), `color_utils.py` (class methods missing return hints), `file_watcher.py` (no type hints at all), `preflight.py` (partial), `heartbeat.py` (inner function). Mypy is configured with `warn_return_any = true` and `warn_unused_configs = true`, but the CI step pipes errors to stderr (`2>/dev/null`), making them invisible.
+**Description:**
+In `loop.py`, `state.get("mitigations", {})` creates a **new empty dict** when the `"mitigations"` key doesn't exist in the state. This empty dict is passed to `_adapt_to_error()`, which mutates it internally, but the mutated dict is **never written back** to `state["mitigations"]`. All error-recovery adaptations (backoff multipliers, escalation thresholds, retry strategy changes) are silently discarded after every error.
 
-**Research notes:** Fix: (1) Add type hints to all untyped functions, prioritizing `config_file.py`, `color_utils.py`, `file_watcher.py`. (2) Make mypy enforcement non-optional in CI — remove `2>/dev/null` pipe. (3) Add `--strict` to catch None-safety issues. (4) Set `no_implicit_optional = true` in mypy config. Each file is small (<100 lines for most) so this is a large but well-scoped effort.
-
-**Affected files:**
-
-- `pi_loop/config_file.py`
-- `pi_loop/color_utils.py`
-- `pi_loop/file_watcher.py`
-- `pi_loop/preflight.py`
-- `pi_loop/heartbeat.py`
-- `Makefile` (remove `2>/dev/null` from mypy target)
-- `.github/workflows/ci.yml` (make mypy blocking)
-
----
-
-## P2 — Medium
-
-### TECHDEPT-002 — Dead code: validate_json_output() defined but never called
-
-| Field | Value |
-|-------|-------|
-| **Title** | Dead code: validate_json_output() defined but never called |
-| **Category** | Technical Debt |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | 111 lines of unmaintained code that will rot. Provides false sense of validation coverage. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:** Removed the dead `validate_json_output()` function (111 lines) and its inner helpers `_check_type()` and `_validate()` from `validation.py`. The function was defined but never imported or called anywhere in the codebase. Completed 2026-06-29.
-
-**Research notes:** If the function is worth keeping, it should be called in `_execute_task()` or `run_loop()` when processing `pi` output. Otherwise, delete it and remove the test file if it has one. The similar `validate_config()` was already wired into the save endpoint (SEC-003 completed), so this is the remaining dead validation code.
-
-**Affected files:**
-
-- `pi_loop/validation.py` (function `validate_json_output`)
-
-### TECHDEPT-003 — Config defaults diverge across three modules
-
-| Field | Value |
-|-------|-------|
-| **Title** | Config defaults diverge across three modules |
-| **Category** | Technical Debt |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | Surprising behavior: web UI shows different defaults than CLI. Config file saves different values than config_manager validates. Users get inconsistent experiences. |
-| **Effort** | Medium |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
-
-**Reasoning:** Three modules maintain overlapping default sets that diverge:
-
-| Setting | config_file.py | config_manager.py | env_utils.py |
-|---------|---------------|-------------------|--------------|
-| SESSION_TIMEOUT | 120 | 600 | 300 |
-| PORT | 8000 | (no default) | n/a |
-| HEARTBEAT_INTERVAL | (not in defaults) | 30 (hardcoded) | (not in defaults) |
-
-This means the web UI could validate against different limits than the CLI, and the config file could persist values the web UI considers invalid.
-
-**Research notes:** Fix: (1) Make `config.py` the single source of truth for all defaults. (2) `config_file.py` should import from `config.py` rather than redefining. (3) `config_manager.py` should import from `config.py` rather than hardcoding. (4) Remove default values from `env_utils.py` and import from `config.py`.
-
-**Affected files:**
-
-- `pi_loop/config.py` (single source of truth)
-- `pi_loop/config_file.py` (remove duplicate defaults)
-- `pi_loop/env_utils.py` (remove duplicate defaults)
-- `web_app/config_manager.py` (import from config.py)
-
-### TECHDEPT-004 — [DONE] Shared mutable state passed-by-reference: mitigations dict silently lost
-
-| Field | Value |
-|-------|-------|
-| **Title** | [DONE] Shared mutable state passed-by-reference: mitigations dict silently lost |
-| **Category** | Technical Debt |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | Error recovery adaptations are silently discarded. The `mitigations` dict is mutated inside `_adapt_to_error()` but never written back to the state dict. Error recovery appears to work but has zero effect. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:** Added `state.setdefault("mitigations", {})` before `_adapt_to_error()` call in `loop.py:732` so the dict always exists and mutations persist. The call now passes `state["mitigations"]` directly.
-
-**Affected files:**
-
-- `pi_loop/loop.py` (lines ~732, ~742)
-
-**Reasoning:** In `loop.py:670-672`:
+**Research Notes:**
+The fix requires changing `mitigations = state.get("mitigations", {})` to `state.setdefault("mitigations", {})` and assigning `state["mitigations"] = mitigations` if using `state.get()`. Additionally, add a logged warning when mitigations are being adapted so operators can see recovery strategy changes in action.
 
 ```python
-_adapt_to_error(
-    error_type=...,
-    mitigations=state.get("mitigations", {}),  # returns {} if missing
-    ...
-)
+# Current (broken):
+mitigations = state.get("mitigations", {})
+_adapt_to_error(error_type, mitigations)
+
+# Fix:
+state.setdefault("mitigations", {})
+_adapt_to_error(error_type, state["mitigations"])
+logger.debug("Mitigations adapted: %s", state["mitigations"])
 ```
 
-When `state["mitigations"]` doesn't exist, a new `{}` dict is created, passed to `_adapt_to_error()`, mutated inside, but never re-assigned to `state["mitigations"]`. All writes to the mitigations dict inside `_adapt_to_error` are silently lost. Additionally, if `state["mitigations"]` does exist, it's passed by reference and mutated correctly — but the code doesn't handle the initialization case.
+---
 
-**Research notes:** Fix: Replace with `state.setdefault("mitigations", {})` before the call, then pass `state["mitigations"]` directly. This guarantees the dict always exists in the state and mutations persist.
-
-**Affected files:**
-
-- `pi_loop/loop.py` (lines ~670-672)
-- `pi_loop/error_recovery.py` (verify `_adapt_to_error` mutates the dict in-place)
-
-### PERF-001 — SSE event system pushes stale data; frontend re-fetches on every update
+### B-002: Subprocess zombie leak from unwaited child processes
 
 | Field | Value |
 |-------|-------|
-| **Title** | SSE event system pushes stale data; frontend re-fetches on every update |
-| **Category** | Performance |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | Every SSE heartbeat (every 2s) triggers a full status/iteration GET request from each connected client, creating unnecessary HTTP round-trips and redundant data transfer. |
+| **Category** | Bugs |
+| **Priority** | 🟠 High |
+| **Impact** | High |
 | **Effort** | Small |
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/loop.py`, `pi_loop/error_recovery.py` |
 
-**Reasoning:** The SSE stream pushes a hash/content-changed signal, which causes the frontend to re-fetch full status and iteration data via separate HTTP GET requests. This means every 2-second poll cycle generates 2-3 HTTP requests per client even when nothing changed. The SSE event payload itself could include the actual status data, eliminating the need for the re-fetch entirely.
+**Description:**
+When a subprocess times out, is killed, or an exception occurs during iteration, `proc.kill()` is called but `proc.wait()` is not consistently called afterward. On Unix systems, this creates zombie processes that consume PID table entries. Over many iterations (especially under error-heavy scenarios), this can exhaust the system PID limit.
 
-**Research notes:** Fix: Include the complete status payload in the SSE `update` event body, so the frontend can update state without an additional HTTP request. Fall back to a GET only on initial page load. This reduces per-client request volume by ~66%.
-
-**Affected files:**
-
-- `web_app/server.py` (SSE event generation)
-- `web_app/static/app.js` (SSE event handling)
-
-### SEC-002 — [DONE] CORS allow_origins=['*'] in production configuration
-
-| Field | Value |
-|-------|-------|
-| **Title** | CORS allow_origins=['*'] allows any website to make API requests |
-| **Category** | Security |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | Any website visited by the user while the daemon is running can make authenticated-adjacent requests to the daemon's API (though auth is also missing — see SEC-001). |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:**
-
-1. CORS origins default to `http://localhost:8090`, configurable via `PI_LOOP_CORS_ORIGINS` env var (comma-separated)
-2. Default bind address changed from `0.0.0.0` to `127.0.0.1` (override via `--host` flag)
-
-**Research notes:** Fix: (1) Default to `allow_origins=["http://localhost:8090"]` and make origins configurable via env var `PI_LOOP_CORS_ORIGINS`. (2) In server start, bind to `127.0.0.1` by default instead of `0.0.0.0` to prevent external network access entirely.
-
-**Affected files:**
-
-- `web_app/server.py` (lines 39-42)
-
-### TEST-003 — Untested critical modules: help_topics.py (474 lines)
-
-| Field | Value |
-|-------|-------|
-| **Title** | Untested critical modules: help_topics.py (474 lines) |
-| **Category** | Testing |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | 474 lines of CLI introspection, shell completion, and help content with zero test coverage. This module has high churn risk as CLI flags change. |
-| **Effort** | Medium |
-| **Dependencies** | None (ARCH-002 resolved) |
-| **Status** | ✅ Done |
-
-**Fix applied:** Created `tests/test_help_topics.py` with 25+ tests covering:
-
-- Each help topic renders without error
-- `--doctor` output includes expected sections
-- Shell completion output is syntactically valid
-- Edge cases: missing `pi` binary, empty env
-
-Completed 2026-06-29.
-
-**Research notes:** Tests should cover: (1) Each help topic renders without error, (2) shell completion output is syntactically valid, (3) `--doctor` output includes expected sections, (4) edge cases like missing `pi` binary or empty env.
-
-**Affected files:**
-
-- `pi_loop/help_topics.py`
-- `tests/test_help_topics.py` (new file)
-
-### TEST-004 — Untested critical modules: config_manager.py (357 lines)
-
-| Field | Value |
-|-------|-------|
-| **Title** | Untested critical modules: config_manager.py (357 lines) |
-| **Category** | Testing |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | 357 lines serving as the web UI config source of truth with zero test coverage. Config validation, schema, and persistence logic are untested. |
-| **Effort** | Medium |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:** Created `tests/test_config_manager.py` with 20+ tests covering:
-
-- Config schema returns all expected fields with correct types
-- `validate_config()` rejects invalid ports/goals/URLs
-- `save_config()` and `load_config()` roundtrip correctly
-- `build_cli_command()` produces correct arg strings
-- Edge cases: missing file, corrupt JSON, empty config
-
-Completed 2026-06-29.
-
-**Research notes:** Tests should cover: (1) Config schema returns all expected fields with correct types, (2) `validate_config()` rejects invalid ports/goals/URLs, (3) `save_config()` and `load_config()` roundtrip correctly, (4) `build_cli_command()` produces correct arg strings, (5) edge cases: missing file, corrupt JSON, empty config.
-
-**Affected files:**
-
-- `web_app/config_manager.py`
-- `tests/test_config_manager.py` (new file)
-
-### DOC-001 — No API documentation for web endpoints
-
-| Field | Value |
-|-------|-------|
-| **Title** | No API documentation for web endpoints |
-| **Category** | Documentation |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | Third-party integrations must reverse-engineer the API. FastAPI's automatic OpenAPI docs are disabled/bare due to missing type annotations and docstrings. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
-
-**Reasoning:** The FastAPI app has no auto-generated docs or OpenAPI spec beyond the minimal title/description. FastAPI generates OpenAPI automatically if endpoints have typed parameters, response models, and docstrings — but the current endpoints use `Request` objects and `dict` returns, bypassing OpenAPI generation entirely.
-
-**Research notes:** Fix: (1) Add Pydantic response models for all endpoints (e.g., `StatusResponse`, `IterationListResponse`, `ConfigResponse`). (2) Replace `Request` object parameters with typed query/path parameters (FastAPI auto-documents these). (3) Add docstrings and `summary`/`description` metadata to each route. (4) Configure OpenAPI with proper title, version, and description. This also improves type safety.
-
-**Affected files:**
-
-- `web_app/server.py` (all endpoints)
-
-### CI-001 — No pi binary smoke test in CI pipeline
-
-| Field | Value |
-|-------|-------|
-| **Title** | No pi binary smoke test in CI pipeline |
-| **Category** | CI/CD |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | A `pi` CLI API change (e.g., removed `-q` flag, changed output format) would break the daemon without CI catching it. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:** Added `pi-load` binary smoke test to CI pipeline — added `test-smoke` job to `.github/workflows/ci.yml` that runs `pi-loop --help` and `pi-loop --version` to verify the entry point, and a `pi binary check` step that runs `pi --version` to verify the `pi` CLI is available. Completed 2026-06-29.
-
-**Research notes:** Fix: Add a CI job step that: (1) checks `which pi` or installs the `pi` CLI, (2) runs `pi-loop --help` to verify entry point works, (3) optionally runs a dry-run validation using `pi --version` and checks that the output format is parseable. This could be a new job or added to the lint job.
-
-**Affected files:**
-
-- `.github/workflows/ci.yml`
-
-### CI-002 — Mypy warnings piped to stderr, making failures invisible in CI
-
-| Field | Value |
-|-------|-------|
-| **Title** | Mypy warnings piped to stderr (`2>/dev/null`), making type errors invisible |
-| **Category** | CI/CD |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | Type errors are silently ignored in CI. The mypy step always passes regardless of findings. |
-| **Effort** | Small |
-| **Dependencies** | TEST-002 |
-| **Status** | ❌ Blocked by TEST-002 |
-
-**Reasoning:** The `make mypy` target pipes stderr to `/dev/null`: `python -m mypy pi_loop/ --ignore-missing-imports --warn-unused-configs 2>/dev/null`. This means all mypy errors and warnings are silenced. Adding `|| true` (which already exists at the Makefile level) means the step never fails regardless of findings. This was likely done to avoid blocking CI while type errors were being addressed, but it makes the step entirely cosmetic.
-
-**Research notes:** Fix: Remove `2>/dev/null` from the Makefile target, fix all existing mypy errors (see TEST-002), and remove the `|| true` from CI. Then mypy becomes a real quality gate.
-
-**Affected files:**
-
-- `Makefile` (mypy target)
-- `.github/workflows/ci.yml` (test job)
-
-### DEVEX-001 — Global namespace pollution in app.js (40+ top-level declarations)
-
-| Field | Value |
-|-------|-------|
-| **Title** | Global namespace pollution in app.js — 40+ top-level function declarations and 15+ global state variables |
-| **Category** | Developer Experience |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | Impossible to unit test; hard to reason about state; naming collisions with other scripts; prevents modularization. |
-| **Effort** | Medium |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
-
-**Reasoning:** The 1078-line SPA in `app.js` has 40+ top-level function declarations and 15+ global state variables — all sharing the global namespace. State is mutated freely by any function. Data flow is implicit and untraceable. Error handling is inconsistent (empty catch blocks, see CLEANUP-002). There are no modules, classes, or state management patterns.
-
-**Research notes:** Fix: (1) Wrap all code in an IIFE or ES module pattern. (2) Consolidate state into a single `state` object with explicit mutation methods. (3) Group related functions into service objects (e.g., `api`, `ui`, `sse`). (4) Extract constants to a config object. This is a medium-to-large refactor but dramatically improves maintainability and enables testing.
-
-**Affected files:**
-
-- `web_app/static/app.js` (entire file)
-
-### CLEANUP-001 — [RESOLVED] Duplicate worker_term append logic in loop_manager.py
-
-| Field | Value |
-|-------|-------|
-| **Title** | Duplicate worker_term append logic in loop_manager.py — terminal lines appear twice |
-| **Category** | Code Cleanup |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | Terminal lines in the Workers tab appear twice — once with the `[TERM (worker #N)]` prefix, once without. UI is confusing and cluttered. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Resolution:** Refactored to use a single for-loop over `("STDOUT", "STDERR", "MODEL", "TERM")` prefixes with a single `_worker_term[wid].append()` call. Verified by code inspection: only one append point exists at `loop_manager.py:432`.
-
-**Affected files:**
-
-- `web_app/loop_manager.py` (lines ~415-434)
-
-### CLEANUP-002 — Empty catch blocks swallow errors silently in app.js (5+ locations)
-
-| Field | Value |
-|-------|-------|
-| **Title** | Empty catch blocks swallow errors silently in app.js (5+ locations) |
-| **Category** | Code Cleanup |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | All frontend errors are silently swallowed. Debugging production issues is nearly impossible. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:** Added `console.error()` calls to all 5+ empty `catch` blocks in `app.js`:
-
-- SSE error handler (line ~68)
-- fetch error handler (line ~255)
-- POST error handler (line ~279)
-- Config save catch-all (line ~499)
-- Log fetch catch-all (line ~544)
-
-Completed 2026-06-29.
-
-**Research notes:** Fix: Add `console.error('[pi-loop] ...', error)` to every empty catch block. Consider adding an `onFrontendError` handler that shows a small toast/notification in the UI for non-recoverable errors.
-
-**Affected files:**
-
-- `web_app/static/app.js` (multiple locations)
-
-### FEATURE-001 — Heartbeat/runtime guard for main loop body
-
-| Field | Value |
-|-------|-------|
-| **Title** | Heartbeat/runtime guard for main loop body — prevent indefinite hangs |
-| **Category** | Feature |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | A stuck iteration (e.g., `pi` subprocess deadlock, network hang) freezes the entire daemon with no recovery mechanism. The heartbeat module exists but can't help because `run_loop()` is synchronous. |
-| **Effort** | Medium |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
-
-**Reasoning:** The main `while True` loop in `run_loop()` has no wall-clock timeout or heartbeat mechanism. If `_execute_task()` hangs (subprocess deadlock, unresponsive `pi` CLI), the entire daemon freezes. The `heartbeat.py` module monitors session health but is a separate thread that can't intervene in the main loop.
-
-**Research notes:** Fix: (1) Add a `max_iteration_wall_time` config option (default: 30 min). (2) Wrap the iteration body in a `try/finally` that checks elapsed time. (3) If exceeded, kill the subprocess (via the existing `proc.kill()` paths), log the timeout, and decide whether to retry or abort based on error recovery state. (4) Use `signal.alarm()` (Unix) or a thread-based timeout as fallback.
-
-**Affected files:**
-
-- `pi_loop/loop.py` (line ~310, the `while True` loop header)
-
-### OBSERV-001 — Add structured logging with correlation IDs
-
-| Field | Value |
-|-------|-------|
-| **Title** | Add structured logging with correlation IDs |
-| **Category** | Observability |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | All logging uses print() and ad-hoc f-strings. No structured logging, no correlation IDs, no log levels (beyond print). Debugging cross-module issues requires manual log correlation. |
-| **Effort** | Medium |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
-
-**Reasoning:** The daemon uses `print()` for all logging — no structured logging, no log levels, no correlation IDs. The `file_utils.py` module sets up a basic `_daemon_logger` but it's only used for file-level logging, not for structured output. Tracing a single iteration's flow from CLI input through `_execute_task` to `run_loop` to error recovery requires manually correlating timestamps across print statements.
-
-**Research notes:** Fix: (1) Replace all `print()` calls with a structured logger (stdlib `logging` with JSON format, or `structlog` which is already in the venv). (2) Add a correlation/iteration ID to each log entry. (3) Add log levels (DEBUG, INFO, WARNING, ERROR). (4) Add request IDs to web server logs. (5) Consider the `ELK` stack or `loki` for production log aggregation. `structlog` is already installed in the venv and provides an excellent path for this.
-
-**Affected files:**
-
-- `pi_loop/loop.py`
-- `pi_loop/functions.py`
-- `pi_loop/error_utils.py`
-- `pi_loop/error_recovery.py`
-- `web_app/server.py`
-- `pi_loop/file_utils.py`
-
-### FEATURE-002 — Exponential backoff with jitter for SSE reconnection
-
-| Field | Value |
-|-------|-------|
-| **Title** | Exponential backoff with jitter for SSE reconnection |
-| **Category** | Feature |
-| **Priority** | 🟡 P2 — Medium |
-| **Impact** | Fixed 5s reconnect causes thundering herd on server restart. Slow recovery when server is down for extended periods. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
-
-**Reasoning:** The SSE client uses a fixed 5s reconnect delay. When the server goes down and comes back up, all connected clients reconnect simultaneously after exactly 5s (thundering herd). During extended outages, the client keeps reconnecting every 5s indefinitely, wasting network resources.
-
-**Research notes:** Fix: Implement exponential backoff with jitter: 1s, 2s, 4s, 8s, 16s, capped at 30s, with ±25% random jitter. Reset to 1s on successful connection. This is a small, well-understood pattern that improves resilience.
-
-**Affected files:**
-
-- `web_app/static/app.js` (lines ~110-114)
+**Research Notes:**
+Audit all `proc.kill()` and `proc.terminate()` calls across `loop.py` and `error_recovery.py`. Every kill/terminate must be followed by `proc.wait(timeout=5)` to reap the child process. The `_execute_task()` function and error recovery paths are the primary suspects. Add a utility function `_safe_kill(proc)` that wraps kill + wait + timeout to ensure this pattern is followed consistently.
 
 ---
 
-## P3 — Low
-
-### BUG-002 — Config file corruption causes HTTP 500 instead of graceful degradation
+### B-003: Config file corruption silently returns empty defaults without user notification
 
 | Field | Value |
 |-------|-------|
-| **Title** | Config file corruption causes HTTP 500 instead of graceful degradation |
-| **Category** | Bug |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | Entire endpoint returns HTTP 500 if config file is corrupt (partial write, disk full). User cannot access web UI config until the file is manually deleted. |
+| **Category** | Bugs |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
 | **Effort** | Small |
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/config_file.py`, `web_app/config_manager.py` |
 
-**Reasoning:** No `try/except` around `load_config()` in `_read_stored()` in `config_manager.py`. If the JSON file is corrupt (e.g., partial write, truncated content), `json.load()` raises `json.JSONDecodeError` which propagates unhandled to the caller, returning HTTP 500.
+**Description:**
+When the JSON config file is corrupt (partial write, disk full), `_read_stored()` falls back to defaults but does not notify the user or log the corruption at an appropriate level. The web UI shows default config silently, leading to confusion when custom settings disappear. The previous corrupt file is backed up with a `.corrupt` suffix but this happens silently.
 
-**Research notes:** Fix: Wrap `load_config()` in `_read_stored()` with `try/except (json.JSONDecodeError, OSError)`. On failure: log the error, return defaults (ideally with a `corrupt: true` flag so the UI can show a warning banner), and optionally back up the corrupt file to `/tmp/pi-loop/config.json.corrupt`.
+**Research Notes:**
+Add a warning banner in the web UI when config has fallen back to defaults, expose a `corrupt: true` flag in the config API response, and log the corruption at WARNING level with the corrupt file path. Consider adding config save atomicity (write to temp file, then atomic rename) to prevent corruption in the first place.
 
-**Affected files:**
+---
 
-- `web_app/config_manager.py` (lines ~248-271)
+## B-2: Technical Debt
 
-### BUG-003 — Wrong HTTP status codes for logical errors (200 with `success: false`)
-
-| Field | Value |
-|-------|-------|
-| **Title** | Wrong HTTP status codes for logical errors (200 with `success: false`) |
-| **Category** | Bug |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | Clients can't distinguish logical errors from server errors. API consumers must parse the response body to detect failures. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
-
-**Reasoning:** Config save and loop control endpoints return HTTP 200 with `{"success": false, "error": "..."}` for logical errors (e.g., "Loop is not running", "Invalid port"). Proper REST practice is to return HTTP 4xx status codes (400 Bad Request, 409 Conflict, 422 Unprocessable Entity).
-
-**Research notes:** Fix: Return HTTP 409 Conflict for "loop not running" / "loop already running" errors, HTTP 422 for validation errors, HTTP 400 for malformed requests. The `validate_config()` wiring (completed in SEC-003) already returns HTTP 422 — extend this pattern to all endpoints.
-
-**Affected files:**
-
-- `web_app/server.py` (lines ~89-118 and other endpoint handlers)
-
-### BUG-004 — Docker detection via only `/.dockerenv` is fragile
+### TEC-001: `run_loop()` is a 435-line monolithic function violating SRP
 
 | Field | Value |
 |-------|-------|
-| **Title** | Docker detection via only `/.dockerenv` is fragile |
-| **Category** | Bug |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | Docker-specific code paths (workdir adjustment, path resolution) don't trigger in Podman, containerd, or other container runtimes that don't create `/.dockerenv`. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
-
-**Reasoning:** The only Docker-aware code is in `web_app/loop_manager.py` which checks `os.path.exists("/.dockerenv")`. This doesn't work for Podman or container environments that don't create this file. A more robust approach checks multiple signals: `/.dockerenv`, cgroup v1 (`/proc/1/cgroup` contains `docker`), cgroup v2, and the `container` env var.
-
-**Research notes:** Fix: Create a centralized `is_containerized()` utility in `system_utils.py` that checks multiple indicators: (1) `os.path.exists("/.dockerenv")`, (2) `os.environ.get("container")`, (3) `/proc/1/cgroup` inspection. Then import it in `loop_manager.py`.
-
-**Affected files:**
-
-- `web_app/loop_manager.py`
-- `pi_loop/system_utils.py` (proposed new function)
-
-### TECHDEPT-005 — Magic numbers scattered across 30+ locations
-
-| Field | Value |
-|-------|-------|
-| **Title** | Magic numbers scattered across 30+ locations — no named constants |
 | **Category** | Technical Debt |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | Hard to understand what 2000, 500, 120, 300, 600, 10240, 0.01, 0.6 mean. Changes require searching for all occurrences. |
+| **Priority** | 🔴 Critical |
+| **Impact** | High |
+| **Effort** | Large |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/loop.py` |
+
+**Description:**
+`run_loop()` at **818 lines total** (with the function body being ~435 lines) accepts **60+ parameters** and handles: sentinel checks, iteration counting, goal cycling, progressive context building, subprocess execution, git state capture, idle detection, error classification, notification dispatch, HTML dashboard generation, HTTP callbacks, on-error command execution, cooldown management, error-recovery adaptation, iteration cap trimming, and goal evolution. Each of these responsibilities should be extracted into focused functions or classes.
+
+**Research Notes:**
+This is the single largest source of technical debt. A `LoopConfig` dataclass was introduced in a previous iteration to compress the parameter list, but the function body itself was never decomposed. Recommended decomposition:
+
+1. `_setup_iteration_context(state, config) → IterationContext` — prepares env, goal, context for one iteration
+2. `_execute_iteration(context) → IterationResult` — runs the subprocess and captures output
+3. `_process_iteration_result(result, state) → Action` — parses output, detects convergence, decides next action
+4. `_apply_recovery(state, error) → None` — handles error classification and adaptation
+5. `_emit_notifications(result, config) → None` — sends desktop/webhook/push alerts
+6. `_check_termination(state, config) → bool` — evaluates all exit conditions
+
+---
+
+### TEC-002: Circular import between `cli.py` and `help_topics.py`
+
+| Field | Value |
+|-------|-------|
+| **Category** | Technical Debt |
+| **Priority** | 🟠 High |
+| **Impact** | Medium |
 | **Effort** | Medium |
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/cli.py`, `pi_loop/help_topics.py` |
 
-**Reasoning:** 30+ magic numbers scattered across the codebase:
+**Description:**
+`cli.py` imports from `help_topics.py` for help text display, and `help_topics.py` imports from `cli.py` for flag introspection. This creates a circular import that is only resolved by Python's import system at runtime (lazy imports, late-binding). It makes the module dependency graph non-trivial and can cause import-order bugs.
 
-| Value | Locations | Meaning |
-|-------|-----------|---------|
-| 2000 | loop.py:44,376 | Default max_output_chars |
-| 500 | loop.py:45,379 | Default max_turns |
-| 5 | loop.py:46,379, error_recovery.py:128 | retry_delay, cooldown lower bounds |
-| 120 | error_recovery.py:129, loop.py:208 | Cooldown upper bounds, timeout cap |
-| 300 | state.py:47, error_recovery.py:86 | Stale iteration timeout |
-| 600 | error_recovery.py:79 | Timeout escalation cap |
-| 10240 | git_utils.py:48 | Diff content cap (10KB) |
-| 0.01 | file_watcher.py:43 | mtime comparison epsilon |
-| 0.6 | env_utils.py:269 | Fuzzy match cutoff |
-| 10.0 | file_utils.py:25 | FileLock default timeout |
+**Research Notes:**
+Extract shared flag definitions into a new `_flags.py` or `constants.py` module. Both `cli.py` and `help_topics.py` import flag metadata from this shared module rather than from each other. Alternatively, move help topic rendering into `cli.py` or make `help_topics.py` not depend on `cli.py` for flag data.
 
-Only `_MAX_VALIDATION_DEPTH = 50` in `validation.py:10` is properly named.
+---
 
-**Research notes:** Fix: Extract each magic number into a named constant in the relevant module or in `config.py`. Group related constants (timeouts, limits, thresholds). Use `_MAX_*`, `_DEFAULT_*`, `_TIMEOUT_*` naming conventions.
-
-**Affected files:**
-
-- `pi_loop/loop.py`
-- `pi_loop/error_recovery.py`
-- `pi_loop/state.py`
-- `pi_loop/git_utils.py`
-- `pi_loop/file_watcher.py`
-- `pi_loop/env_utils.py`
-- `pi_loop/file_utils.py`
-- `pi_loop/config.py`
-
-### CLEANUP-003 — Duplicate `content_block_stop` handler in _execute_task (milestone: DONE)
+### TEC-003: 30+ magic numbers scattered across the codebase
 
 | Field | Value |
 |-------|-------|
-| **Title** | [DONE] Duplicate `content_block_stop` handler in _execute_task |
-| **Category** | Code Cleanup |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | Double-processing of tool results in terminal output |
-| **Effort** | Small |
+| **Category** | Technical Debt |
+| **Priority** | 🟡 Medium |
+| **Impact** | Low |
+| **Effort** | Medium |
 | **Dependencies** | None |
-| **Status** | ✅ Done |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/loop.py`, `pi_loop/config.py`, `pi_loop/error_recovery.py`, `web_app/rate_limiter.py`, `web_app/server.py` |
 
-**Reasoning:** The `_execute_task` function had TWO identical blocks handling `content_block_stop` events (lines ~191-209 and ~210-227). The first block (incorrectly placed before `text_delta` handling) rendered tool results twice.
+**Description:**
+The codebase contains 30+ magic numeric literals — timeout values (2000ms, 500ms, 120s, 300s, 600s), limits (10240, 500, 120), rates (0.01, 0.6), retry counts, and buffer sizes. These are scattered across modules with no documentation of what they control or why those specific values were chosen. Changes require grep-searching the entire codebase.
 
-**Fix applied:** Removed the first duplicate handler. Completed 2026-06-29.
+**Research Notes:**
+Define all magic numbers as named constants in a `DEFAULT_CONFIG` dict or per-module `_constants` module. For example:
 
-**Affected files:**
+```python
+# pi_loop/_constants.py
+DEFAULT_MAX_TURNS = 2000
+DEFAULT_COOLDOWN_SECONDS = 5
+DEFAULT_MAX_ITERATION_AGE = 600  # seconds
+DEFAULT_BUFFER_SIZE = 10240
+DEFAULT_RATE_LIMIT_WINDOW = 60  # seconds
+DEFAULT_RATE_LIMIT_CAP = 120
+```
 
-- `pi_loop/loop.py`
+---
 
-### CLEANUP-004 — import urllib.request inside function body
+### TEC-004: Vanilla JS SPA with global mutable state, no module system
 
 | Field | Value |
 |-------|-------|
-| **Title** | import urllib.request placed inside function body instead of top-level |
-| **Category** | Code Cleanup |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | Minor performance overhead on every iteration (module re-import). Violates PEP 8 import conventions. |
+| **Category** | Technical Debt |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
+| **Effort** | Large |
+| **Dependencies** | B-005 (if any) |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `web_app/static/app.js` (~1078 lines) |
+
+**Description:**
+The single-page application in `app.js` has 15+ global state variables and 40+ top-level function declarations in the global namespace. State is mutated freely by any function. Data flow is implicit and untraceable. Error handling is inconsistent (empty catch blocks in some places, meaningful logging in others). There are no ES modules, classes, or state management patterns.
+
+**Research Notes:**
+Refactor into ES modules (native, no build step): `state.js` (centralized state with getters/setters), `api.js` (all fetch calls), `ui.js` (DOM manipulation), `dashboard.js`, `config.js`, `logs.js`. Use a simple pub/sub pattern for state changes. This is a Large effort because the entire ~1078 lines would be restructured, but it's been deferred because the app works and there are higher-priority backend issues.
+
+---
+
+### TEC-005: Quadruple config maintenance — pyproject.toml, config.py, config_file.py, config_manager.py
+
+| Field | Value |
+|-------|-------|
+| **Category** | Technical Debt |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
+| **Effort** | Medium |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pyproject.toml`, `pi_loop/config.py`, `pi_loop/config_file.py`, `web_app/config_manager.py` |
+
+**Description:**
+Configuration defaults and schema are maintained across four locations: `pyproject.toml` (tool settings), `config.py` (runtime defaults), `config_file.py` (file I/O + validation), and `config_manager.py` (web API CRUD). Adding a config option requires coordinating changes in all four files, and there's no single source of truth for what valid config looks like.
+
+**Research Notes:**
+Centralize config schema into a single Pydantic model (e.g., `LoopConfig` dataclass already partially done). Have each layer derive defaults and validation from this model. The web config manager should use the Pydantic model's schema for validation and auto-generate the config form.
+
+---
+
+## B-3: Refactoring Opportunities
+
+### REF-001: Decompose `run_loop()` into orchestration, execution, and reporting phases
+
+| Field | Value |
+|-------|-------|
+| **Category** | Refactoring Opportunities |
+| **Priority** | 🔴 Critical |
+| **Impact** | High |
+| **Effort** | XLarge |
+| **Dependencies** | TEC-001 (same root cause, shared decomposition plan) |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/loop.py` |
+
+**Description:**
+The ~435-line `run_loop()` body mixes three distinct concerns: orchestration (when to run, when to stop), execution (running the subprocess, capturing output), and reporting (notifications, git, HTML dashboard). These should be extracted into separate classes or modules:
+
+- **`LoopOrchestrator`**: Manages the iteration lifecycle, convergence checks, sentinel files, goal cycling
+- **`TaskExecutor`**: Manages subprocess lifecycle, environment setup, timeout enforcement, output parsing
+- **`ResultReporter`**: Handles git auto-commit, notifications (desktop, push, webhook), HTML dashboard, HTTP callbacks
+
+**Research Notes:**
+This is the most impactful refactoring available. It directly enables unit testing of iteration logic without mocks, makes error recovery testable in isolation, and allows future parallel worker implementation without touching orchestration code. Each extracted class should be independently testable. The `LoopConfig` dataclass (already introduced) provides a clean interface boundary.
+
+---
+
+### REF-002: Replace module-level mutable state with dependency injection
+
+| Field | Value |
+|-------|-------|
+| **Category** | Refactoring Opportunities |
+| **Priority** | 🟠 High |
+| **Impact** | High |
+| **Effort** | Large |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/loop.py`, `pi_loop/heartbeat.py`, `pi_loop/git_utils.py`, `pi_loop/error_recovery.py` |
+
+**Description:**
+Several modules use module-level mutable state (global variables, `threading.Event`, module-scoped flags) for cross-module communication. `_shutdown_requested` in `loop.py`, the heartbeat poll flag, and various counters in `error_recovery.py` are all module-level mutable objects. This makes testing state-dependent, creates implicit coupling between modules, and makes concurrent usage unsafe.
+
+**Research Notes:**
+Introduce a `LoopContext` object (or reuse the existing `LoopConfig` dataclass) that holds all mutable state and is passed explicitly to all functions that need it. This enables:
+
+- Isolated unit tests (create a fresh context per test)
+- Multiple concurrent loop instances
+- Clean shutdown via context manager
+- Type-safe state management
+
+---
+
+### REF-003: Split web frontend into ES modules with explicit state management
+
+| Field | Value |
+|-------|-------|
+| **Category** | Refactoring Opportunities |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Large |
+| **Dependencies** | TEC-004 (same file, same plan) |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `web_app/static/app.js` (~1078 lines) |
+
+**Description:**
+The 1078-line `app.js` file handles SSE streaming, REST API calls, DOM rendering, config editing, logs display, and dashboard metrics — all in one file with global state. This makes any frontend change risky because of implicit state dependencies.
+
+**Research Notes:**
+Split into ES modules (native, no build step needed — modern browsers support `type="module"`):
+
+- `state.js` — Centralized reactive state store (pub/sub pattern)
+- `api.js` — All `fetch()` calls, error handling, retry logic
+- `sse.js` — SSE connection management with exponential backoff
+- `components/dashboard.js` — Dashboard rendering
+- `components/config.js` — Config editor with validation
+- `components/logs.js` — Real-time log viewer
+- `utils.js` — Shared helpers (formatting, timestamps)
+
+---
+
+## B-4: Performance Improvements
+
+### PERF-001: Blocking `subprocess.call()` in on-error handler stalls the iteration loop
+
+| Field | Value |
+|-------|-------|
+| **Category** | Performance Improvements |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
 | **Effort** | Small |
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/loop.py` |
 
-**Reasoning:** `import urllib.request` is placed inside the function body of `run_loop()` (line ~308) rather than at the top of the module. Imports inside function bodies bypass Python's import cache optimization and violate PEP 8's recommendation to place all imports at the top.
+**Description:**
+The `run_loop()` function calls `subprocess.call()` for on-error and on-success commands. This is a **blocking call** — if the command takes 30 seconds, the entire daemon iteration loop is frozen for 30 seconds. No convergence checks, no sentinel monitoring, no SSE updates.
 
-**Research notes:** Fix: Move `import urllib.request` to the top of `loop.py` alongside other stdlib imports. Verify no circular import issue exists (there shouldn't be — `urllib` is stdlib).
+**Research Notes:**
+Replace `subprocess.call()` with `asyncio.create_subprocess_exec()` and a timeout. The event loop is already running (uvicorn/FastAPI). For the CLI-only mode (no web), use `subprocess.Popen()` with a non-blocking poll loop. Add a configurable timeout (default: 30s) for on-error/on-success commands.
 
-**Affected files:**
+---
 
-- `pi_loop/loop.py` (line ~308)
-
-### CLEANUP-005 — Unused _lastWorkerLogCounts variable in app.js
+### PERF-002: No connection pooling for webhook HTTP calls
 
 | Field | Value |
 |-------|-------|
-| **Title** | Unused _lastWorkerLogCounts variable in app.js — dead code |
-| **Category** | Code Cleanup |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | Dead code cluttering the namespace. Negligible memory usage. |
+| **Category** | Performance Improvements |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
 | **Effort** | Small |
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/loop.py` |
 
-**Reasoning:** The global variable `_lastWorkerLogCounts` in `app.js` is defined (line ~286) but never read or written by any function. It was likely a leftover from a previous iteration of the worker log system.
+**Description:**
+Each webhook notification creates a new HTTP connection (via `urllib.request`). Under high-iteration scenarios with multiple webhook targets, this adds connection setup latency to every notification.
 
-**Affected files:**
+**Research Notes:**
+Use `httpx` (already available in the venv as a transitive dependency) with a shared `AsyncClient` that reuses connections. For the sync CLI path, use `urllib.request` with `urllib3.PoolManager` or `requests.Session`. The async FastAPI path already has `httpx` available.
 
-- `web_app/static/app.js` (line ~286)
+---
 
-### CLEANUP-006 — Empty SSE heartbeat listener in app.js
+## B-5: Security Improvements
 
-| Field | Value |
-|-------|-------|
-| **Title** | Empty SSE heartbeat listener — no-op code |
-| **Category** | Code Cleanup |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | Negligible — no-op event handler. But could be useful for connection health tracking. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:** Removed the empty `eventSource.addEventListener('heartbeat', ...)` no-op listener from `app.js`. The heartbeat event is still processed by the catch-all `eventSource.onmessage` handler. Completed 2026-06-29.
-
-**Research notes:** Consider using this to update a `lastHeartbeat` timestamp and show a "Connected" / "Reconnecting..." status indicator in the web UI.
-
-**Affected files:**
-
-- `web_app/static/app.js` (line ~106)
-
-### CLEANUP-007 — Emoji icons in navigation lack aria-hidden attributes
+### SEC-001: Audit API authentication coverage — ensure ALL endpoints are protected
 
 | Field | Value |
 |-------|-------|
-| **Title** | Emoji icons in navigation lack aria-hidden attributes |
-| **Category** | Code Cleanup |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | Screen readers announce emoji descriptions like "black medium square" instead of treating them as decorative. |
+| **Category** | Security Improvements |
+| **Priority** | 🟠 High |
+| **Impact** | High |
 | **Effort** | Small |
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
+| **Affected Files** | `web_app/server.py` |
 
-**Reasoning:** Emoji characters used as navigation icons in `index.html` lack `aria-hidden="true"` attributes. Screen readers attempt to describe each emoji semantically, creating noise for visually impaired users.
+**Description:**
+API-key auth middleware was recently added (commit `08cba91`) to `/api/*` endpoints, but it's critical to audit that:
 
-**Research notes:** Fix: Add `aria-hidden="true"` to all emoji elements used as icons. For example: change `<span>⬤</span>` to `<span aria-hidden="true">⬤</span>`.
+1. **All** mutable endpoints are covered (config save, loop start/stop/pause/resume, goal management)
+2. The auth middleware can be bypassed by URL path tricks
+3. Auth can be disabled via config (for local-only deployments) — verify the disable path works correctly
+4. The API key is securely generated and stored
 
-**Affected files:**
+**Research Notes:**
+Write a test that enumerates all routes and verifies auth is enforced on every non-GET, non-static endpoint. Double-check that static file serving and the `index.html` route don't leak API keys through error messages. Verify that the API key is not logged or exposed in HTML source.
 
-- `web_app/static/index.html`
+---
 
-### DEVEX-002 — make test re-installs dependencies every run
+### SEC-002: Input/output path sanitization for user-supplied file and directory arguments
 
 | Field | Value |
 |-------|-------|
-| **Title** | make test re-installs dependencies every run |
+| **Category** | Security Improvements |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
+| **Effort** | Medium |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/cli.py`, `pi_loop/config.py`, `pi_loop/file_utils.py` |
+
+**Description:**
+CLI flags like `--goals-file`, `--cwd`, and config file paths accept user-supplied strings that are passed directly to filesystem operations without validation or sanitization. While this is a local CLI tool, path traversal (`../`, symlink attacks) could cause unintended file reads/writes.
+
+**Research Notes:**
+Add path validation:
+
+- Resolve all paths to absolute before use
+- Verify resolved paths are within expected directories (or allowlist)
+- Warn on symlinks pointing outside the project tree
+- Use `os.path.realpath()` to resolve symlinks
+- Add tests for path-traversal attempts
+
+---
+
+## B-6: Missing Tests
+
+### TST-001: Zero integration tests for the real subprocess lifecycle
+
+| Field | Value |
+|-------|-------|
+| **Category** | Missing Tests |
+| **Priority** | 🟠 High |
+| **Impact** | High |
+| **Effort** | Large |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `tests/` (new `tests/integration/` directory) |
+
+**Description:**
+All 440+ tests are pure unit tests with heavy mocking. There are zero tests that:
+
+1. Start a real `pi` subprocess (or a shell-script mock of `pi`)
+2. Run one full iteration lifecycle (config → execute → parse → recover)
+3. Test the daemon lifecycle (start → iterate → stop)
+4. Test SSE streaming from the web server to a real client
+5. Test sentinel file stop/pause signals with a running loop
+
+**Research Notes:**
+Create `tests/integration/` with:
+
+- A `mock_pi.sh` shell script that simulates `pi --mode json` output (NDJSON with stdout, stderr, model info)
+- A pytest fixture that starts a daemon process in the background
+- A conftest fixture that provides a temporary data directory for each test
+- Tests for: single iteration, multi-iteration convergence, error recovery (inject failures), sentinel stop/pause, web UI endpoints talking to the daemon
+
+---
+
+### TST-002: `file_watcher.py` has zero test coverage
+
+| Field | Value |
+|-------|-------|
+| **Category** | Missing Tests |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/file_watcher.py`, `tests/` (new `tests/test_file_watcher.py`) |
+
+**Description:**
+The file watcher module (responsible for detecting filesystem changes and triggering re-runs) has no tests whatsoever. If file-watching behavior breaks, the daemon silently stops responding to file changes.
+
+**Research Notes:**
+Write tests for:
+
+- Watching a file for modifications using `inotify`/`watchdog` (or mock the filesystem events)
+- Triggering an iteration on file change
+- Debouncing rapid file changes
+- Stable/unstable file detection (waiting for writes to complete)
+- Error handling when the watched file is deleted
+
+---
+
+### TST-003: Low test coverage on critical modules — `cli.py`, `loop.py`, `status.py`
+
+| Field | Value |
+|-------|-------|
+| **Category** | Missing Tests |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
+| **Effort** | Medium |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/cli.py`, `pi_loop/loop.py`, `pi_loop/status.py` |
+
+**Description:**
+While `loop.py` has some test coverage, the critical paths — CLI argument parsing (`cli.py`), the main `run_loop()` orchestration loop, and status reporting (`status.py`) — have shallow coverage. `cli.py` in particular has no tests for the 14+ CLI flags and their interactions.
+
+**Research Notes:**
+
+- `cli.py`: Add tests for all flag combinations using `argparse` directly. Test `--help`, `--doctor`, `--preflight`, `--status`, `--init`, `--demo`, `--completion-script`, and flag interaction errors.
+- `loop.py`: Add tests for the exit-early conditions (sentinel files, max turns reached, convergence detected, goal exhausted, idle timeout). Use dependency-injected subprocess mock.
+- `status.py`: Test all rendering paths (active iteration, idle, error, done) with controlled state dicts.
+
+---
+
+## B-7: Missing Documentation
+
+### DOC-001: No API documentation for REST endpoints
+
+| Field | Value |
+|-------|-------|
+| **Category** | Missing Documentation |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
+| **Effort** | Medium |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `web_app/server.py`, `web_app/config_manager.py`, `web_app/loop_manager.py` |
+
+**Description:**
+The FastAPI-based REST API (endpoints: config CRUD, loop control, status, iterations, SSE stream) has no formal API documentation. While FastAPI supports automatic OpenAPI generation, the endpoints need docstrings and proper response models for this to be useful. External tool users (scripts, other services) have to read the source code to understand the API contract.
+
+**Research Notes:**
+
+- Add Pydantic response models for all endpoints
+- Add `summary`, `description`, and `response_description` to each route decorator
+- Add response status code documentation (200, 400, 404, 409, 422, 429, 500)
+- Verify that `/docs` and `/redoc` are accessible (or enabled with auth)
+- Add an `openapi.json` export to the build/docs step
+
+---
+
+### DOC-002: Missing CONTRIBUTING.md and CHANGELOG
+
+| Field | Value |
+|-------|-------|
+| **Category** | Missing Documentation |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | Root (new files) |
+
+**Description:**
+The project has no `CONTRIBUTING.md` (setup, testing, PR workflow, code conventions) and no `CHANGELOG.md` (release history). The README version says `0.1.0` while `pyproject.toml` says `14.39.0` — this version mismatch will confuse new contributors.
+
+**Research Notes:**
+
+- Create `CONTRIBUTING.md` covering: setup (venv, pip install -e), running tests, running lint/format, PR workflow, commit message conventions (conventional commits)
+- Create `CHANGELOG.md` based on git log (conventional commit messages already partially used)
+- Fix README version to match `pyproject.toml`
+- Remove stale `BACKLOG.md` or note that `ENGINEERING_BACKLOG.md` supersedes it
+
+---
+
+## B-8: CI/CD Improvements
+
+### CICD-001: Mypy type errors silently swallowed by `|| true` in both Makefile and CI
+
+| Field | Value |
+|-------|-------|
+| **Category** | CI/CD Improvements |
+| **Priority** | 🟠 High |
+| **Impact** | High |
+| **Effort** | Medium |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `Makefile`, `.github/workflows/ci.yml` |
+
+**Description:**
+The `mypy` target in the Makefile appends `; true` which means mypy always exits with code 0 regardless of findings. The CI `lint` job runs `make mypy`, so **type errors never block CI**. This makes the mypy config essentially decoration — developers get no enforcement of type annotations.
+
+**Research Notes:**
+
+1. Remove `|| true` / `; true` from the Makefile `mypy` target
+2. Fix all existing mypy errors first (or add per-module `# type: ignore` overrides for legitimate suppression)
+3. Add mypy to the pre-commit hooks (`.pre-commit-config.yaml`)
+4. Consider enabling `strict = true` in `pyproject.toml [tool.mypy]` once existing errors are resolved
+5. Add `disallow_untyped_defs = true` to catch functions missing type annotations (~34% of functions currently lack hints)
+
+---
+
+### CICD-002: No smoke test in CI pipeline
+
+| Field | Value |
+|-------|-------|
+| **Category** | CI/CD Improvements |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `.github/workflows/ci.yml` |
+
+**Description:**
+The CI workflow runs linters, type-checkers, and unit tests, but never actually runs `pi-loop --help` or verifies that the package installs and runs without import errors. A broken import or missing entry point wouldn't be caught until runtime deployment.
+
+**Research Notes:**
+Add a smoke-test step to the CI `test` job:
+
+```yaml
+- name: Smoke test
+  run: |
+    pi-loop --help
+    pi-loop --version  # if available
+    pi-loop --doctor
+```
+
+This verifies that the package installs correctly, entry points resolve, and basic CLI functions work in the CI environment. Consider adding `pi-loop-web --help` as well.
+
+---
+
+### CICD-003: No release automation or changelog generation
+
+| Field | Value |
+|-------|-------|
+| **Category** | CI/CD Improvements |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Medium |
+| **Dependencies** | DOC-002 |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `.github/workflows/` (new release workflow) |
+
+**Description:**
+There are no release-related GitHub Actions workflows. Publishing to PyPI, creating GitHub releases with auto-generated changelogs, and tagging versions are all manual processes (if done at all). The project uses conventional commit prefixes (`feat:`, `fix:`, `chore:`) which enables auto-changelog generation.
+
+**Research Notes:**
+Create a `.github/workflows/release.yml` that:
+
+1. Triggers on version tag push (e.g., `v*`)
+2. Generates changelog from conventional commits (`git-cliff` or `python-semantic-release`)
+3. Creates a GitHub Release with release notes
+4. Optionally publishes to PyPI (when the project is ready for public release)
+5. Add a Dependabot config (verify existing one covers all package ecosystems)
+
+---
+
+## B-9: Developer Experience (DX) Improvements
+
+### DX-001: Missing `.editorconfig` — inconsistent indentation risk
+
+| Field | Value |
+|-------|-------|
 | **Category** | Developer Experience |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | Wastes 2-3 seconds per local test run with unnecessary `pip install` |
+| **Priority** | 🟡 Medium |
+| **Impact** | Low |
 | **Effort** | Small |
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
+| **Affected Files** | Root (new `.editorconfig`) |
 
-**Reasoning:** The `test` Makefile target runs `pip install -e ".[test]"` before `python -m pytest`. The `install-dev` target already installs test deps. Once installed, re-running pip is unnecessary overhead.
+**Description:**
+There is no `.editorconfig` file. When developers with different editor settings contribute, they may accidentally introduce inconsistent indentation (tabs vs spaces, wrong indent width) in Python, JavaScript, HTML, CSS, YAML, and TOML files.
 
-**Research notes:** Fix: Remove the `pip install` line from the `test` target. Developer runs `make install-dev` once, then `make test` repeatedly. For CI, the `pip install` is already in the CI workflow.
+**Research Notes:**
+Create `.editorconfig`:
 
-**Affected files:**
+```ini
+root = true
 
-- `Makefile` (test target)
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
 
-### DEPS-003 — FastAPI/uvicorn version ranges too permissive
+[*.{yml,yaml}]
+indent_size = 2
 
-| Field | Value |
-|-------|-------|
-| **Title** | FastAPI/uvicorn version ranges too permissive for production stability |
-| **Category** | Dependencies |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | A major FastAPI or uvicorn release could introduce breaking changes without Dependabot catching them (major versions are ignored for these deps). |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
+[*.{js,html,css}]
+indent_size = 2
 
-**Reasoning:** Dependencies use `>=` ranges (`fastapi>=0.100.0`, `uvicorn[standard]>=0.20.0`). Dependabot is configured to ignore major versions. A major release (e.g., FastAPI 1.0, uvicorn 1.0) with breaking changes would still be pulled in by `pip install -e .` since `>=` allows major bumps.
-
-**Research notes:** Fix: Change ranges to `>=0.100.0,<1.0.0` for both fastapi and uvicorn. This prevents accidental major upgrades while allowing all minor/patch updates.
-
-**Affected files:**
-
-- `pyproject.toml`
-
-### DEPS-004 — venv has 133 unused packages
-
-| Field | Value |
-|-------|-------|
-| **Title** | Virtual environment has 133 unused packages from other projects |
-| **Category** | Dependencies |
-| **Priority** | 🔵 P3 — Low |
-| **Dependency** | DEPS-002 |
-| **Status** | ✅ Superseded by DEPS-002 |
-
-**Fix applied:** Rebuilt venv from scratch as part of DEPS-002. 201 packages → 35.
-
-**Affected files:**
-
-- `.venv/` (rebuild)
-
-### CLEANUP-008 — Hardcoded `[TERM (worker #1)]` prefix in HTML dashboard
-
-| Field | Value |
-|-------|-------|
-| **Title** | HTML dashboard hardcodes `worker #1` prefix |
-| **Category** | Code Cleanup |
-| **Priority** | 🔵 P3 — Low |
-| **Impact** | The `_build_dashboard_html()` function hardcodes "worker #1" in the suggested stop command string. |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
-
-**Reasoning:** The `_build_dashboard_html()` function in `loop.py` generates a stop command suggestion that references "worker #1" — but with `--workers N` support, this should dynamically reflect the actual worker number.
-
-**Research notes:** Fix: Derive the worker display from the current iteration's worker state rather than hardcoding.
-
-**Affected files:**
-
-- `pi_loop/loop.py` (dashboard HTML generation)
+[Makefile]
+indent_style = tab
+```
 
 ---
 
-## P4 — Wishlist
-
-### FEATURE-003 — Event-loop-safe async I/O in all remaining web endpoints
+### DX-002: `.coverage` not in `.gitignore` — 53KB binary pollutes the working tree
 
 | Field | Value |
 |-------|-------|
-| **Title** | Event-loop-safe async I/O in all remaining web endpoints |
-| **Category** | Feature |
-| **Priority** | ⚪ P4 — Wishlist |
-| **Impact** | Blocking `open()`/`read()/`json.load()` calls in async endpoints block the entire event loop, degrading all connections. |
+| **Category** | Developer Experience |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Trivial |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `.gitignore` |
+
+**Description:**
+A 53KB `.coverage` binary file (SQLite coverage database) is present in the repo root and not listed in `.gitignore`. If accidentally committed, it adds binary noise to diffs and bloats the repo.
+
+**Research Notes:**
+Add to `.gitignore`:
+
+```gitignore
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+```
+
+---
+
+### DX-003: No Docker or devcontainer for one-command setup
+
+| Field | Value |
+|-------|-------|
+| **Category** | Developer Experience |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
 | **Effort** | Medium |
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
+| **Affected Files** | Root (new `Dockerfile`, `docker-compose.yml`, `.devcontainer/devcontainer.json`) |
 
-**Reasoning:** Multiple web endpoints use blocking I/O (`open()`, `read()`, `json.load()`) in async context. The `index()` endpoint was already fixed with `asyncio.to_thread()` (completed), but `config_manager.py`'s `load_config()` and `save_config()` still use blocking file I/O from async callers. Similarly, the status file reader and health check use blocking `/proc` reads.
+**Description:**
+Docker and devcontainer files exist only in stale git worktrees and were never ported to the main branch. New contributors must manually set up a Python virtual environment, install dependencies, and configure their environment.
 
-**Research notes:** Fix: (1) Use `aiofiles` for all file I/O in web endpoints. (2) Wrap blocking `/proc` reads in `asyncio.to_thread()`. (3) Ensure `config_manager.py` provides async variants of `load_config`/`save_config`. (4) Consider adding `aiofiles` as a dependency.
+**Research Notes:**
 
-**Affected files:**
+- Port the `Dockerfile` from the worktree with updates for the current codebase
+- Create a `docker-compose.yml` with the web server, volume mounts for config, and port mapping
+- Create `.devcontainer/devcontainer.json` for VS Code/Cursor remote container development
+- The Docker image should be minimal (slim-bullseye or alpine) with just Python + pi installed
 
-- `web_app/server.py`
-- `web_app/config_manager.py`
+---
 
-### OBSERV-002 — Add Prometheus metrics endpoint
+## B-10: Code Cleanup
+
+### CLN-001: Stale analysis artifacts and worktree clutter
 
 | Field | Value |
 |-------|-------|
-| **Title** | Add Prometheus metrics endpoint for production monitoring |
-| **Category** | Observability |
-| **Priority** | ⚪ P4 — Wishlist |
-| **Impact** | No metrics for iteration count, error rates, subprocess duration, convergence detection, or system resources. Operations teams have no visibility into daemon health. |
+| **Category** | Code Cleanup |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `.analysis/`, `synthesis-output.json`, `tooling-findings.txt`, `.worktrees/` |
+
+**Description:**
+The repo root contains analysis artifacts (`.analysis/`, `synthesis-output.json`, `tooling-findings.txt`) that are outputs from automated analysis tools, not source code. These clutter the directory tree and confuse new developers. The 3 stale git worktrees in `.worktrees/` contain superseded code that has diverged from main.
+
+**Research Notes:**
+
+- Move analysis artifacts to a `.archive/` or remove them from the working tree
+- Add `*.analysis*` and `synthesis-output*` to `.gitignore`
+- Evaluate whether the `.worktrees/` directories still have valuable work that should be merged, then prune them
+
+---
+
+### CLN-002: Redundant pre-commit hook mechanisms
+
+| Field | Value |
+|-------|-------|
+| **Category** | Code Cleanup |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `.pre-commit-config.yaml`, `.githooks/pre-commit` |
+
+**Description:**
+There are two parallel pre-commit mechanisms: the `pre-commit` framework (`.pre-commit-config.yaml`) which provides ruff + ruff-format + 5 generic checks, and a bash script (`.githooks/pre-commit`) that runs ruff check + format on staged Python files. These overlap in coverage and may conflict.
+
+**Research Notes:**
+
+- Keep `.pre-commit-config.yaml` as the primary mechanism (richer, maintained, CI-integrated)
+- Remove or archive `.githooks/pre-commit` bash script
+- Add mypy (post-fix) to the pre-commit config once CICD-001 is resolved
+- Ensure the Makefile's `pre-commit` target installs the `.pre-commit-config.yaml` hooks via `pre-commit install`
+
+---
+
+## B-11: Dependency Updates
+
+### DEP-001: `pydantic-core` pinned to outdated minor — update and validate
+
+| Field | Value |
+|-------|-------|
+| **Category** | Dependency Updates |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `requirements.txt`, `requirements-dev.txt` |
+
+**Description:**
+`pydantic-core` is pinned at `2.46.4` but `2.47.0` is available. While this is a minor bump and typically safe, it's a Rust-native core component of Pydantic, so updates can affect behavior.
+
+**Research Notes:**
+
+```bash
+pip-compile --upgrade-package pydantic-core
+make test
+make lint-all
+make mypy
+```
+
+Verify no test failures or type errors after the update. Commit both regenerated lockfiles.
+
+---
+
+### DEP-002: `fastapi` minimum constraint too loose — tighten to known-good version
+
+| Field | Value |
+|-------|-------|
+| **Category** | Dependency Updates |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pyproject.toml`, `requirements.txt` |
+
+**Description:**
+`pyproject.toml` specifies `fastapi>=0.100.0`, but the project now uses features from `0.138.x`. On a fresh install, pip could resolve `0.100.0` which is 38 versions behind and may lack required APIs (e.g., `lifespan`, certain middleware patterns).
+
+**Research Notes:**
+Update the minimum bound: `fastapi>=0.115.0` (a reasonable known-good minimum) or match the installed version: `fastapi>=0.138.0`. Then regenerate lockfiles: `pip-compile --upgrade`.
+
+---
+
+## B-12: Architecture Improvements
+
+### ARC-001: No clean separation between config validation and runtime state
+
+| Field | Value |
+|-------|-------|
+| **Category** | Architecture Improvements |
+| **Priority** | 🟠 High |
+| **Impact** | High |
+| **Effort** | Large |
+| **Dependencies** | TEC-001, REF-001 |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/config.py`, `pi_loop/loop.py`, `pi_loop/state.py` |
+
+**Description:**
+Configuration and runtime state are conflated throughout the codebase. `config.py` handles both static config (user settings) and dynamic state (current iteration, mitigations, error history). The JSON ledger (`state.py`) stores a mix of config values, runtime counters, and per-iteration records. This makes it impossible to:
+
+- Reset state without losing config
+- Validate config independently of the runtime
+- Have multiple iterations running with different configs
+
+**Research Notes:**
+Separate into three clear layers:
+
+1. **`LoopConfig`** — Immutable (or copy-on-write) user settings from CLI flags + config file. Pydantic model with validation.
+2. **`LoopState`** — Mutable runtime state: current iteration, error count, mitigations, active context. Reset separately from config.
+3. **`IterationLedger`** — Persisted iteration history: per-turn output, timestamps, git diffs, decisions. Append-only log.
+
+This architecture enables config-only reloads, state resets without config loss, and clean separation for testing.
+
+---
+
+### ARC-002: Error recovery path lacks transactional rollback for partial state updates
+
+| Field | Value |
+|-------|-------|
+| **Category** | Architecture Improvements |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
+| **Effort** | Medium |
+| **Dependencies** | B-001, ARC-001 |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/error_recovery.py`, `pi_loop/loop.py` |
+
+**Description:**
+When an iteration fails mid-way, the error recovery path updates state (incrementing error counts, adjusting mitigations, updating the JSON ledger) but does not have a transactional rollback mechanism. If the recovery itself fails (e.g., sentinel file write fails, notification fails), the state is left in an inconsistent partial-update state.
+
+**Research Notes:**
+Introduce a simple rollback pattern:
+
+```python
+class RecoveryTransaction:
+    def __init__(self, state):
+        self.state = copy.deepcopy(state)
+        self.original = state
+        
+    def commit(self):
+        self.original.update(self.state)
+        
+    def rollback(self):
+        pass  # Don't apply changes
+```
+
+Or use an append-only log model where state is reconstructed from sequential events (event sourcing). This eliminates partial-update inconsistency entirely.
+
+---
+
+## B-13: Automation Opportunities
+
+### AUT-001: Add mypy to pre-commit hooks for automated type-checking
+
+| Field | Value |
+|-------|-------|
+| **Category** | Automation Opportunities |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
+| **Effort** | Small |
+| **Dependencies** | CICD-001 (must fix mypy errors first) |
+| **Status** | ⏳ Pending, ❌ Blocked by CICD-001 |
+| **Affected Files** | `.pre-commit-config.yaml` |
+
+**Description:**
+The pre-commit config currently runs ruff (lint + format) but does not run mypy. Adding mypy to pre-commit ensures type errors are caught before code is committed, not just in CI (where it's currently silently ignored).
+
+**Research Notes:**
+After fixing existing mypy errors (CICD-001), add to `.pre-commit-config.yaml`:
+
+```yaml
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v2.1.0
+  hooks:
+    - id: mypy
+      args: [--config-file=pyproject.toml]
+      additional_dependencies: [pydantic, fastapi, httpx]
+```
+
+---
+
+### AUT-002: No automated license header or copyright check
+
+| Field | Value |
+|-------|-------|
+| **Category** | Automation Opportunities |
+| **Priority** | 🔵 Low |
+| **Impact** | Low |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `.pre-commit-config.yaml` |
+
+**Description:**
+There is no pre-commit hook checking for consistent license headers or copyright statements in source files. While the project has an MIT `LICENSE` file, individual source files lack the standard MIT copyright header.
+
+**Research Notes:**
+Add a pre-commit hook (e.g., `add-license-header` or a custom bash snippet) that verifies each `.py`, `.js`, `.css`, `.html` file has a standard header:
+
+```python
+# Copyright 2026 Hermes Agent / Nous Research
+# SPDX-License-Identifier: MIT
+```
+
+Or use a relaxed approach: only verify that new files have headers, skip existing files.
+
+---
+
+## B-14: Feature Ideas
+
+### FTR-001: Docker image and Docker Compose for containerized deployment
+
+| Field | Value |
+|-------|-------|
+| **Category** | Feature Ideas |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
 | **Effort** | Medium |
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
+| **Affected Files** | Root (new `Dockerfile`, `docker-compose.yml`) |
 
-**Reasoning:** There's no metrics endpoint for monitoring. Key metrics that would be valuable: iteration count (total, per-goal), error count by type, subprocess duration (p50/p95/p99), convergence hits, cooldown time, active workers, and system resource usage. The `prometheus-client` package is already in the venv.
+**Description:**
+Docker and docker-compose files exist in stale worktrees but were never ported to main. A containerized deployment would provide:
 
-**Research notes:** Implement: (1) A `/metrics` endpoint exposing Prometheus-format metrics. (2) A `MetricsCollector` class that tracks iteration/error/convergence counters. (3) Use `prometheus_client` library (already installed). (4) Add a Grafana dashboard template in a `monitoring/` directory. (5) Expose daemon stats from `stats.py` as Prometheus gauges.
+- Reproducible environment (pin Python + system deps)
+- Easy deployment on any Linux server
+- Volume mounts for config and data persistence
+- Integrated web UI port mapping
+- Resource limits (CPU, memory) for the daemon and subprocesses
 
-**Affected files:**
+**Research Notes:**
 
-- `web_app/server.py` (new `/metrics` endpoint)
-- `pi_loop/stats.py` (wire into metrics collection)
-- `pi_loop/heartbeat.py` (system metrics)
-- New: `monitoring/` directory with Grafana dashboard
+- Base image: `python:3.12-slim` (or 3.11-slim for maximum compatibility)
+- Install pi-coding-agent in the Dockerfile
+- Use multi-stage build to minimize image size
+- `docker-compose.yml`: services for `pi-loop` (daemon + web), optional `redis` for pub/sub state
+- Docker healthcheck endpoint for orchestration platforms
 
-### OBSERV-002 — Implement structured logging with correlation IDs
+---
+
+### FTR-002: Prometheus metrics endpoint for operational monitoring
 
 | Field | Value |
 |-------|-------|
-| **Title** | [DUPLICATE] Implement structured logging with correlation IDs |
+| **Category** | Feature Ideas |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
+| **Effort** | Medium |
+| **Dependencies** | OBS-002 (same implementation) |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `web_app/server.py` (new `/metrics` endpoint) |
+
+**Description:**
+There is no metrics endpoint for Prometheus/Grafana monitoring. Key operational metrics that should be exposed:
+
+- `pi_loop_iterations_total` — Count of iterations by status (success, error, timeout, convergence)
+- `pi_loop_iteration_duration_seconds` — Histogram of subprocess execution time (p50/p95/p99)
+- `pi_loop_active_workers` — Current active worker count (gauge)
+- `pi_loop_errors_total` — Error count by type (timeout, parse, subprocess, config)
+- `pi_loop_convergence_hits_total` — How often convergence detection triggered
+- `pi_loop_cooldown_seconds` — Current cooldown time (gauge)
+
+**Research Notes:**
+Use `prometheus_client` (check if available or add to deps). Create a `MetricsCollector` that threads through the loop engine and is exposed at `/metrics`. Provide a `monitoring/grafana-dashboard.json` template.
+
+---
+
+## B-15: Observability / Monitoring
+
+### OBS-001: No structured logging — `print()` used throughout with no log levels or correlation IDs
+
+| Field | Value |
+|-------|-------|
 | **Category** | Observability |
-| **Priority** | ⚪ P4 — Wishlist |
-| **Status** | 🔄 Superseded by OBSERV-001 |
+| **Priority** | 🟠 High |
+| **Impact** | High |
+| **Effort** | Medium |
+| **Dependencies** | None |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `pi_loop/loop.py`, `pi_loop/error_recovery.py`, `pi_loop/git_utils.py`, `pi_loop/heartbeat.py`, `pi_loop/preflight.py`, `web_app/server.py` |
 
-**Reasoning:** Duplicate entry — see OBSERV-001 for the active item. This placeholder is kept to prevent re-discovery.
+**Description:**
+The daemon uses `print()` for all logging — no structured/JSON logging, no log levels (DEBUG, INFO, WARNING, ERROR), no correlation IDs. Tracing a single iteration's flow from CLI input through `_execute_task` to `run_loop` to error recovery requires manually correlating timestamps across print statements. The web server uses uvicorn's default access log but the application logs are unstructured.
 
-**Affected files:**
+**Research Notes:**
+Replace all `print()` calls with `structlog` (check availability) or stdlib `logging` with a JSON formatter:
 
-- (none — superseded)
+```python
+import structlog
+logger = structlog.get_logger()
+
+# Usage
+logger.info("iteration.completed", iteration=n, duration=elapsed, status="success")
+logger.warning("recovery.adapted", error_type=err_type, mitigations=mitigations)
+logger.error("subprocess.failed", exit_code=code, stderr=stderr[:500])
+
+# Correlation ID per run
+logger.bind(loop_id=loop_id, iteration=n)
+```
+
+Key improvements:
+
+- Structured JSON output for log aggregators (Loki, ELK, Datadog)
+- Correlation/iteration IDs for request tracing
+- Consistent log levels (DEBUG for development, INFO for production)
+- Request IDs in web server logs for API call tracing
+- File + console logging with different formats
 
 ---
 
-### FIXXX-001 — Mypy type errors fixed across 5 files
+### OBS-002: No health check endpoint or daemon status probe
 
 | Field | Value |
 |-------|-------|
-| **Title** | Mypy type errors fixed across 5 files |
-| **Category** | Code Cleanup |
-| **Priority** | 🟡 P2 — Medium |
+| **Category** | Observability |
+| **Priority** | 🟡 Medium |
+| **Impact** | Medium |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ✅ Done |
+| **Status** | ⏳ Pending |
+| **Affected Files** | `web_app/server.py` (new `/health` endpoint) |
 
-**Fix applied:** Fixed mypy type errors in `pi_loop/error_utils.py`, `pi_loop/help_topics.py`, `pi_loop/loop.py` (operator/misc lambdas), `pi_loop/state.py`, `pi_loop/status.py`. All 23 source files now pass mypy with zero errors.
+**Description:**
+There is no `/health` or similar readiness/liveness endpoint. Docker orchestration platforms (Kubernetes, Nomad, Docker Compose) need a health check to know when the service is ready and whether it's still alive. The existing `/api/status` endpoint returns 200 even if the daemon is in a broken state (no subprocess, corrupted state file).
 
-Completed 2026-06-29.
+**Research Notes:**
+Add a dedicated `/health` endpoint that performs:
 
-**Affected files:**
+1. **Liveness check**: Is the web server running? (always true if responding)
+2. **Readiness check**: Is the daemon process alive? Is the config file readable?
+3. **Dependency check**: Is `pi` binary available on PATH?
+4. **Database check**: Is the JSON ledger file readable (not corrupt)?
 
-- `pi_loop/error_utils.py`
-- `pi_loop/help_topics.py`
-- `pi_loop/loop.py`
-- `pi_loop/state.py`
-- `pi_loop/status.py`
-
-### FIXXX-002 — Ruff ARG001 unused parameters fixed
-
-| Field | Value |
-|-------|-------|
-| **Title** | Ruff ARG001 unused parameters fixed |
-| **Category** | Code Cleanup |
-| **Priority** | 🟡 P2 — Medium |
-| **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ✅ Done |
-
-**Fix applied:** Fixed all `ARG001` (unused function parameter) violations across the codebase. Parameters either prefixed with `_` or removed entirely where safe.
-
-Completed 2026-06-29.
-
-**Affected files:**
-
-- `pi_loop/error_utils.py`
-- `pi_loop/help_topics.py`
-- `pi_loop/state.py`
-- `pi_loop/status.py`
-- `pi_loop/validation.py`
+The endpoint should return HTTP 200 with `{"status": "healthy"}` or HTTP 503 with `{"status": "unhealthy", "checks": {"pi": "missing", "ledger": "corrupt"}}`. This enables Docker health checks and load balancer probes.
 
 ---
 
-## ✅ Completed Items
+## Appendix: Completed Items Summary
 
-| ID | Title | Category | Completed |
-|----|-------|----------|-----------|
-| BUG-005 | Subprocess leak on timeout (zombie processes) — proc.kill() + proc.wait() added | Bug | ✅ |
-| BUG-006 | Race condition in loop_manager.stop() — self._lock added | Bug | ✅ |
-| BUG-007 | TOCTOU race in loop_manager.stop() — os.kill(pid,0) ownership check added | Bug | ✅ |
-| BUG-008 | Race: status='running' set before monitors created — moved after create_task | Bug | ✅ |
-| BUG-009 | Race: _read_stream AttributeError on self._process — local_proc captured | Bug | ✅ |
-| TECHDEPT-006 | Duplicated shutdown logic in run_loop() —_shutdown() helper extracted (-134 lines) | Tech Debt | ✅ |
-| TECHDEPT-007 | Silent exception swallowing (bare except: pass) — all replaced with typed, logged handlers | Tech Debt | ✅ |
-| TECHDEPT-008 | Retry loop output capture lossy — per-attempt buffers added | Tech Debt | ✅ |
-| ARCH-003 | Dead / broken _evolve_goal feature — _extract_next_goal() helper added | Architecture | ✅ |
-| PERF-002 | Blocking synchronous I/O in async index() endpoint — replaced with asyncio.to_thread() | Performance | ✅ |
-| PERF-003 | Unbounded limit/offset parameters on /api/iterations — capped [1, 500] | Performance | ✅ |
-| PERF-004 | SSE _status_poller runs with zero clients — early-return when empty | Performance | ✅ |
-| SEC-003 | No schema validation on save_config_api — validate_config() wired in, returns 422 | Security | ✅ |
-| TEST-005 | Zero test coverage — 404 tests across 19 test files created | Testing | ✅ |
-| CI-003 | CI references non-existent make targets — lint-all and test targets created | CI/CD | ✅ |
-| CI-004 | Pre-commit hook disabled (exit 0) — rewritten to run ruff check + format | CI/CD | ✅ |
-| CI-005 | Missing dev/test dependencies in pyproject.toml — test and dev sections added | CI/CD | ✅ |
-| CI-006 | No Python version matrix in CI — 3.10-3.13 matrix added | CI/CD | ✅ |
-| CI-007 | Add mypy type-checking to CI pipeline — config + make target + CI step added | CI/CD | ✅ |
-| CI-008 | Dependabot configuration — .github/dependabot.yml created with weekly updates | CI/CD | ✅ |
-| DEVEX-003 | No ruff / mypy config in pyproject.toml — [tool.ruff] and [tool.mypy] sections added | DX | ✅ |
-| DEPS-005 | Add pyproject.toml [tool.ruff.lint] section — E,F,W,I,N,UP,B,SIM,ARG,RUF100 selected | Dependencies | ✅ |
-| CLEANUP-009 | Duplicated content_block_stop handler in _execute_task — first duplicate removed | Cleanup | ✅ |
-| CLEANUP-010 | Hardcoded 'worker #1' string in _execute_task — parameterized with worker_id | Cleanup | ✅ |
-| FEATURE-004 | CI pipeline with test + lint + type-check — full pipeline operational | Feature | ✅ |
-| FEATURE-005 | Worker terminal state lost on navigation — capped at 2000 lines, KeyError fixed | Feature | ✅ |
-| RELIABILITY-005 | _get_cpu_percent() first-read returns 0% — pre-warmed CPU deltas at import | Reliability | ✅ |
-| RELIABILITY-006 | Config file corruption resilience — graceful degradation with default fallback | Reliability | ✅ |
-| CI-001 | No pi binary smoke test in CI pipeline | CI/CD | ✅ |
-| CLEANUP-002 | Empty catch blocks in app.js (5+ locations) — console.error() added | Cleanup | ✅ |
-| CLEANUP-006 | Empty SSE heartbeat listener in app.js — removed | Cleanup | ✅ |
-| FIXXX-001 | Mypy type errors fixed across 5 files | Code Cleanup | ✅ |
-| FIXXX-002 | Ruff ARG001 unused parameters fixed | Code Cleanup | ✅ |
-| TECHDEPT-002 | Dead code: validate_json_output() defined but never called — removed | Tech Debt | ✅ |
-| TEST-003 | Untested: help_topics.py (474 lines) — 25+ tests added | Testing | ✅ |
-| TEST-004 | Untested: config_manager.py (357 lines) — 20+ tests added | Testing | ✅ |
+The following items have been addressed in previous iterations but are noted for historical context:
+
+| ID | Title | Category | Status |
+|----|-------|----------|--------|
+| — | API-key authentication middleware on all `/api/*` endpoints | Security | ✅ Done |
+| — | CORS tightened to localhost-only by default | Security | ✅ Done |
+| — | HMAC-SHA256 webhook signing | Security | ✅ Done |
+| — | Validate_config() wired into save_config_api — returns 422 on invalid input | Security | ✅ Done |
+| — | Config file corruption resilience — graceful degradation with default fallback | Reliability | ✅ Done |
+| — | Subprocess zombie leak — proc.kill() + proc.wait(timeout=5) | Bug | ✅ Done |
+| — | Silent exception swallowing — all bare except:pass replaced with typed, logged handlers | Tech Debt | ✅ Done |
+| — | Empty SSE heartbeat listener removed | Cleanup | ✅ Done |
+| — | Empty catch blocks in app.js — console.error() added | Cleanup | ✅ Done |
+| — | Duplicate worker_term initialization consolidated | Cleanup | ✅ Done |
+| — | Ruff ARG001 unused parameters fixed | Cleanup | ✅ Done |
+| — | Mypy type errors fixed across 5 files | Cleanup | ✅ Done |
+| — | Hard-coded `/tmp` path consolidation (partial — status.py, preflight.py, help_topics.py, loop.py) | Bug | ✅ Done |
+| — | 440+ unit tests created across 19 test files | Testing | ✅ Done |
+| — | SEC-003 redundant get_auth_config removed | Cleanup | ✅ Done |
+| — | validate_json_output() dead code removed | Tech Debt | ✅ Done |
 
 ---
 
-## Repository Health Summary
+## Prioritized Action Plan (Top 10)
 
-### Overall Assessment: 🟢 **Good — Actively Maintained**
+| Rank | ID | Title | Priority | Effort | Why Now |
+|------|----|-------|----------|--------|---------|
+| 1 | **TEC-001 / REF-001** | Decompose `run_loop()` (435 lines, 71 params) | 🔴 Critical | XLarge | Blocks all other improvements to the core loop; highest RO I refactoring |
+| 2 | **B-001** | Lost error recovery mitigations silently discarded | 🟠 High | Small | Defect causing silent data loss — trivial fix, high impact |
+| 3 | **CICD-001** | Mypy errors swallowed by `|| true` | 🟠 High | Medium | Type enforcement is the cheapest bug-prevention strategy |
+| 4 | **ARC-001** | Separate config validation from runtime state | 🟠 High | Large | Enables config-only reloads, multi-instance, clean testing |
+| 5 | **OBS-001** | Replace `print()` with structured logging | 🟠 High | Medium | Without this, production debugging is manual and slow |
+| 6 | **SEC-001** | Audit API authentication coverage | 🟠 High | Small | Verify all endpoints are actually protected |
+| 7 | **TST-001** | Integration tests for real subprocess lifecycle | 🟠 High | Large | Only way to catch regressions in the core value proposition |
+| 8 | **TEC-002** | Fix circular import cli.py ↔ help_topics.py | 🟠 High | Medium | Import-order bugs are hard to debug and intermittent |
+| 9 | **B-002** | Subprocess zombie leak from unwaited children | 🟠 High | Small | Zombie processes can exhaust PID table on long-running instances |
+| 10 | **TST-002** | Test file_watcher.py (zero coverage) | 🟡 Medium | Small | Untested module in the watch-execute pipeline |
 
-The **pi-loop** (hermes-loop) repository is a well-structured, actively maintained Python daemon project. With 191 commits in ~1 week of development, 404 passing tests (0.53s total), and a comprehensive CI/CD pipeline, the project has strong engineering practices. Below is a health summary across all dimensions.
+---
 
-| Dimension | Grade | Notes |
-|-----------|-------|-------|
-| **Code Organization** | 🟢 A | Modular design, single-responsibility modules, clear separation of concerns |
-| **Testing** | 🟢 A | 404 tests, 83% file coverage, blazing fast (0.53s), 100% pass rate |
-| **CI/CD** | 🟢 A | Full pipeline: lint (ruff) + format check + mypy + test matrix (3.10-3.13) + Dependabot |
-| **Documentation** | 🟡 B | README is good, REFACTOR_PLAN.md covers web app. Missing: API docs, CONTRIBUTING.md |
-| **Type Safety** | 🟡 B | Mypy configured, but 34% of functions lack hints; CI makes mypy non-blocking |
-| **Security** | 🟡 B | No auth/rate-limiting on web endpoints (acceptable for local tool); CORS wide open |
-| **Dependencies** | 🟡 B | Minimal declared deps (2 runtime), but shared venv has 133 unused packages + chromadb CVE |
-| **Performance** | 🟢 A | Sub-second test suite, async SSE, no obvious bottlenecks |
-| **Code Quality** | 🟡 B | 4 high-complexity functions, 71-param monster function, 30+ magic numbers |
-| **Architecture** | 🟡 B | Clean three-layer design, but circular import exists, mutable state passed-by-reference bug |
-| **Error Handling** | 🟡 B | Good error recovery engine, but broad exception suppression in several paths |
-| **Accessibility** | 🔴 F | Zero accessibility support — no aria labels, aria-live regions, keyboard nav, or screen reader support |
-
-### Active Issues By File
-
-| File | P0 | P1 | P2 | P3 | Total Active |
-|------|----|----|----|----|-------------|
-| `pi_loop/loop.py` | 0 | 2 | 1 | 2 | 5 |
-
-| `pi_loop/cli.py` | 0 | 0 | 0 | 0 | 0 |
-| `pi_loop/preflight.py` | 1 | — | — | — | 1 |
-| `pi_loop/status.py` | 1 | — | — | — | 1 |
-
-| `pi_loop/config.py` | — | — | 1 | 1 | 2 |
-| `pi_loop/config_file.py` | — | — | 1 | — | 1 |
-| `pi_loop/env_utils.py` | — | — | 1 | 1 | 2 |
-| `pi_loop/error_recovery.py` | — | — | 1 | 1 | 2 |
-| `pi_loop/git_utils.py` | — | — | — | 1 | 1 |
-| `pi_loop/file_watcher.py` | — | — | — | 1 | 1 |
-| `pi_loop/system_utils.py` | — | — | 1 | — | 1 |
-| `web_app/server.py` | 1 | 1 | 1 | 1 | 4 |
-| `web_app/loop_manager.py` | — | — | 1 | 1 | 2 |
-| `web_app/config_manager.py` | — | — | — | 1 | 1 |
-| `web_app/static/app.js` | — | — | 2 | 2 | 4 |
-| `web_app/static/index.html` | — | — | — | 1 | 1 |
-| `web_app/static/style.css` | — | — | — | 1 | 1 |
-| `tests/` | — | 1 | 2 | — | 3 |
-| `Makefile` | — | 1 | — | 1 | 2 |
-| `.github/workflows/ci.yml` | — | 1 | 1 | — | 2 |
-| `pyproject.toml` | — | 0 | — | 1 | 1 |
-
-### Key Metrics
+## Summary
 
 | Metric | Value |
 |--------|-------|
-| **Total source lines** | ~13,300 (pi_loop + web_app + tests) |
-| **Test count** | 440 (all passing, 2.47s) |
-| **Test coverage** | 83% file coverage (21/25 modules) |
-| **Active backlog items** | 29 |
-| **Completed this iteration** | 41 |
-| **Functions with >100 lines** | 12 |
-| **Longest function** | `run_loop()` — 435 lines, 71 parameters |
-| **Total commits** | 191 (all by `ningtoba`) |
-| **Time span** | ~1 week of intensive development |
-
-### Top 5 Immediate Actions
-
-1. **BUG-001** — Consolidate all `/tmp` hardcoded paths to use unified `PI_LOOP_DATA_DIR` override
-2. **SEC-001** — Add authentication/binding controls to web endpoints for safe deployment
-3. **DEPS-001** — Generate a lock file for reproducible builds and supply-chain security
-4. **TECHDEPT-001** — Introduce `LoopConfig` dataclass to eliminate the 71-parameter `run_loop()` signature
-5. **DEPS-002** — Rebuild venv to remove chromadb (CRITICAL CVE) and 130+ unused packages
+| **Total backlog items** | 34 |
+| **Critical (P0)** | 3 |
+| **High (P1)** | 8 |
+| **Medium (P2)** | 14 |
+| **Low (P3)** | 9 |
+| **All 15 categories covered** | ✅ |
+| **Categories with Critical items** | Bugs (0), Technical Debt (1), Refactoring (1) |
+| **Top 3 priorities** | `run_loop()` decomposition, lost error recovery fix, mypy enforcement in CI |

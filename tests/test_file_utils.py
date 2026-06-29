@@ -90,7 +90,8 @@ class TestInitLogger:
         logger = _init_logger(log_file, max_mb=5)
         logger.info("write me")
         logger.handlers[0].flush()
-        content = open(log_file).read()
+        with open(log_file) as f:
+            content = f.read()
         assert "write me" in content
 
 
@@ -108,13 +109,15 @@ class TestWriteLedger:
     def test_writes_state(self, tmp_path):
         """write_ledger writes state to LEDGER_PATH."""
         state = {"iterations": [], "status": "running"}
-        with patch("pi_loop.file_utils.LEDGER_PATH", str(tmp_path / "ledger.json")):
-            with patch("pi_loop.file_utils.FileLock"):
-                write_ledger(state)
-                ledger_file = tmp_path / "ledger.json"
-                assert ledger_file.exists()
-                data = json.loads(ledger_file.read_text())
-                assert data["status"] == "running"
+        with (
+            patch("pi_loop.file_utils.LEDGER_PATH", str(tmp_path / "ledger.json")),
+            patch("pi_loop.file_utils.FileLock"),
+        ):
+            write_ledger(state)
+            ledger_file = tmp_path / "ledger.json"
+            assert ledger_file.exists()
+            data = json.loads(ledger_file.read_text())
+            assert data["status"] == "running"
 
 
 class TestReadLedger:
@@ -163,9 +166,11 @@ class TestWriteStatusFile:
 
     def test_error_logged(self):
         """write_status_file logs on OSError."""
-        with patch("pi_loop.file_utils._log") as mock_log:
-            with patch("builtins.open", side_effect=OSError("permission denied")):
-                write_status_file("/nonexistent/status.json", {}, iteration=0)
+        with (
+            patch("pi_loop.file_utils._log") as mock_log,
+            patch("builtins.open", side_effect=OSError("permission denied")),
+        ):
+            write_status_file("/nonexistent/status.json", {}, iteration=0)
         # Check an error was logged (at least one call about the failure)
         assert mock_log.call_count > 0
 

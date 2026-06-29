@@ -53,7 +53,7 @@ class TestWriteHeartbeatFile:
         """_write_heartbeat_file writes via .tmp then rename."""
         hb_file = str(tmp_path / "heartbeat")
         result = _write_heartbeat_file(hb_file, {"key": "value"})
-        assert result == True
+        assert result
         assert (tmp_path / "heartbeat").exists()
         data = json.loads((tmp_path / "heartbeat").read_text())
         assert data["key"] == "value"
@@ -62,7 +62,7 @@ class TestWriteHeartbeatFile:
         """_write_heartbeat_file returns False on OSError."""
         with patch("os.makedirs", side_effect=OSError("permission denied")):
             result = _write_heartbeat_file("/proc/heartbeat", {})
-        assert result == False
+        assert not result
 
 
 class TestHeartbeatAge:

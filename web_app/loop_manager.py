@@ -35,6 +35,11 @@ class LoopManager:
         self._worker_states: dict[str, dict[str, Any]] = {}
         self._worker_logs: dict[str, list[dict[str, Any]]] = {}  # wid -> log entries
         self._worker_term: dict[str, list[str]] = {}  # wid -> raw terminal lines (ANSI intact)
+        # Hydrate in-memory logs from the persisted log file so worker output
+        # survives web UI restarts.  Skipped when PI_LOOP_NO_HYDRATE is set
+        # (tests) so that test assertions are not polluted by real log data.
+        if not os.environ.get("PI_LOOP_NO_HYDRATE"):
+            self._hydrate_from_log_file()
 
     @property
     def live_iteration(self) -> dict[str, Any]:
@@ -70,6 +75,50 @@ class LoopManager:
             ts = entry["timestamp"][:19]
             self._log_fp.write(f"[{ts}] [{level}] {message}\n")
             self._log_fp.flush()
+        except OSError:
+            pass
+
+    def _hydrate_from_log_file(self) -> None:
+        """Replay recent log entries from the persisted log file so that
+        worker terminal output and structured logs survive web UI restarts.
+
+        Reads the last 64 KB of the log file and re-parses every line through
+        ``_parse_daemon_line`` to reconstruct ``_worker_logs`` and
+        ``_worker_term``.
+        """
+        try:
+            if not os.path.isfile(self._log_file):
+                return
+            file_size = os.path.getsize(self._log_file)
+            if file_size == 0:
+                return
+
+            # Read the tail of the log file (last 64 KB covers plenty of
+            # recent context without loading the whole file into memory).
+            tail_bytes = min(file_size, 64 * 1024)
+            with open(self._log_file, "rb") as f:
+                if file_size > tail_bytes:
+                    f.seek(file_size - tail_bytes)
+                    f.readline()  # discard partial first line
+                for line in f:
+                    text = line.decode("utf-8", errors="replace").rstrip()
+                    if not text:
+                        continue
+                    m = re.match(r"^\[([^\]]+)\] \[(\w+)\] (.*)", text)
+                    if m is None:
+                        continue
+                    level, message = m.group(2), m.group(3)
+                    entry = {
+                        "timestamp": m.group(1),
+                        "level": level,
+                        "message": message,
+                    }
+                    self._logs.append(entry)
+                    self._parse_daemon_line(message)
+
+            # Trim to configured limits.
+            if len(self._logs) > self._max_logs:
+                self._logs = self._logs[-self._max_logs :]
         except OSError:
             pass
 

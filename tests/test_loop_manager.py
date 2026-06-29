@@ -15,7 +15,7 @@ class TestLoopManagerInit:
         """LoopManager starts in 'stopped' state."""
         mgr = LoopManager()
         assert mgr.status == "stopped"
-        assert mgr.is_running == False
+        assert not mgr.is_running
         assert mgr.live_iteration == {}
         assert mgr.logs == []
 
@@ -29,14 +29,14 @@ class TestLoopManagerStatus:
     def test_not_running_when_stopped(self):
         """is_running is False when stopped."""
         mgr = LoopManager()
-        assert mgr.is_running == False
+        assert not mgr.is_running
 
     def test_not_running_when_no_process(self):
         """is_running is False when process is None."""
         mgr = LoopManager()
         mgr._status = "running"
         mgr._process = None
-        assert mgr.is_running == False
+        assert not mgr.is_running
 
 
 class TestLoopManagerAddLog:
@@ -97,7 +97,7 @@ class TestLoopManagerGetLedger:
 
 
 class TestLoopManagerGetStatus:
-    def test_returns_combined_status(self, tmp_path):
+    def test_returns_combined_status(self):
         """get_status returns combined status information."""
         mgr = LoopManager()
         mgr._status = "stopped"
@@ -132,7 +132,7 @@ class TestLoopManagerStart:
         mgr._status = "running"
         mgr._process = MagicMock()
         result = await mgr.start()
-        assert result["success"] == False
+        assert not result["success"]
         assert "already running" in result["error"]
 
     async def test_start_success(self):
@@ -149,7 +149,7 @@ class TestLoopManagerStart:
         ):
             result = await mgr.start()
 
-        assert result["success"] == True
+        assert result["success"]
         assert result["pid"] == 9999
         assert mgr._status == "running"
 
@@ -163,7 +163,7 @@ class TestLoopManagerStart:
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc), patch("asyncio.sleep"):
             result = await mgr.start()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert mgr._status == "error"
 
     async def test_start_timeout(self):
@@ -176,7 +176,7 @@ class TestLoopManagerStart:
         ):
             result = await mgr.start()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "Timed out" in result["error"]
 
 
@@ -186,19 +186,23 @@ class TestLoopManagerStop:
         """stop returns error when not running."""
         mgr = LoopManager()
         result = await mgr.stop()
-        assert result["success"] == False
+        assert not result["success"]
 
-    async def test_stop_success(self):
+    async def test_stop_success(self, tmp_path):
         """stop kills process group and cleans up."""
         mgr = LoopManager()
+        # Route sentinel writes to a temp file so the real daemon sentinel
+        # (/tmp/infinite-loop-stop) is never touched by tests.
+        sentinel = tmp_path / "sentinel"
+        mgr._sentinel_path = str(sentinel)
+
         mock_proc = AsyncMock()
         mock_proc.pid = 12345
         mgr._process = mock_proc
         mgr._status = "running"
 
         with (
-            patch("os.path.exists", return_value=True),
-            patch("os.remove"),
+            patch("web_app.loop_manager.SENTINEL_PATH", str(sentinel)),
             patch("os.kill"),
             patch("os.getpgid", return_value=12345),
             patch.object(mgr, "close"),
@@ -206,8 +210,11 @@ class TestLoopManagerStop:
         ):
             result = await mgr.stop()
 
-        assert result["success"] == True
+        assert result["success"]
         assert mgr._process is None
+        # Sentinel file should have been cleaned up by stop() on the real
+        # filesystem (os.path.exists + os.remove are not mocked).
+        assert not sentinel.exists()
 
 
 @pytest.mark.asyncio
@@ -216,7 +223,7 @@ class TestLoopManagerPauseResume:
         """pause returns error when not running."""
         mgr = LoopManager()
         result = await mgr.pause()
-        assert result["success"] == False
+        assert not result["success"]
 
     async def test_pause_writes_sentinel(self):
         """pause writes sentinel and sets status to paused."""
@@ -225,14 +232,14 @@ class TestLoopManagerPauseResume:
         mgr._status = "running"
         with patch("builtins.open", MagicMock()):
             result = await mgr.pause()
-        assert result["success"] == True
+        assert result["success"]
         assert mgr._status == "paused"
 
     async def test_resume_not_paused(self):
         """resume returns error when not paused."""
         mgr = LoopManager()
         result = await mgr.resume()
-        assert result["success"] == False
+        assert not result["success"]
 
     async def test_resume_removes_sentinel(self):
         """resume removes sentinel and sets status to running."""
@@ -240,7 +247,7 @@ class TestLoopManagerPauseResume:
         mgr._status = "paused"
         with patch("os.path.exists", return_value=True), patch("os.remove"):
             result = await mgr.resume()
-        assert result["success"] == True
+        assert result["success"]
         assert mgr._status == "running"
 
 
@@ -349,3 +356,54 @@ class TestGetLoopManager:
         """get_loop_manager returns a LoopManager instance."""
         mgr = get_loop_manager()
         assert isinstance(mgr, LoopManager)
+
+
+class TestLoopManagerHydrateFromLogFile:
+    def test_hydrates_logs_from_file(self, tmp_path):
+        """_hydrate_from_log_file replays structured log entries and worker
+        terminal output from a persisted log file."""
+        log_file = tmp_path / "web.log"
+        # Write a realistic log snippet with daemon iteration start, worker
+        # spawn, terminal output, worker completion, and plain entries.
+        log_file.write_text(
+            "[2026-06-29T15:01:16] [info] [15:01:16]  Iteration  #4\n"
+            "[2026-06-29T15:01:17] [info] [SPAWN (worker #1)] pi --mode json\n"
+            "[2026-06-29T15:01:18] [info] [TERM (worker #1)] Building project...\n"
+            "[2026-06-29T15:02:00] [info] [TERM (worker #1)] All tests pass\n"
+            "[2026-06-29T15:20:25] [info] [WORKER (worker #1)] Response in 1147.8s (status=ok)\n"
+            "[2026-06-29T15:20:26] [info] Daemon exited with code 0\n"
+        )
+
+        mgr = LoopManager()
+        mgr._log_file = str(log_file)
+        mgr._hydrate_from_log_file()
+
+        # Structured logs should be replayed (6 lines).
+        assert len(mgr.logs) >= 5
+
+        # Worker #1 terminal output should be reconstructed.
+        assert "1" in mgr._worker_term
+        assert "Building project..." in mgr._worker_term["1"]
+        assert "All tests pass" in mgr._worker_term["1"]
+
+        # Worker #1 log entries should be captured.
+        assert "1" in mgr._worker_logs
+
+        # Worker state should show completed.
+        assert mgr._worker_states.get("1", {}).get("status") == "ok"
+
+    def test_missing_log_file_is_noop(self, tmp_path):
+        """_hydrate_from_log_file does nothing when the log file is absent."""
+        mgr = LoopManager()
+        mgr._log_file = str(tmp_path / "nonexistent.log")
+        mgr._hydrate_from_log_file()
+        assert mgr.logs == []
+
+    def test_empty_log_file_is_noop(self, tmp_path):
+        """_hydrate_from_log_file does nothing when the log file is empty."""
+        log_file = tmp_path / "empty.log"
+        log_file.write_text("")
+        mgr = LoopManager()
+        mgr._log_file = str(log_file)
+        mgr._hydrate_from_log_file()
+        assert mgr.logs == []

@@ -64,7 +64,9 @@ _ERROR_SEVERITY = {
 
 _ERROR_THRESHOLDS: dict[str, dict[str, int | None]] = {
     "timeout": {"mild": 3, "moderate": 5, "stop": 8},
-    "network": {"mild": 2, "moderate": 4, "stop": 6},
+    # Network errors are typically transient (API downtime, rate limiting,
+    # DNS flaps).  Never auto-stop for network — just keep backing off.
+    "network": {"mild": 2, "moderate": 4, "stop": None},
     "schema": {"mild": 3, "moderate": None, "stop": 5},  # None = skip moderate level
     "unknown": {"mild": 3, "moderate": 5, "stop": 7},
     "heartbeat": {"mild": 3, "moderate": 5, "stop": 7},
@@ -345,7 +347,7 @@ class LoopConfig:
     workers: int = 1
     session_timeout: int = 7200
     max_turns: int = 500
-    max_retries: int = 0
+    max_retries: int = 2
     retry_delay: int = 5
     max_output_chars: int = 2000
     profile: str = ""

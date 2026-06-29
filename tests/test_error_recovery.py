@@ -90,7 +90,7 @@ class TestAdaptToErrorNoError:
         assert new_timeout == 300
         assert new_cooldown == 10
         assert new_mode == "fixed"
-        assert new_library == True
+        assert new_library
         assert new_workers == 2
         assert actions == []
 
@@ -153,7 +153,7 @@ class TestAdaptToErrorNoError:
             new_timeout, new_cooldown, new_mode, new_library, new_workers, actions = result
             assert new_timeout == 300
             assert new_cooldown == 10
-            assert new_library == True
+            assert new_library
             assert new_workers == 2
 
 
@@ -232,7 +232,7 @@ class TestAdaptToErrorTimeout:
         )
         _, _, _, _, _, actions = result
         has_stop = any("STOP" in a for a in actions)
-        assert has_stop == True
+        assert has_stop
 
 
 class TestAdaptToErrorNetwork:
@@ -260,7 +260,7 @@ class TestAdaptToErrorNetwork:
             )
             _, new_cooldown, new_mode, _, _, actions = result
             assert new_cooldown >= 30
-            assert new_mode == "fixed"
+            assert new_mode == "adaptive"  # exponential backoff uses adaptive mode
             assert len(actions) > 0
 
     def test_moderate_threshold_reduces_workers(self):
@@ -285,35 +285,45 @@ class TestAdaptToErrorNetwork:
             workers=2,
         )
         _, _, _, new_library, new_workers, actions = result
-        assert new_library == False
+        assert not new_library
         assert new_workers == 1
         assert len(actions) > 0
 
     def test_stop_threshold(self):
-        """_adapt_to_error with network at stop threshold."""
-        # At level 2 already, count >= 6 triggers stop
+        """_adapt_to_error with network at high count — never triggers stop.
+
+        Network errors (API downtime, rate limiting, DNS flaps) are transient
+        by nature.  The daemon should keep backing off exponentially rather
+        than shutting down.
+        """
+        # Even at count 100 with mitigation_level 0 (fresh state), network
+        # errors should apply backoff but never trigger STOP.
         result = _adapt_to_error(
             error_type="network",
             mitigations={
-                "mitigation_level": 2,
+                "mitigation_level": 0,
                 "timeout_increased": False,
-                "cooldown_elevated": True,
-                "force_subprocess": True,
-                "reduced_workers": True,
+                "cooldown_elevated": False,
+                "force_subprocess": False,
+                "reduced_workers": False,
                 "last_applied": "",
                 "actions": [],
             },
             consecutive_successes=0,
-            error_type_counts={"timeout": 0, "network": 6, "schema": 0, "unknown": 0, "heartbeat": 0},
+            error_type_counts={"timeout": 0, "network": 100, "schema": 0, "unknown": 0, "heartbeat": 0},
             session_timeout=300,
-            cooldown=30,
+            cooldown=10,
             cooldown_mode="fixed",
             use_library=False,
             workers=1,
         )
-        _, _, _, _, _, actions = result
+        _, new_cooldown, new_mode, _, _, actions = result
         has_stop = any("STOP" in a for a in actions)
-        assert has_stop == True
+        assert not has_stop
+        # Should apply exponential backoff and cap at 1800s (30 min).
+        assert "backoff" in " ".join(actions).lower()
+        assert new_cooldown >= 30
+        assert new_mode == "adaptive"
 
 
 class TestAdaptToErrorUnknown:

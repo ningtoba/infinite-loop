@@ -10,7 +10,7 @@ class TestCheckPythonVersion:
     def test_meets_minimum(self):
         """check_python_version returns True for Python >= 3.10."""
         result = PreflightChecker.check_python_version()
-        assert result[0] == True
+        assert result[0]
         assert "Python" in result[1]
 
 
@@ -18,26 +18,26 @@ class TestCheckWorkdir:
     def test_empty_workdir(self):
         """check_workdir with empty string returns True."""
         result = PreflightChecker.check_workdir("")
-        assert result[0] == True
+        assert result[0]
         assert "current dir" in result[1]
 
     def test_exists(self, tmp_path):
         """check_workdir returns True when directory exists."""
         result = PreflightChecker.check_workdir(str(tmp_path))
-        assert result[0] == True
+        assert result[0]
         assert str(tmp_path) in result[1]
 
     def test_not_exists(self):
         """check_workdir returns False when directory does not exist."""
         result = PreflightChecker.check_workdir("/nonexistent/path")
-        assert result[0] == False
+        assert not result[0]
 
     def test_not_a_directory(self, tmp_path):
         """check_workdir returns False when path is not a directory."""
         f = tmp_path / "file.txt"
         f.write_text("test")
         result = PreflightChecker.check_workdir(str(f))
-        assert result[0] == False
+        assert not result[0]
 
 
 class TestCheckGitRepo:
@@ -45,19 +45,19 @@ class TestCheckGitRepo:
         """check_git_repo returns True when .git exists."""
         (tmp_path / ".git").mkdir()
         result = PreflightChecker.check_git_repo(str(tmp_path))
-        assert result[0] == True
+        assert result[0]
 
     def test_no_git_dir(self, tmp_path):
         """check_git_repo returns False when .git does not exist."""
         result = PreflightChecker.check_git_repo(str(tmp_path))
-        assert result[0] == False
+        assert not result[0]
 
     def test_empty_workdir_uses_cwd(self):
         """check_git_repo with empty workdir uses os.getcwd."""
         # Should not crash, will check cwd
         with patch("os.path.isdir", return_value=False):
             result = PreflightChecker.check_git_repo("")
-        assert result[0] == False
+        assert not result[0]
 
 
 class TestCheckSentinelWritable:
@@ -65,75 +65,75 @@ class TestCheckSentinelWritable:
         """check_sentinel_writable returns True for writable directory."""
         sentinel = str(tmp_path / "sentinel")
         result = PreflightChecker.check_sentinel_writable(sentinel)
-        assert result[0] == True
+        assert result[0]
 
     def test_not_writable(self):
         """check_sentinel_writable returns False for non-writable."""
         with patch("os.access", return_value=False):
             result = PreflightChecker.check_sentinel_writable("/proc/foo")
-        assert result[0] == False
+        assert not result[0]
 
 
 class TestCheckPortAvailable:
     def test_port_zero(self):
         """check_port_available with port <= 0 returns True."""
         result = PreflightChecker.check_port_available(0)
-        assert result[0] == True
+        assert result[0]
 
     def test_port_available(self):
         """check_port_available returns True when port can be bound."""
         with patch("socket.socket") as mock_socket:
             mock_socket.return_value.__enter__.return_value.bind.return_value = None
             result = PreflightChecker.check_port_available(12345)
-        assert result[0] == True
+        assert result[0]
 
     def test_port_in_use(self):
         """check_port_available returns False when port is in use."""
         with patch("socket.socket") as mock_socket:
             mock_socket.return_value.__enter__.return_value.bind.side_effect = OSError("Address in use")
             result = PreflightChecker.check_port_available(12345)
-        assert result[0] == False
+        assert not result[0]
 
 
 class TestCheckFileReadable:
     def test_empty_path(self):
         """check_file_readable with empty path returns True."""
         result = PreflightChecker.check_file_readable("", "test-file")
-        assert result[0] == True
+        assert result[0]
 
     def test_file_exists(self, tmp_path):
         """check_file_readable returns True for existing readable file."""
         f = tmp_path / "test.txt"
         f.write_text("data")
         result = PreflightChecker.check_file_readable(str(f), "test-file")
-        assert result[0] == True
+        assert result[0]
         assert str(f) in result[1]
 
     def test_file_not_found(self, tmp_path):
         """check_file_readable returns False when file doesn't exist."""
         result = PreflightChecker.check_file_readable(str(tmp_path / "nonexistent.txt"), "test-file")
-        assert result[0] == False
+        assert not result[0]
 
 
 class TestCheckSchemaFile:
     def test_empty_path(self):
         """check_schema_file with empty path returns True."""
         result = PreflightChecker.check_schema_file("")
-        assert result[0] == True
+        assert result[0]
 
     def test_valid_json(self, tmp_path):
         """check_schema_file returns True for valid JSON schema."""
         f = tmp_path / "schema.json"
         f.write_text(json.dumps({"type": "object"}))
         result = PreflightChecker.check_schema_file(str(f))
-        assert result[0] == True
+        assert result[0]
 
     def test_invalid_json(self, tmp_path):
         """check_schema_file returns False for invalid JSON."""
         f = tmp_path / "schema.json"
         f.write_text("not json")
         result = PreflightChecker.check_schema_file(str(f))
-        assert result[0] == False
+        assert not result[0]
 
 
 class TestCheckDiskSpace:
@@ -142,7 +142,7 @@ class TestCheckDiskSpace:
         with patch("os.statvfs") as mock_vfs:
             mock_vfs.return_value = Mock(f_frsize=4096, f_bavail=1024 * 1024 * 1024)
             result = PreflightChecker.check_disk_space("/tmp")
-        assert result[0] == True
+        assert result[0]
 
 
 class TestRunAllChecks:
@@ -165,7 +165,7 @@ class TestRunAllChecks:
         with patch("pi_loop.preflight.PreflightChecker.check_python_version", return_value=(False, "FAIL")):
             results = PreflightChecker.run_all_checks(fail_fast=True)
         assert len(results) == 1
-        assert results[0]["passed"] == False
+        assert not results[0]["passed"]
 
     def test_includes_git_check(self):
         """run_all_checks includes git check when requested."""
@@ -207,7 +207,7 @@ class TestPreflightChecker:
         mock_args.goals_file = ""
         mock_args.output_schema_file = ""
         checker = PreflightChecker(mock_args, fail_fast=True)
-        assert checker._fail_fast == True
+        assert checker._fail_fast
 
     def test_run_all_true(self):
         """PreflightChecker.run_all returns True when all pass."""
@@ -230,7 +230,7 @@ class TestPreflightChecker:
             mock_args.log_file = "/tmp/log"
             checker = PreflightChecker(mock_args, fail_fast=False)
             result = checker.run_all()
-        assert result == True
+        assert result
 
     def test_format_results(self):
         """format_results produces readable output."""

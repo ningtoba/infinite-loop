@@ -1,6 +1,12 @@
 """Shared pytest fixtures for pi-loop tests."""
 
+import os
+
 import pytest
+
+# Prevent LoopManager from hydrating in-memory logs from the real production
+# log file during tests — otherwise test assertions on empty initial state fail.
+os.environ.setdefault("PI_LOOP_NO_HYDRATE", "1")
 
 
 @pytest.fixture

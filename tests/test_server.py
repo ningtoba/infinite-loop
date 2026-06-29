@@ -99,7 +99,7 @@ class TestStartAPI:
         with patch("web_app.server.get_loop_manager", return_value=mock_mgr):
             resp = client.post("/api/loop/start")
         assert resp.status_code == 200
-        assert resp.json()["success"] == False
+        assert not resp.json()["success"]
 
 
 class TestStopAPI:
@@ -228,7 +228,7 @@ class TestValidateConfig:
         from web_app.config_manager import validate_config
 
         result = validate_config({"INFINITE_LOOP_GOAL": ""})
-        assert result.get("valid") == False
+        assert not result.get("valid")
         errors = result.get("errors", [])
         assert isinstance(errors, list) and len(errors) > 0
 
@@ -237,4 +237,4 @@ class TestValidateConfig:
         from web_app.config_manager import validate_config
 
         result = validate_config({"INFINITE_LOOP_GOAL": "my goal"})
-        assert result.get("valid") == True
+        assert result.get("valid")

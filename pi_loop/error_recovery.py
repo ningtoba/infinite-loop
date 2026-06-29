@@ -100,9 +100,10 @@ def _adapt_to_error(
     count = error_type_counts.get(error_type, 0)
     thresholds = _ERROR_THRESHOLDS.get(error_type, {"mild": 999, "moderate": 999, "stop": 999})
 
-    if count >= thresholds.get("stop", 999):
+    stop_threshold = thresholds.get("stop")
+    if stop_threshold is not None and count >= stop_threshold:
         target_level = 3
-    elif count >= (thresholds.get("moderate") or 999):
+    elif thresholds.get("moderate") is not None and count >= (thresholds.get("moderate") or 999):
         target_level = 2
     elif count >= thresholds.get("mild", 999):
         target_level = 1
@@ -116,11 +117,13 @@ def _adapt_to_error(
             new_timeout = min(600, int(session_timeout or 0) * 150 // 100)
             actions.append(f"[MITIGATION] Timeout errors: increased timeout to {new_timeout}s")
         elif error_type == "network":
-            new_cooldown = min(300, max(_ORIGINAL_COOLDOWN, cooldown * 4))
-            if new_cooldown < 30:
-                new_cooldown = 30
-            new_mode = "fixed"
-            actions.append(f"[MITIGATION] Network errors: elevated cooldown to {new_cooldown}s")
+            # Exponential backoff: cooldown = base * 2^count, capped at 30 min.
+            # This handles transient API outages without shutting down the daemon.
+            base = max(_ORIGINAL_COOLDOWN, 15)
+            backoff = min(1800, base * (2 ** min(count, 10)))
+            new_cooldown = max(30, backoff)
+            new_mode = "adaptive"
+            actions.append(f"[MITIGATION] Network errors: exponential backoff → {new_cooldown}s (count={count})")
         elif error_type == "schema":
             actions.append("[MITIGATION] Schema errors: monitoring (no parameter changes yet)")
         elif error_type == "unknown":

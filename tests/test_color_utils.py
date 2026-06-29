@@ -1,7 +1,7 @@
 """Tests for Colorizer and related utilities."""
 
-import sys
 import os
+import sys
 
 from pi_loop.color_utils import Colorizer, configure_color_mode, strip_ansi
 

@@ -37,12 +37,12 @@ def load_or_create_ledger(goal: str, context: str, sentinel_path: str = "", rese
                 pending = existing["pending_iteration"]
                 started_at = pending.get("started_at", "")
                 try:
-                    if "Z" in started_at or "+" in started_at:
-                        started_ts = datetime.fromisoformat(started_at).timestamp()
-                    else:
-                        started_ts = datetime.fromisoformat(started_at[:19]).timestamp()
+                    started_ts = datetime.fromisoformat(started_at).timestamp()
                 except (ValueError, TypeError):
-                    started_ts = 0
+                    try:
+                        started_ts = datetime.fromisoformat(started_at[:19]).timestamp()
+                    except (ValueError, TypeError):
+                        started_ts = 0
                 elapsed = time.time() - started_ts
                 if elapsed >= 300:
                     _log(f"[RECOVER] Stale pending iteration #{pending.get('n')} ({elapsed:.0f}s old)")

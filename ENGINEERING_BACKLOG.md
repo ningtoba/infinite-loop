@@ -155,10 +155,10 @@ This backlog is organized by category, then sorted by priority within each categ
 - **Priority:** Low
 - **Impact:** Low — docstring invisible to `help()` and IDE tooltips
 - **Effort:** small
-- **Status:** open
+- **Status:** done
 - **Affected Files:** `pi_loop/preflight.py` ~line 100
 - **Description:** `preflight.py:~100`, the `check_disk_space` method has its docstring positioned after the function body's first `if` block instead of at the top of the method. This makes the docstring invisible to `help()` and IDE tooltips.
-- **Research Notes:** Move the docstring to the first line of the method body.
+- **Research Notes:** ✅ Resolved — moved docstring to the first line of `check_disk_space()` method body.
 
 ### [BUG-010] `loop_manager.py` log file handle never rotates
 
@@ -177,10 +177,10 @@ This backlog is organized by category, then sorted by priority within each categ
 - **Priority:** Medium
 - **Impact:** Medium — short iterations see doubled latency
 - **Effort:** small
-- **Status:** open
+- **Status:** done
 - **Affected Files:** `pi_loop/heartbeat.py` ~line 67
 - **Description:** `_monitor_heartbeat()` sleeps for `HEARTBEAT_POLL_INTERVAL` (5 seconds) between heartbeat checks. Any iteration completion is detected up to 5 seconds late because the poll cycle must complete before the next heartbeat check.
-- **Research Notes:** Use `threading.Event.wait(timeout=interval)` with a set-able event for shutdown notification, reducing effective latency to near-zero while maintaining the poll interval.
+- **Research Notes:** ✅ Resolved — replaced `time.sleep(HEARTBEAT_POLL_INTERVAL)` with `_shutdown_requested.wait(timeout=HEARTBEAT_POLL_INTERVAL)`, which returns immediately when shutdown is requested, reducing latency to near-zero while maintaining the poll interval.
 
 ### [BUG-012] File lock busy-waits with fixed 100ms sleep
 
@@ -210,12 +210,23 @@ This backlog is organized by category, then sorted by priority within each categ
 - **Priority:** Low
 - **Impact:** Low — fragile parsing of ISO 8601 timestamps
 - **Effort:** small
-- **Status:** open
+- **Status:** done
 - **Affected Files:** `pi_loop/state.py` lines 44-54
 - **Description:** Timezone-aware ISO datetime parsing uses `"Z" in started_at or "+" in started_at` — this is fragile. ISO 8601 timestamps may contain `+` in the timezone offset section or literally in the timestamp value itself.
-- **Research Notes:** Use `datetime.fromisoformat()` with proper timezone handling. Python 3.11+ has improved ISO 8601 parsing.
+- **Research Notes:** ✅ Resolved — replaced fragile manual check with `try: datetime.fromisoformat()` with fallback to `started_at[:19]` only on first parser failure.
 
-### [BUG-015] `_execute_task` has 13-parameter signature with unused extracted params
+### [BUG-014B] `os.access()` calls in `preflight.py` can raise `OSError`
+
+- **Category:** bug
+- **Priority:** Low
+- **Impact:** Low — `check_sentinel_writable()` and `check_file_readable()` could crash if filesystem returns errors
+- **Effort:** small
+- **Status:** done
+- **Affected Files:** `pi_loop/preflight.py` lines ~91, ~115
+- **Description:** Two `PreflightChecker` static methods call `os.access()` without wrapping in try/except. Permission errors or FUSE filesystem issues could raise `OSError` and crash the preflight check.
+- **Research Notes:** ✅ Resolved — wrapped both `os.access()` calls with `try/except OSError`, returning a descriptive failure message.
+
+### [BUG-015] `_execute_task` has 71-parameter signature with unused extracted params
 
 - **Category:** bug
 - **Priority:** Medium
@@ -567,10 +578,10 @@ This backlog is organized by category, then sorted by priority within each categ
 - **Priority:** Medium
 - **Impact:** Medium — inconsistent behavior depending on which system is active
 - **Effort:** small
-- **Status:** open
+- **Status:** done
 - **Affected Files:** `.pre-commit-config.yaml`, `.githooks/pre-commit`, `.githooks/README.md`
 - **Description:** There are two independent pre-commit systems: `.pre-commit-config.yaml` (used by `pre-commit` tool, runs ruff + file checks) and `.githooks/pre-commit` (bash script, also runs ruff check+format on staged files). The `.githooks/README.md` describes a different hook (shell completion regeneration) than what the script actually does (ruff linting). Contributors get inconsistent behavior depending on which system they activate.
-- **Research Notes:** Pick one system and remove the other. Either: (a) use `pre-commit` tool exclusively (preferred — more maintainable) and delete `.githooks/pre-commit`, or (b) keep the bash script and delete `.pre-commit-config.yaml`. Document the chosen approach in CONTRIBUTING.md.
+- **Research Notes:** ✅ Resolved — removed `.githooks/pre-commit` and `.githooks/README.md`. The `pre-commit` tool (`.pre-commit-config.yaml`) is now the sole pre-commit system.
 
 ### [TOOL-003] No `py.typed` marker for downstream type checking (resolved)
 
@@ -741,7 +752,7 @@ This backlog is organized by category, then sorted by priority within each categ
 - **Priority:** Medium
 - **Impact:** Medium — defense-in-depth: secrets could be committed
 - **Effort:** small
-- **Status:** open
+- **Status:** done
 - **Affected Files:** `.gitignore`
 - **Description:** The `.gitignore` file has `.env` commented out with the note "config_file used instead." While the project does use JSON config files, if a developer creates a `.env` file locally with secrets (API keys, callback secrets), those secrets would be committed to git.
 - **Research Notes:** Uncomment the `.env` entry and add `.env.*` (covers `.env.local`, `.env.production`) as well. Add a comment explaining this is a safety net even though `.env` is not the primary config mechanism.

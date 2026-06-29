@@ -88,7 +88,11 @@ class PreflightChecker:
     def check_sentinel_writable(sentinel_path: str) -> tuple[bool, str]:
         """Check that sentinel parent directory is writable."""
         parent = os.path.dirname(os.path.expanduser(sentinel_path)) or "."
-        if os.access(parent, os.W_OK):
+        try:
+            writable = os.access(parent, os.W_OK)
+        except OSError:
+            return False, f"'{parent}' — permission error"
+        if writable:
             return True, f"'{parent}' is writable"
         return False, f"'{parent}' is not writable"
 
@@ -112,7 +116,11 @@ class PreflightChecker:
         p = os.path.expanduser(path)
         if not os.path.isfile(p):
             return False, f"--{label} file '{p}' not found"
-        if not os.access(p, os.R_OK):
+        try:
+            readable = os.access(p, os.R_OK)
+        except OSError:
+            return False, f"--{label} file '{p}' — permission error"
+        if not readable:
             return False, f"--{label} file '{p}' not readable"
         return True, f"--{label} file '{p}' found"
 
@@ -133,9 +141,9 @@ class PreflightChecker:
 
     @staticmethod
     def check_disk_space(path: str | None = None, min_gb: float = 0.5) -> tuple[bool, str]:
+        """Check minimum free disk space (Linux statvfs)."""
         if path is None:
             path = _get_data_dir()
-        """Check minimum free disk space (Linux statvfs)."""
         try:
             if hasattr(os, "statvfs"):
                 st = os.statvfs(os.path.dirname(os.path.abspath(path)))

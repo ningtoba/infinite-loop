@@ -134,7 +134,8 @@ def _monitor_heartbeat(
         else:
             _log(f"[HEARTBEAT] Alive — {age:.1f}s ago", level="DEBUG")
 
-        time.sleep(HEARTBEAT_POLL_INTERVAL)
+        if _shutdown_requested.wait(timeout=HEARTBEAT_POLL_INTERVAL):
+            break
 
     return {"status": "alive", "age_seconds": 0, "last_heartbeat_data": None}
 

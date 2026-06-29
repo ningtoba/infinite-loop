@@ -22,7 +22,7 @@
 | **Testing** | pytest 9.1, pytest-asyncio, pytest-cov, pytest-timeout (440+ tests across 25+ files) |
 | **Linting** | Ruff 0.15.20 |
 | **Type checking** | mypy 2.1.0 |
-| **CI/CD** | GitHub Actions (Python 3.10–3.13 matrix) |
+| **CI/CD** | GitHub Actions (Python 3.10–3.13 matrix, lint, mypy, security, coverage) |
 | **Worktrees** | 3 active feature worktrees (`bd038f68`, `edaf42c8`, `d19eb158`) plus extensive research/design docs |
 
 ### Structure
@@ -35,11 +35,14 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 
 ### Current State
 
-- **440+ tests** across 19 test modules (up from 0 in prior iteration)
-- **CI fully operational** with Python matrix, lint, type-check, verify-lock
-- **5 bugs fixed** (subprocess zombie leaks, race conditions in loop_manager)
-- **Security baseline**: dashboard XSS fixed, `validate_config()` wired into API, silent I/O suppression replaced with logging
-- **Major remaining debt**: monolithic `run_loop()` (300+ lines, 60+ locals), `LoopConfig` god dataclass (63 fields), no release workflow, no CHANGELOG, DOM XSS in frontend, no security scanning in CI, `/proc`-only system monitoring
+- **460+ tests** across 19 test modules
+- **CI fully operational** with Python matrix (3.10–3.13), lint, mypy, security, verify-lock, multi-version coverage merge
+- **All known security issues resolved** — dashboard XSS eliminated via `escapeHtml()`, security scanning (`safety` + `bandit`) automated in CI and **actually fails on vulnerabilities** (no `|| true` masking), Dependabot configured for weekly updates
+- **Mypy enforced** in CI, no redundant second run (merged into `make lint-all`)
+- **Coverage reporting** — matrix builds upload raw `.coverage` files per Python version, combined via `coverage combine` into a single merged report
+- **SSE reconnect** uses exponential backoff with jitter (no thundering herd)
+- **10 bugs/quality issues fixed** in latest iteration: broken Makefile quoting, `--shutdown-sentinel` CLI arg propagation, `_MISSING_TYPE` → `dataclasses.MISSING`, `_request_shutdown()` wired to signal handlers, hardcoded `/tmp` path in web UI, `$(PYTHON)` consistency, stale BACKLOG.md deleted
+- **Major remaining debt**: monolithic `run_loop()` (300+ lines, 60+ locals), `LoopConfig` god dataclass (63 fields), no release workflow, no CHANGELOG, `/proc`-only system monitoring
 
 ---
 
@@ -47,29 +50,27 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 
 | Priority | Count |
 |----------|-------|
-| 🔴 **P0 — Critical** | 5 |
+| 🔴 **P0 — Critical** | 1 |
 | 🟠 **P1 — High** | 9 |
-| 🟡 **P2 — Medium** | 11 |
-| 🔵 **P3 — Low** | 6 |
+| 🟡 **P2 — Medium** | 9 |
+| 🔵 **P3 — Low** | 5 |
 | ⚪ **P4 — Wishlist** | 4 |
-| **Total Active** | **35** |
+| **Total Active** | **28** |
 
 | Category | Count |
 |----------|-------|
-| Security | 2 |
-| Architecture | 4 |
-| Tech Debt | 4 |
-| Reliability | 4 |
-| CI/CD | 4 |
-| Performance | 3 |
-| Testing | 2 |
+| Tech Debt | 5 |
+| Performance | 4 |
+| Architecture | 3 |
+| Reliability | 3 |
+| DevX | 3 |
+| CI/CD | 2 |
+| Testing | 1 |
 | Documentation | 2 |
-| Frontend/CSS | 4 |
-| DevX | 2 |
+| Frontend/CSS | 2 |
+| Security | 1 |
 | Observability | 1 |
 | Feature | 1 |
-| Automation | 1 |
-| Dependency | 1 |
 
 ---
 
@@ -77,30 +78,17 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 
 | Rank | ID | Title | Priority | Effort | Category |
 |------|-----|-------|----------|--------|----------|
-| 1 | **BACKLOG-001** | Fix DOM XSS in web app frontend (app.js) | P0 🔴 | Small | Security |
-| 2 | **BACKLOG-002** | Consolidate hardcoded `/tmp` paths under `PI_LOOP_DATA_DIR` | P0 🔴 | Medium | Reliability |
-| 3 | **BACKLOG-003** | Wire mypy to actually fail CI (remove `|| true`) | P0 🔴 | Small | CI/CD |
-| 4 | **BACKLOG-004** | Automate security scanning in CI (bandit + safety) | P1 🟠 | Small | CI/CD |
-| 5 | **BACKLOG-005** | Implement structured logging with correlation IDs | P1 🟠 | Medium | Observability |
+| 1 | **BACKLOG-002** | Consolidate hardcoded `/tmp` paths under `PI_LOOP_DATA_DIR` | P0 🔴 | Medium | Reliability |
+| 2 | **BACKLOG-005** | Implement structured logging with correlation IDs | P1 🟠 | Medium | Observability |
+| 3 | **BACKLOG-006** | Split LoopConfig god dataclass into focused config classes | P1 🟠 | Medium | Architecture |
+| 4 | **BACKLOG-007** | Decompose monolithic `run_loop()` into focused modules | P1 🟠 | X-Large | Architecture |
+| 5 | **BACKLOG-008** | Add noop/fallback system monitoring for non-Linux platforms | P1 🟠 | Medium | Architecture |
 
 ---
 
 ## Backlog Items
 
 ### P0 — Critical
-
----
-
-### BACKLOG-001 — Fix DOM XSS in web app frontend (app.js)
-
-| Field | Value |
-|-------|-------|
-| **Category** | security |
-| **Priority** | 🔴 P0 Critical |
-| **Impact** | high |
-| **Effort** | small |
-| **Reasoning** | `escapeHtml()` helper exists in `app.js` but is used inconsistently. Three template-literal interpolations (`w.id`, `branch`) in `onclick` handlers create DOM-based XSS vectors. An attacker who controls worker IDs or branch names (via loop_manager API) can execute arbitrary JavaScript in the dashboard browser session. |
-| **Affected files** | `web_app/static/app.js` |
 
 ---
 
@@ -114,32 +102,11 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 | **Effort** | medium |
 | **Reasoning** | `PI_LOOP_DATA_DIR` env var exists in `config.py` and drives ledger/lock/sentinel paths, but 5+ locations still hardcode `/tmp`: HTML dashboard suggestions (`loop.py`), help examples (`help_topics.py`), preflight disk check default (`preflight.py`), status file default (`status.py`). Breaks container deployments and multi-instance setups. |
 | **Affected files** | `pi_loop/loop.py` (~line 305), `pi_loop/help_topics.py` (lines 145–159), `pi_loop/preflight.py` (~line 35), `pi_loop/status.py` (~line 14) |
+| **Progress** | `web_app/config_manager.py` fixed (now uses `SENTINEL_PATH_DEFAULT`); 4 locations remain |
 
 ---
 
-### BACKLOG-003 — Wire mypy to actually fail CI (remove `|| true`)
-
-| Field | Value |
-|-------|-------|
-| **Category** | ci-cd |
-| **Priority** | 🔴 P0 Critical |
-| **Impact** | high |
-| **Effort** | small |
-| **Reasoning** | `make mypy` and `make lint-all` pipe mypy through `|| true` and `2>/dev/null; true`, silently ignoring all type errors. CI runs these targets so type errors pass unnoticed. Fix each discovered type error or suppress with precise`# type: ignore[code]` comments. |
-| **Affected files** | `Makefile`, `.github/workflows/ci.yml`, multiple `.py` files |
-
----
-
-### BACKLOG-004 — Automate security scanning in CI (bandit + safety)
-
-| Field | Value |
-|-------|-------|
-| **Category** | ci-cd |
-| **Priority** | 🔴 P0 Critical |
-| **Impact** | high |
-| **Effort** | small |
-| **Reasoning** | No automated security scanning exists despite the project handling API keys, callback secrets, and having addressed starlette CVEs. Add `bandit` for static analysis SAST, `safety` or `pip-audit` for dependency vulnerability scanning. Create a `make security` target and a CI job. |
-| **Affected files** | `Makefile`, `.github/workflows/ci.yml`, `requirements-dev.txt` |
+### P1 — High
 
 ---
 
@@ -148,15 +115,11 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 | Field | Value |
 |-------|-------|
 | **Category** | observability |
-| **Priority** | 🔴 P0 Critical |
+| **Priority** | 🟠 P1 High |
 | **Impact** | high |
 | **Effort** | medium |
 | **Reasoning** | The codebase uses `print()` and `_log()` with no structured fields, no correlation IDs, no log levels for filtering. Production debugging requires manual log scraping. Adopt a structured approach (stdlib `logging` with JSON formatter or `structlog`) with `iteration_id`, `loop_id`, `duration_ms`, `event` fields. |
 | **Affected files** | `pi_loop/loop.py`, `pi_loop/error_recovery.py`, `pi_loop/git_utils.py`, `pi_loop/heartbeat.py`, `pi_loop/preflight.py`, `web_app/server.py` |
-
----
-
-### P1 — High
 
 ---
 
@@ -196,19 +159,6 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 | **Effort** | medium |
 | **Reasoning** | CPU/memory monitoring reads `/proc/[pid]/status`, `/proc/stat`, `/proc/meminfo`, and uses `os.sysconf_names["SC_CLK_TCK"]`. These are Linux-specific. On macOS/BSD the system monitoring endpoints crash with `FileNotFoundError`. Create an abstract `SystemResourceProvider` with `LinuxProvider` and `NoopProvider` (returns 0s with a warning). |
 | **Affected files** | `pi_loop/system_utils.py`, `web_app/server.py`, `pi_loop/status.py` |
-
----
-
-### BACKLOG-009 — Fix SSE reconnect using exponential backoff
-
-| Field | Value |
-|-------|-------|
-| **Category** | reliability |
-| **Priority** | 🟠 P1 High |
-| **Impact** | medium |
-| **Effort** | small |
-| **Reasoning** | Frontend SSE reconnect uses a fixed 5s `setTimeout`. On server restart, all connected clients reconnect simultaneously (thundering herd). Replace with exponential backoff: 1s, 2s, 4s, 8s, max 30s, with ±25% random jitter. Reset to minimum on successful connection. |
-| **Affected files** | `web_app/static/app.js` (~lines 110–114) |
 
 ---
 
@@ -398,32 +348,6 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 
 ---
 
-### BACKLOG-024 — Add Dependabot/Renovate configuration
-
-| Field | Value |
-|-------|-------|
-| **Category** | ci-cd |
-| **Priority** | 🟡 P2 Medium |
-| **Impact** | medium |
-| **Effort** | small |
-| **Reasoning** | No automated dependency update configuration. FastAPI, uvicorn, pytest, ruff dependencies won't get automatic PRs for security updates. Configure Dependabot for `pip` ecosystem with weekly schedule. |
-| **Affected files** | `.github/dependabot.yml` (new) |
-
----
-
-### BACKLOG-025 — Add coverage reporting to CI
-
-| Field | Value |
-|-------|-------|
-| **Category** | testing |
-| **Priority** | 🟡 P2 Medium |
-| **Impact** | medium |
-| **Effort** | small |
-| **Reasoning** | pytest-cov is installed but unused. Add `--cov=pi_loop --cov=web_app --cov-report=term-missing` to `make test`. Add coverage step to CI test job. Set minimum coverage threshold (e.g., 65%) to prevent regressions. |
-| **Affected files** | `Makefile`, `.github/workflows/ci.yml` |
-
----
-
 ### P3 — Low
 
 ---
@@ -451,19 +375,6 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 | **Effort** | small |
 | **Reasoning** | While `[tool.ruff]` line-length config exists, there's no `[tool.ruff.lint]` section selecting specific rule sets. Default rules may be too permissive. Add explicit select (E, F, W, I, N, UP, B, SIM, ARG, RUF100 — already in ruff config). |
 | **Affected files** | `pyproject.toml` |
-
----
-
-### BACKLOG-028 — Fix empty catch blocks in app.js
-
-| Field | Value |
-|-------|-------|
-| **Category** | frontend |
-| **Priority** | 🔵 P3 Low |
-| **Impact** | low |
-| **Effort** | small |
-| **Reasoning** | 5+ empty `catch` blocks in `app.js` (lines 68–70, 255–257, 279–281, 499–506, 544–548) make frontend errors invisible. Add `console.error('Error [label]:', e)` to each. |
-| **Affected files** | `web_app/static/app.js` |
 
 ---
 
@@ -593,6 +504,44 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 
 ---
 
+## Iteration 6 — Completed
+
+| ID | Title | Category | Completed |
+|----|-------|----------|-----------|
+| BACKLOG-001 | Fix DOM XSS in web app frontend (app.js) — consistent `escapeHtml()` on all template-literal interpolations | Security | ✅ |
+| BACKLOG-009 | Fix SSE reconnect using exponential backoff with jitter (1s–30s, ±25%) | Reliability | ✅ |
+| BACKLOG-028 | Fix empty catch blocks in app.js — all catches log via `console.warn`/`console.error` | Frontend/CSS | ✅ |
+| BACKLOG-003 | Wire mypy to actually fail CI (remove `|| true`) —`make mypy` no longer masks errors | CI/CD | ✅ |
+| BACKLOG-004 | Automate security scanning in CI (bandit + safety) — `make security`, GitHub Actions security job | CI/CD | ✅ |
+| BACKLOG-024 | Add Dependabot config for weekly pip updates | CI/CD | ✅ |
+
+---
+
+## Iteration 7 — Completed
+
+| ID | Title | Category | Completed |
+|----|-------|----------|-----------|
+| BACKLOG-025 | Add coverage reporting to CI — proper multi-version merge via raw `.coverage` artifacts + `coverage combine` | CI/CD | ✅ |
+| | Remove `|| true` from safety check so CI security job actually fails on vulnerabilities | CI/CD | ✅ |
+| | Fix broken quoting in `Makefile` `help` target (unclosed quotes lines 17–18, triple quote line 19) | Bug | ✅ |
+| | Remove duplicate `make mypy` from CI lint job (already covered by `make lint-all`) | CI/CD | ✅ |
+| | Use `$(PYTHON)` consistently across `Makefile` — replaces bare `python`/`pip` with `$(PYTHON) -m pip` in all targets | DevX | ✅ |
+| | Fix hardcoded `/tmp/infinite-loop-stop` in `web_app/config_manager.py` — import and use `SENTINEL_PATH_DEFAULT` from `pi_loop.config` | Reliability | ✅ |
+| | Wire `--shutdown-sentinel` CLI arg to `LoopConfig.sentinel_path` (was silently dropped by `from_args()`) | Bug | ✅ |
+| | Replace private `dataclasses._MISSING_TYPE` with public `dataclasses.MISSING` in `pi_loop/config.py` | Tech Debt | ✅ |
+| | Wire `_request_shutdown()` to SIGINT/SIGTERM handlers in `pi_loop/cli.py` — graceful shutdown instead of abrupt `KeyboardInterrupt` | Tech Debt | ✅ |
+| | Delete stale `BACKLOG.md` (superseded by `ENGINEERING_BACKLOG.md`) | Documentation | ✅ |
+
+### Partially Addressed
+
+| Item | Progress | Remaining |
+|------|----------|-----------|
+| BACKLOG-002 (/tmp consolidation) | Fixed `web_app/config_manager.py` hardcoded path | `pi_loop/loop.py`, `pi_loop/help_topics.py`, `pi_loop/preflight.py`, `pi_loop/status.py` still hardcode `/tmp` |
+| BACKLOG-006 (config split) | Replaced private `_MISSING_TYPE` with public `dataclasses.MISSING` | God dataclass still has 63 fields; split into focused config classes not started |
+| BACKLOG-014 (dead code) | `_request_shutdown()` is now reachable from production (signal handlers) | `validate_json_output()`, `_classify_progress()` still dead; `cli.py` has unused imports |
+
+---
+
 ## File-by-File Issue Density
 
 | File | Active Issues |
@@ -606,18 +555,16 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 | `pi_loop/config.py` | 1 (BACKLOG-006) |
 | `pi_loop/system_utils.py` | 2 (BACKLOG-008, -019) |
 | `pi_loop/functions.py` | 1 (BACKLOG-015) |
-| `pi_loop/file_utils.py` | 1 (BACKLOG-016), 1 (BACKLOG-035) |
+| `pi_loop/file_utils.py` | 2 (BACKLOG-016, -035) |
 | `pi_loop/heartbeat.py` | 1 (BACKLOG-031) |
 | `pi_loop/config_file.py` | 1 (BACKLOG-011) |
-| `web_app/static/app.js` | 3 (BACKLOG-001, -009, -028) |
 | `web_app/server.py` | 2 (BACKLOG-020, -021) |
 | `web_app/loop_manager.py` | 1 (BACKLOG-010) |
 | `web_app/config_manager.py` | 1 (BACKLOG-011) |
 | `web_app/static/style.css` | 2 (BACKLOG-023, -029) |
 | `web_app/static/index.html` | 1 (BACKLOG-029, -033) |
-| `Makefile` | 3 (BACKLOG-003, -004, -025, -026) |
-| `.github/workflows/ci.yml` | 3 (BACKLOG-003, -004, -025, -030) |
-| `.github/` (dependabot, release) | 2 new files needed (BACKLOG-012, -024) |
+| `Makefile` | 1 (BACKLOG-026) |
+| `.github/workflows/ci.yml` | 1 (BACKLOG-030) |
 | `.github/workflows/release.yml` | 1 (BACKLOG-012) |
 | `pyproject.toml` | 1 (BACKLOG-027) |
 
@@ -627,8 +574,8 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 
 | Effort | Count | Items |
 |--------|-------|-------|
-| **Small** | 20 | BACKLOG-001, -003, -004, -009, -010, -011, -014, -015, -016, -019, -022, -024, -025, -026, -027, -028, -029, -030, -031, -032, -033 |
-| **Medium** | 12 | BACKLOG-002, -005, -006, -008, -012, -017, -020, -021, -023, -034, -035 |
+| **Small** | 13 | BACKLOG-010, -011, -014, -015, -016, -019, -022, -026, -027, -029, -030, -031, -032, -033 |
+| **Medium** | 11 | BACKLOG-002, -005, -006, -008, -012, -017, -020, -021, -023, -034, -035 |
 | **Large** | 2 | BACKLOG-007, -013 |
 | **X-Large** | 1 | BACKLOG-007 internal note (project-wide decomposition) |
 
@@ -639,20 +586,18 @@ tests/         → 25+ test files covering pi_loop and web_app modules
 ```
 High Impact ─────────────────────────────────────────────────────
             │                                          │
-            │  BACKLOG-001 (XSS fix)                   │  BACKLOG-007 (run_loop decomp)
-            │  BACKLOG-004 (security CI)               │  BACKLOG-013 (integration tests)
-            │  BACKLOG-005 (structured logging)        │
+            │  BACKLOG-002 (/tmp consolidation)        │  BACKLOG-007 (run_loop decomp)
+            │  BACKLOG-005 (structured logging)        │  BACKLOG-013 (integration tests)
             │  BACKLOG-006 (config split)              │
-            │  BACKLOG-002 (/tmp consolidation)        │
+            │  BACKLOG-008 (non-Linux monitoring)       │
             │                                          │
-            │  BACKLOG-009 (SSE backoff)               │  BACKLOG-012 (release workflow)
-            │  BACKLOG-011 (atomic config)             │  BACKLOG-015 (cooldown fix)
+            │  BACKLOG-011 (atomic config)             │  BACKLOG-012 (release workflow)
             │  BACKLOG-010 (colorized parse)           │  BACKLOG-017 (non-blocking cmds)
             │                                          │
 Low Effort ───────────────────────────────────────────────────── High Effort
 ```
 
-**Sweet spot (top-left):** Highest value per unit effort — tackle BACKLOG-001, -003, -004, -011, -009, -010 first.
+**Sweet spot (top-left):** Highest value per unit effort — tackle BACKLOG-002 *(4 remaining /tmp paths)*, BACKLOG-011, BACKLOG-010, BACKLOG-005 next.
 **Strategic investments (bottom-right):** BACKLOG-007 and BACKLOG-013 require significant effort but provide foundational improvements.
 
 ---
@@ -663,9 +608,9 @@ Low Effort ───────────────────────
 |------|--------|------------|
 | BACKLOG-007 (run_loop decomp) | BACKLOG-013 (integration tests), BACKLOG-017 (non-blocking cmds) | BACKLOG-006 (config split — recommended) |
 | BACKLOG-023 (CSS custom props) | — | — (independent) |
-| BACKLOG-012 (release workflow) | BACKLOG-022 (CHANGELOG) | BACKLOG-003 (mypy CI — release should gate on clean CI) |
+| BACKLOG-012 (release workflow) | BACKLOG-022 (CHANGELOG) | — (independent — release should gate on clean CI) |
 | BACKLOG-011 (atomic config) | — | — (independent) |
 
 ---
 
-*This backlog is a living document. Items should be re-prioritized quarterly. The top 5 (BACKLOG-001 through BACKLOG-005) represent the highest-value work for the next sprint.*
+*This backlog is a living document. Items should be re-prioritized quarterly. The top 5 (BACKLOG-002, -005, -006, -007, -008) represent the highest-value work for the next sprint.*

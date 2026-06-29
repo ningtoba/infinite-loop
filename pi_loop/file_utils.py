@@ -31,18 +31,23 @@ class FileLock:
     def __enter__(self):
         fd = os.open(self.path, os.O_CREAT | os.O_RDWR, 0o644)
         deadline = time.monotonic() + self.timeout
+        # Exponential backoff: start at 10ms, double each retry, cap at 1s
+        delay = 0.01
+        max_delay = 1.0
         while True:
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 self._fd = fd
                 return self
             except OSError:
-                if time.monotonic() >= deadline:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
                     os.close(fd)
                     raise TimeoutError(f"Could not acquire lock on {self.path} within {self.timeout}s") from None
-                time.sleep(0.1)
+                time.sleep(min(delay, remaining))
+                delay = min(delay * 2, max_delay)
 
-    def __exit__(self, *args):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         if self._fd is not None:
             fcntl.flock(self._fd, fcntl.LOCK_UN)
             os.close(self._fd)

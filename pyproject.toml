@@ -26,14 +26,26 @@ test = [
   "pytest-timeout>=2.0",
   "httpx2>=0.2.0",
 ]
-dev = ["ruff>=0.6.0", "mypy>=1.8.0", "pip-tools>=7.0.0", "pre-commit>=3.0.0"]
+dev = [
+  "ruff>=0.6.0",
+  "mypy>=1.8.0",
+  "pip-tools>=7.0.0",
+  "pre-commit>=3.0.0",
+  "bandit>=1.7.0",
+  "safety>=3.0.0",
+]
 
 [tool.ruff]
 target-version = "py310"
 line-length = 120
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "ARG", "RUF100"]
+# Rule codes:
+#   E = pycodestyle errors      F = pyflakes         W = pycodestyle warnings
+#   I = isort (import order)     N = pep8-naming      UP = pyupgrade
+#   B = flake8-bugbear           SIM = flake8-simplify ARG = flake8-unused-arguments
+#   RUF100 = unused noqa         C4 = flake8-comprehensions
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "ARG", "RUF100", "C4"]
 ignore = ["E501"]
 
 [tool.ruff.format]
@@ -44,6 +56,11 @@ python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+
+[tool.bandit]
+targets = ["pi_loop/", "web_app/"]
+skips = ["B101"]
+confidence = "high"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

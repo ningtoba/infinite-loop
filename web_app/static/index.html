@@ -30,23 +30,28 @@
           <h1>&#x3C0; pi-loop</h1>
           <span class="version">Web UI v2.0</span>
         </div>
-        <div class="sidebar-nav">
-          <button class="nav-btn active" data-tab="dashboard">
+        <div class="sidebar-nav" role="tablist">
+          <button
+            class="nav-btn active"
+            data-tab="dashboard"
+            role="tab"
+            aria-selected="true"
+          >
             <span class="nav-icon">&#x25A3;</span> Dashboard
           </button>
-          <button class="nav-btn" data-tab="config">
+          <button class="nav-btn" data-tab="config" role="tab">
             <span class="nav-icon">&#x2699;</span> Configuration
           </button>
-          <button class="nav-btn" data-tab="iterations">
+          <button class="nav-btn" data-tab="iterations" role="tab">
             <span class="nav-icon">&#x25B7;</span> Iterations
           </button>
-          <button class="nav-btn" data-tab="logs">
+          <button class="nav-btn" data-tab="logs" role="tab">
             <span class="nav-icon">&#x2261;</span> Logs
           </button>
-          <button class="nav-btn" data-tab="workers">
+          <button class="nav-btn" data-tab="workers" role="tab">
             <span class="nav-icon">&#x2691;</span> Workers
           </button>
-          <button class="nav-btn" data-tab="system">
+          <button class="nav-btn" data-tab="system" role="tab">
             <span class="nav-icon">📊</span> System
           </button>
         </div>
@@ -70,7 +75,7 @@
       <!-- Main content -->
       <main id="main-content">
         <!-- Dashboard Tab -->
-        <section id="tab-dashboard" class="tab-content active">
+        <section id="tab-dashboard" class="tab-content active" role="tabpanel">
           <div class="top-bar">
             <h2>Dashboard</h2>
             <div class="control-buttons">
@@ -121,7 +126,7 @@
           </div>
 
           <!-- Status Cards -->
-          <div class="status-grid">
+          <div class="status-grid" aria-live="polite">
             <div class="status-card">
               <div class="card-label">Loop Status</div>
               <div class="card-value">
@@ -157,7 +162,7 @@
           </div>
 
           <!-- Progress Bar -->
-          <div class="progress-section">
+          <div class="progress-section" aria-live="polite">
             <div class="progress-label">
               <span>Progress</span>
               <span id="progress-text">0%</span>
@@ -172,7 +177,7 @@
           </div>
 
           <!-- Goal Info -->
-          <div class="info-row">
+          <div class="info-row" aria-live="polite">
             <div class="info-item">
               <span class="info-label">Goal:</span>
               <span class="info-value" id="info-goal">—</span>
@@ -220,7 +225,7 @@
           <div class="section">
             <h3>Recent Iterations</h3>
             <div class="table-wrap">
-              <table id="recent-iterations-table">
+              <table id="recent-iterations-table" aria-live="polite">
                 <thead>
                   <tr>
                     <th>#</th>
@@ -238,7 +243,7 @@
         </section>
 
         <!-- Configuration Tab -->
-        <section id="tab-config" class="tab-content">
+        <section id="tab-config" class="tab-content" role="tabpanel">
           <div class="top-bar">
             <h2>Configuration</h2>
             <div class="config-actions">
@@ -268,7 +273,7 @@
         </section>
 
         <!-- Iterations Tab -->
-        <section id="tab-iterations" class="tab-content">
+        <section id="tab-iterations" class="tab-content" role="tabpanel">
           <div class="top-bar">
             <h2>Iterations</h2>
             <span class="subtitle" id="iterations-count">0 total</span>
@@ -294,7 +299,7 @@
         </section>
 
         <!-- Logs Tab -->
-        <section id="tab-logs" class="tab-content">
+        <section id="tab-logs" class="tab-content" role="tabpanel">
           <div class="top-bar">
             <h2>
               Logs
@@ -317,7 +322,7 @@
               Show All
             </button>
           </div>
-          <div class="log-container" id="log-container">
+          <div class="log-container" id="log-container" aria-live="polite">
             <div class="log-empty">
               No logs yet. Start the loop to see output.
             </div>
@@ -325,7 +330,7 @@
         </section>
 
         <!-- Workers Tab -->
-        <section id="tab-workers" class="tab-content">
+        <section id="tab-workers" class="tab-content" role="tabpanel">
           <div id="workers-cards-view">
             <div class="top-bar">
               <h2>Workers</h2>
@@ -356,7 +361,7 @@
             ></div>
           </div>
         </section>
-        <section id="tab-system" class="tab-content">
+        <section id="tab-system" class="tab-content" role="tabpanel">
           <div class="top-bar"><h2>System Resources</h2></div>
           <div class="system-grid" id="system-grid">
             <div class="status-card">

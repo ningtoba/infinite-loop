@@ -15,6 +15,10 @@ from pi_loop.config import SENTINEL_PATH_DEFAULT as SENTINEL_PATH
 
 from .config_manager import build_cli_args, get_raw_config
 
+# Compiled regex to strip ANSI escape sequences from daemon output
+# (e.g. color codes) before matching against known patterns.
+_ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
 
 class LoopManager:
     """Manages the infinite-loop daemon as a subprocess."""
@@ -317,7 +321,7 @@ class LoopManager:
         try:
             if os.path.exists(self._ledger_path):
                 with open(self._ledger_path) as f:
-                    return json.load(f)
+                    return json.load(f)  # type: ignore[no-any-return]
         except (json.JSONDecodeError, OSError):
             pass
         return {"status": "no_ledger", "iterations": [], "total_iterations": 0}
@@ -389,7 +393,10 @@ class LoopManager:
         # Format: "[HH:MM:SS] Iteration N" where the line starts with a
         # timestamp or is preceded by a separator/blank line context.
         # The line must consist ONLY of the timestamp + "Iteration N" (nothing else).
-        m = re.search(r"^\[\d{2}:\d{2}:\d{2}\]\s+Iteration\s+#?(\d+)\s*$", text)
+        # Strip ANSI escape sequences before matching so colorized output
+        # (e.g. "\x1b[32m[HH:MM:SS] Iteration N") is still detected.
+        clean_text = _ANSI_ESCAPE.sub("", text)
+        m = re.search(r"^\[\d{2}:\d{2}:\d{2}\]\s+Iteration\s+#?(\d+)\s*$", clean_text)
         if m and "still running" not in text.lower():
             try:
                 it_num = int(m.group(1))

@@ -1,6 +1,7 @@
 """Goal file loading, startup banner, goal cycling, progressive context, and cooldown handling."""
 
 import os
+import threading
 import time
 
 from .config import LEDGER_PATH, SENTINEL_PATH_DEFAULT, VERSION
@@ -224,10 +225,14 @@ def _handle_cooldown(
     cooldown_mode: str,
     eta_tracker,
     task_type: str,
+    *,
+    shutdown_event: threading.Event | None = None,
 ) -> None:
     """Fixed or adaptive cooldown wait.
 
-    Only sleeps; does not track errors or shutdown in this function.
+    Uses shutdown_event.wait(timeout=1) instead of time.sleep(1) when an event
+    is provided, so SIGTERM is handled promptly instead of blocking for up
+    to the full cooldown duration.
     """
     if cooldown <= 0 and cooldown_mode != "adaptive":
         return
@@ -242,5 +247,11 @@ def _handle_cooldown(
         _log(f"[COOLDOWN] Waiting {effective_cooldown}s before next iteration...")
         elapsed_cd = 0
         while elapsed_cd < effective_cooldown:
-            time.sleep(1)
+            if shutdown_event and shutdown_event.is_set():
+                _log("[COOLDOWN] Shutdown requested — aborting cooldown")
+                return
+            if shutdown_event:
+                shutdown_event.wait(timeout=1)
+            else:
+                time.sleep(1)
             elapsed_cd += 1

@@ -1,0 +1,1189 @@
+{
+  "errors": [],
+  "generated_at": "2026-06-29T18:25:38Z",
+  "metrics": {
+    "_totals": {
+      "CONFIDENCE.HIGH": 27,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 3,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 1,
+      "SEVERITY.LOW": 26,
+      "SEVERITY.MEDIUM": 3,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 5629,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/__init__.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 9,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/__main__.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 4,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/cli.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 229,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/color_utils.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 131,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/config.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 364,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/config_file.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 84,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/env_utils.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 436,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/error_recovery.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 152,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/error_utils.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 151,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/file_utils.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 214,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/file_watcher.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 57,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/functions.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 220,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/git_utils.py": {
+      "CONFIDENCE.HIGH": 17,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 17,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 88,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/heartbeat.py": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 185,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/help_topics.py": {
+      "CONFIDENCE.HIGH": 3,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 3,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 395,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/loop.py": {
+      "CONFIDENCE.HIGH": 6,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 1,
+      "SEVERITY.LOW": 4,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 702,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/parser.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 386,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/preflight.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 189,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/state.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 113,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/stats.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 38,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/status.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 62,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/system_utils.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 74,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "pi_loop/validation.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 15,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "web_app/__init__.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 5,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "web_app/__main__.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 13,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "web_app/config_manager.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 326,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "web_app/loop_manager.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 420,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "web_app/rate_limiter.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 52,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "web_app/server.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 515,
+      "nosec": 0,
+      "skipped_tests": 0
+    }
+  },
+  "results": [
+    {
+      "code": "21     \"\"\"Return the base data directory, respecting PI_LOOP_DATA_DIR env var.\"\"\"\n22     return os.environ.get(\"PI_LOOP_DATA_DIR\", \"/tmp\")\n23 \n",
+      "col_offset": 46,
+      "end_col_offset": 52,
+      "filename": "pi_loop/config.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 377,
+        "link": "https://cwe.mitre.org/data/definitions/377.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Probable insecure usage of temp file/directory.",
+      "line_number": 22,
+      "line_range": [
+        22
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b108_hardcoded_tmp_directory.html",
+      "test_id": "B108",
+      "test_name": "hardcoded_tmp_directory"
+    },
+    {
+      "code": "139     \"INFINITE_LOOP_RESET_GOALS\": \"false\",\n140     \"INFINITE_LOOP_PASS_SESSION_ID\": \"false\",\n141     \"INFINITE_LOOP_USE_LIBRARY\": \"false\",\n142     \"INFINITE_LOOP_EVOLVE\": \"false\",\n143     \"INFINITE_LOOP_COOLDOWN\": \"30\",\n144     \"INFINITE_LOOP_COOLDOWN_MODE\": \"none\",\n145     \"INFINITE_LOOP_RETRY_DELAY\": \"5\",\n146     \"INFINITE_LOOP_MAX_ITERATIONS\": \"100\",\n147     \"INFINITE_LOOP_MAX_IDLE_ITERATIONS\": \"5\",\n148     \"INFINITE_LOOP_MAX_RETRIES\": \"3\",\n149     \"INFINITE_LOOP_MAX_TURNS\": \"20\",\n150     \"INFINITE_LOOP_MAX_OUTPUT_CHARS\": \"10000\",\n151     \"INFINITE_LOOP_SESSION_TIMEOUT\": \"300\",\n152     \"INFINITE_LOOP_HEARTBEAT_TIMEOUT\": \"30\",\n153     \"INFINITE_LOOP_STARTUP_DELAY\": \"0\",\n154     \"INFINITE_LOOP_WORKERS\": \"1\",\n155     \"INFINITE_LOOP_WORKER_URL\": \"\",\n156     \"INFINITE_LOOP_WORKDIR\": \"\",\n157     \"INFINITE_LOOP_CONTEXT\": \"\",\n158     \"INFINITE_LOOP_CONTEXT_FILE\": \"\",\n159     \"INFINITE_LOOP_MODEL\": \"\",\n160     \"INFINITE_LOOP_PROVIDER\": \"\",\n161     \"INFINITE_LOOP_PROMPT_SUFFIX\": \"\",\n162     \"INFINITE_LOOP_TAG\": \"\",\n163     \"INFINITE_LOOP_TASK_TYPE\": \"\",\n164     \"INFINITE_LOOP_PROFILE\": \"\",\n165     \"INFINITE_LOOP_LOG_FILE\": \"\",\n166     \"INFINITE_LOOP_LOG_MAX_MB\": \"10\",\n167     \"INFINITE_LOOP_STATUS_FILE\": \"\",\n168     \"INFINITE_LOOP_STATUS_HTML\": \"\",\n169     \"INFINITE_LOOP_IGNORE_RULES\": \"\",\n170     \"INFINITE_LOOP_IGNORE_USER_CONFIG\": \"false\",\n171     \"INFINITE_LOOP_SKILLS\": \"\",\n172     \"INFINITE_LOOP_TOOLSETS\": \"\",\n173     \"INFINITE_LOOP_ACCEPT_HOOKS\": \"\",\n174     \"INFINITE_LOOP_ON_ERROR_CMD\": \"\",\n175     \"INFINITE_LOOP_HTTP_CALLBACK\": \"\",\n176     \"INFINITE_LOOP_NOTIFY_CMD\": \"\",\n177     \"INFINITE_LOOP_NOTIFY_DESKTOP\": \"false\",\n178     \"INFINITE_LOOP_NOTIFY_NTFY\": \"\",\n179     \"INFINITE_LOOP_NOTIFY_NTFY_SERVER\": \"\",\n180     \"INFINITE_LOOP_NOTIFY_ON_COMPLETION\": \"false\",\n181     \"INFINITE_LOOP_NOTIFY_PUSHBULLET\": \"\",\n182     \"INFINITE_LOOP_WATCH_DIR\": \"\",\n183     \"INFINITE_LOOP_WATCH_POLL\": \"2\",\n184     \"INFINITE_LOOP_WEBHOOK_PORT\": \"0\",\n185     \"INFINITE_LOOP_WORKTREE\": \"false\",\n186     \"INFINITE_LOOP_CHECKPOINTS\": \"\",\n187     \"INFINITE_LOOP_COMPACT_EVERY\": \"0\",\n188     \"INFINITE_LOOP_KEEP_ITERATIONS\": \"50\",\n189     \"INFINITE_LOOP_CONVERGENCE_STOP\": \"false\",\n190     \"INFINITE_LOOP_CONVERGENCE_THRESHOLD\": \"0\",\n191     \"INFINITE_LOOP_CONVERGENCE_WINDOW\": \"5\",\n192     \"INFINITE_LOOP_ARCHIVE_DIR\": \"\",\n193     \"INFINITE_LOOP_ARCHIVE_MAX_SIZE\": \"0\",\n194     \"INFINITE_LOOP_ARCHIVE_RETENTION\": \"7\",\n195     \"INFINITE_LOOP_SHUTDOWN_SENTINEL\": \"\",\n196     \"INFINITE_LOOP_SPAWN_SOURCE\": \"\",\n197     \"INFINITE_LOOP_OUTPUT_SCHEMA\": \"\",\n198     \"INFINITE_LOOP_OUTPUT_SCHEMA_FILE\": \"\",\n199     \"INFINITE_LOOP_CONFIG\": \"\",\n200 }\n201 \n202 \n203 # ---------------------------------------------------------------------------\n204 # Public API: load_env  \u2014 safe, no-crash environment initialisation\n205 # ---------------------------------------------------------------------------\n206 \n207 \n208 def load_env(\n209     env_path: str | None = None,\n210 ) -> dict[str, str]:\n211     \"\"\"Load environment variables from available sources without crashing.\n212 \n213     Resolution order (last wins):\n214         1. IN-MEMORY os.environ \u2014 never overwritten\n215         2. ``pi_loop.config_file``  \u2014 ``~/.config/pi-loop/config.json`` (optional)\n216         3. ``.env`` file in CWD  \u2014 ``.env`` (optional, no crash if missing)\n217         4. Sensible defaults \u2014 final fallback for any unset known var\n218 \n219     Args:\n220         env_path: Path to a ``.env`` file.  Defaults to ``.env`` in CWD.\n221 \n222     Returns:\n223         A dict of all known env vars with their resolved values (as seen\n224         in ``os.environ`` after loading).\n225     \"\"\"\n226     if env_path is None:\n",
+      "col_offset": 4,
+      "end_col_offset": 35,
+      "filename": "pi_loop/env_utils.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 259,
+        "link": "https://cwe.mitre.org/data/definitions/259.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Possible hardcoded password: 'false'",
+      "line_number": 140,
+      "line_range": [
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        128,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144,
+        145,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174,
+        175,
+        176,
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188,
+        189,
+        190,
+        191,
+        192,
+        193,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199,
+        200
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html",
+      "test_id": "B105",
+      "test_name": "hardcoded_password_string"
+    },
+    {
+      "code": "4 import os\n5 import subprocess\n6 \n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 5,
+      "line_range": [
+        5
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "21     try:\n22         r = subprocess.run(\n23             [\"git\", \"diff\", \"--stat\"],\n24             capture_output=True,\n25             text=True,\n26             cwd=cwd,\n27             timeout=10,\n28         )\n29         result[\"diff_stat\"] = r.stdout.strip() or \"(no unstaged changes)\"\n",
+      "col_offset": 12,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 22,
+      "line_range": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "21     try:\n22         r = subprocess.run(\n23             [\"git\", \"diff\", \"--stat\"],\n24             capture_output=True,\n25             text=True,\n26             cwd=cwd,\n27             timeout=10,\n28         )\n29         result[\"diff_stat\"] = r.stdout.strip() or \"(no unstaged changes)\"\n",
+      "col_offset": 12,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 22,
+      "line_range": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "29         result[\"diff_stat\"] = r.stdout.strip() or \"(no unstaged changes)\"\n30         r2 = subprocess.run(\n31             [\"git\", \"diff\", \"--cached\", \"--stat\"],\n32             capture_output=True,\n33             text=True,\n34             cwd=cwd,\n35             timeout=10,\n36         )\n37         result[\"diff_stat_cached\"] = r2.stdout.strip() or \"(no staged changes)\"\n",
+      "col_offset": 13,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 30,
+      "line_range": [
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "29         result[\"diff_stat\"] = r.stdout.strip() or \"(no unstaged changes)\"\n30         r2 = subprocess.run(\n31             [\"git\", \"diff\", \"--cached\", \"--stat\"],\n32             capture_output=True,\n33             text=True,\n34             cwd=cwd,\n35             timeout=10,\n36         )\n37         result[\"diff_stat_cached\"] = r2.stdout.strip() or \"(no staged changes)\"\n",
+      "col_offset": 13,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 30,
+      "line_range": [
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "37         result[\"diff_stat_cached\"] = r2.stdout.strip() or \"(no staged changes)\"\n38         r3 = subprocess.run(\n39             [\"git\", \"rev-parse\", \"--short\", \"HEAD\"],\n40             capture_output=True,\n41             text=True,\n42             cwd=cwd,\n43             timeout=5,\n44         )\n45         result[\"head\"] = r3.stdout.strip() if r3.returncode == 0 else \"\"\n",
+      "col_offset": 13,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 38,
+      "line_range": [
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "37         result[\"diff_stat_cached\"] = r2.stdout.strip() or \"(no staged changes)\"\n38         r3 = subprocess.run(\n39             [\"git\", \"rev-parse\", \"--short\", \"HEAD\"],\n40             capture_output=True,\n41             text=True,\n42             cwd=cwd,\n43             timeout=5,\n44         )\n45         result[\"head\"] = r3.stdout.strip() if r3.returncode == 0 else \"\"\n",
+      "col_offset": 13,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 38,
+      "line_range": [
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "46         if store_diff:\n47             r4 = subprocess.run(\n48                 [\"git\", \"diff\"],\n49                 capture_output=True,\n50                 text=True,\n51                 cwd=cwd,\n52                 timeout=10,\n53             )\n54             diff_text = r4.stdout.strip()\n",
+      "col_offset": 17,
+      "end_col_offset": 13,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 47,
+      "line_range": [
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "46         if store_diff:\n47             r4 = subprocess.run(\n48                 [\"git\", \"diff\"],\n49                 capture_output=True,\n50                 text=True,\n51                 cwd=cwd,\n52                 timeout=10,\n53             )\n54             diff_text = r4.stdout.strip()\n",
+      "col_offset": 17,
+      "end_col_offset": 13,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 47,
+      "line_range": [
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "68     try:\n69         subprocess.run([\"git\", \"add\", \"-A\"], capture_output=True, cwd=cwd, timeout=15)\n70         r = subprocess.run(\n",
+      "col_offset": 8,
+      "end_col_offset": 86,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 69,
+      "line_range": [
+        69
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "68     try:\n69         subprocess.run([\"git\", \"add\", \"-A\"], capture_output=True, cwd=cwd, timeout=15)\n70         r = subprocess.run(\n",
+      "col_offset": 8,
+      "end_col_offset": 86,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 69,
+      "line_range": [
+        69
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "69         subprocess.run([\"git\", \"add\", \"-A\"], capture_output=True, cwd=cwd, timeout=15)\n70         r = subprocess.run(\n71             [\"git\", \"diff\", \"--cached\", \"--quiet\"],\n72             capture_output=True,\n73             cwd=cwd,\n74             timeout=10,\n75         )\n76         if r.returncode == 0:\n",
+      "col_offset": 12,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 70,
+      "line_range": [
+        70,
+        71,
+        72,
+        73,
+        74,
+        75
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "69         subprocess.run([\"git\", \"add\", \"-A\"], capture_output=True, cwd=cwd, timeout=15)\n70         r = subprocess.run(\n71             [\"git\", \"diff\", \"--cached\", \"--quiet\"],\n72             capture_output=True,\n73             cwd=cwd,\n74             timeout=10,\n75         )\n76         if r.returncode == 0:\n",
+      "col_offset": 12,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 70,
+      "line_range": [
+        70,
+        71,
+        72,
+        73,
+        74,
+        75
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "78         msg = f\"infinite-loop iter #{iteration}: {summary[:80]}\"\n79         subprocess.run(\n80             [\"git\", \"commit\", \"-m\", msg],\n81             capture_output=True,\n82             cwd=cwd,\n83             timeout=30,\n84         )\n85         r2 = subprocess.run(\n",
+      "col_offset": 8,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 79,
+      "line_range": [
+        79,
+        80,
+        81,
+        82,
+        83,
+        84
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "78         msg = f\"infinite-loop iter #{iteration}: {summary[:80]}\"\n79         subprocess.run(\n80             [\"git\", \"commit\", \"-m\", msg],\n81             capture_output=True,\n82             cwd=cwd,\n83             timeout=30,\n84         )\n85         r2 = subprocess.run(\n",
+      "col_offset": 8,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 79,
+      "line_range": [
+        79,
+        80,
+        81,
+        82,
+        83,
+        84
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "84         )\n85         r2 = subprocess.run(\n86             [\"git\", \"rev-parse\", \"--short\", \"HEAD\"],\n87             capture_output=True,\n88             text=True,\n89             cwd=cwd,\n90             timeout=5,\n91         )\n92         return r2.stdout.strip() if r2.returncode == 0 else None\n",
+      "col_offset": 13,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 85,
+      "line_range": [
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "84         )\n85         r2 = subprocess.run(\n86             [\"git\", \"rev-parse\", \"--short\", \"HEAD\"],\n87             capture_output=True,\n88             text=True,\n89             cwd=cwd,\n90             timeout=5,\n91         )\n92         return r2.stdout.strip() if r2.returncode == 0 else None\n",
+      "col_offset": 13,
+      "end_col_offset": 9,
+      "filename": "pi_loop/git_utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 85,
+      "line_range": [
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "6 import os\n7 import subprocess\n8 import threading\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "pi_loop/heartbeat.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 7,
+      "line_range": [
+        7
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "10 import shutil\n11 import subprocess\n12 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "pi_loop/help_topics.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 11,
+      "line_range": [
+        11
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "322         try:\n323             r = subprocess.run([pi_bin, \"--version\"], capture_output=True, text=True, timeout=10)\n324             pi_ver = (r.stdout or \"\").strip()[:80]\n",
+      "col_offset": 16,
+      "end_col_offset": 97,
+      "filename": "pi_loop/help_topics.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 323,
+      "line_range": [
+        323
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "344         try:\n345             r = subprocess.run([git_bin, \"--version\"], capture_output=True, text=True, timeout=5)\n346             print(f\"  {c.value('git:'):10s} {c.tag_ok()} {(r.stdout or '').strip()[:60]}\")\n",
+      "col_offset": 16,
+      "end_col_offset": 97,
+      "filename": "pi_loop/help_topics.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 345,
+      "line_range": [
+        345
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "14 import os\n15 import subprocess\n16 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "pi_loop/loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 15,
+      "line_range": [
+        15
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "94         try:\n95             proc = subprocess.Popen(\n96                 cmd,\n97                 stdout=subprocess.PIPE,\n98                 stderr=subprocess.PIPE,\n99                 text=True,\n100                 cwd=workdir or os.getcwd(),\n101             )\n102 \n",
+      "col_offset": 19,
+      "end_col_offset": 13,
+      "filename": "pi_loop/loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 95,
+      "line_range": [
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "685             try:\n686                 subprocess.run(\n687                     [\n688                         \"notify-send\",\n689                         \"pi-loop\",\n690                         combined_summary[:100] or f\"Iteration {iteration_count}\",\n691                     ],\n692                     timeout=5,\n693                 )\n694             except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:\n",
+      "col_offset": 16,
+      "end_col_offset": 17,
+      "filename": "pi_loop/loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 686,
+      "line_range": [
+        686,
+        687,
+        688,
+        689,
+        690,
+        691,
+        692,
+        693
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "685             try:\n686                 subprocess.run(\n687                     [\n688                         \"notify-send\",\n689                         \"pi-loop\",\n690                         combined_summary[:100] or f\"Iteration {iteration_count}\",\n691                     ],\n692                     timeout=5,\n693                 )\n694             except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:\n",
+      "col_offset": 16,
+      "end_col_offset": 17,
+      "filename": "pi_loop/loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 686,
+      "line_range": [
+        686,
+        687,
+        688,
+        689,
+        690,
+        691,
+        692,
+        693
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "714                     req.add_header(\"Authorization\", http_callback_secret)\n715                 urllib.request.urlopen(req, timeout=10)\n716             except (ImportError, OSError, ValueError, json.JSONDecodeError) as e:\n",
+      "col_offset": 16,
+      "end_col_offset": 55,
+      "filename": "pi_loop/loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 22,
+        "link": "https://cwe.mitre.org/data/definitions/22.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.",
+      "line_number": 715,
+      "line_range": [
+        715
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b310-urllib-urlopen",
+      "test_id": "B310",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "721             try:\n722                 subprocess.run(on_error_cmd, shell=True, timeout=30)\n723             except (OSError, subprocess.TimeoutExpired) as e:\n",
+      "col_offset": 16,
+      "end_col_offset": 68,
+      "filename": "pi_loop/loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 722,
+      "line_range": [
+        722
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "72     \"INFINITE_LOOP_SHUTDOWN_SENTINEL\": {\n73         \"default\": \"/tmp/infinite-loop-stop\",\n74         \"type\": \"string\",\n75         \"group\": \"iteration\",\n76         \"label\": \"Shutdown Sentinel\",\n77         \"description\": \"Path to sentinel file for external stop control.\",\n78     },\n79     # \u2500\u2500 Git Integration \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n80     \"INFINITE_LOOP_GIT\": {\n",
+      "col_offset": 19,
+      "end_col_offset": 44,
+      "filename": "web_app/config_manager.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 377,
+        "link": "https://cwe.mitre.org/data/definitions/377.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Probable insecure usage of temp file/directory.",
+      "line_number": 73,
+      "line_range": [
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b108_hardcoded_tmp_directory.html",
+      "test_id": "B108",
+      "test_name": "hardcoded_tmp_directory"
+    }
+  ]
+}

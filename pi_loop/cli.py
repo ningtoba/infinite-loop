@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import signal
 import sys
 
 from . import parser as _parser_mod
@@ -27,7 +28,7 @@ from .help_topics import (
     _run_doctor,
     _run_healthcheck,
 )
-from .loop import run_loop
+from .loop import _request_shutdown, run_loop
 from .preflight import PreflightChecker
 from .state import load_or_create_ledger
 from .validation import load_json_schema
@@ -195,15 +196,23 @@ def main() -> None:
         config_path = os.path.expanduser(args.save_config)
         config_dict = {key: val for key, val in vars(args).items() if val not in (None, "") and not key.startswith("_")}
         config_dict["version"] = VERSION
-        os.makedirs(os.path.dirname(config_path) or ".", exist_ok=True)
-        with open(config_path, "w") as f:
-            json.dump(config_dict, f, indent=2)
-        _log(f"[CONFIG] Saved configuration to {config_path}")
+        try:
+            os.makedirs(os.path.dirname(config_path) or ".", exist_ok=True)
+            with open(config_path, "w") as f:
+                json.dump(config_dict, f, indent=2)
+            _log(f"[CONFIG] Saved configuration to {config_path}")
+        except OSError as e:
+            _log(f"[CONFIG] ERROR: Could not save config to {config_path}: {e}")
+            sys.exit(1)
         sys.exit(0)
 
     if args.run:
         if args.log_file:
             _init_daemon_log(args.log_file, args.log_max_mb)
+
+        # Register signal handlers for graceful shutdown
+        signal.signal(signal.SIGINT, lambda _sig, _frame: _request_shutdown())
+        signal.signal(signal.SIGTERM, lambda _sig, _frame: _request_shutdown())
 
         _log(f"  {colorizer.ok('Starting loop...')}")
         _log(
@@ -211,6 +220,7 @@ def main() -> None:
         )
         _log("")
         cfg = LoopConfig.from_args(args)
+        cfg.sentinel_path = args.shutdown_sentinel
         cfg.context = resolved_context
         cfg.workdir = args.workdir or None
         cfg.notify_cmd = args.notify_cmd or None
@@ -218,7 +228,12 @@ def main() -> None:
         cfg.auto_toolsets = not args.no_auto_toolsets
         cfg.failure_learning = not args.no_failure_learning
         cfg.html_dashboard = args.status_html
-        cfg.output_schema = (json.loads(args.output_schema) if args.output_schema else None) or (
+        try:
+            parsed_schema = json.loads(args.output_schema) if args.output_schema else None
+        except json.JSONDecodeError as e:
+            _log(f"[WARN] Invalid --output-schema JSON: {e}. Ignoring.")
+            parsed_schema = None
+        cfg.output_schema = parsed_schema or (
             load_json_schema(args.output_schema_file) if args.output_schema_file else None
         )
         cfg.checkpoints = False

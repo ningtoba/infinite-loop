@@ -422,11 +422,7 @@ class LoopConfig:
         raw: dict[str, Any] = {name: getattr(args, name, None) for name in known}
         # Strip out attributes set to None that have a non-None default
         for f in cls.__dataclass_fields__.values():
-            if (
-                raw.get(f.name) is None
-                and f.default is not None
-                and not isinstance(f.default, dataclasses._MISSING_TYPE)
-            ):  # type: ignore[attr-defined]
+            if raw.get(f.name) is None and f.default is not None and f.default is not dataclasses.MISSING:
                 raw[f.name] = f.default
         return cls(**raw)
 

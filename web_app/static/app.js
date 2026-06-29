@@ -402,13 +402,13 @@ function updateRecentIterations(data) {
 			if (wt && (wt.merged > 0 || wt.failed > 0)) {
 				let wtLabel = `wt:${wt.merged}✓ ${wt.failed}✗`;
 				if (wt.conflicts > 0) wtLabel += ` ${wt.conflicts}⚡`;
-				wtHtml = `<span class="tag tag-wt" title="${wtTitle}">${wtLabel}</span>`;
+				wtHtml = `<span class="tag tag-wt" title="${escapeHtml(wtTitle)}">${wtLabel}</span>`;
 			}
 			const rowHtml = `<tr class="${cls}">
         <td>${latest.n}</td><td><span class="tag tag-info">${escapeHtml(latest.task_type || "")}</span></td>
         <td>${latest.duration_seconds || 0}s</td>
         <td class="summary-col" title="${escapeHtml(latest.summary || "")}">${escapeHtml((latest.summary || "").substring(0, 80))}</td>
-        <td><span class="tag ${tagCls}">${latest.error ? "ERR" : latest.classification || "OK"}</span></td>
+        <td><span class="tag ${tagCls}">${latest.error ? "ERR" : escapeHtml(latest.classification || "OK")}</span></td>
         <td style="font-size:0.78rem">${wtHtml}</td>
       </tr>`;
 			// Prepend to tbody (insert after any existing header-like content, if any)
@@ -471,7 +471,7 @@ function _appendIterationRows(tbody, iters, seenNs) {
 		if (wt && (wt.merged > 0 || wt.failed > 0)) {
 			let wtLabel = `wt:${wt.merged}✓ ${wt.failed}✗`;
 			if (wt.conflicts > 0) wtLabel += ` ${wt.conflicts}⚡`;
-			wtHtml = `<span class="tag tag-wt" title="${wtTitle}">${wtLabel}</span>`;
+			wtHtml = `<span class="tag tag-wt" title="${escapeHtml(wtTitle)}">${wtLabel}</span>`;
 		}
 		const temp = document.createElement("tbody");
 		temp.insertAdjacentHTML(
@@ -480,7 +480,7 @@ function _appendIterationRows(tbody, iters, seenNs) {
       <td>${it.n}</td><td><span class="tag tag-info">${escapeHtml(it.task_type || "")}</span></td>
       <td>${it.duration_seconds || 0}s</td>
       <td class="summary-col" title="${escapeHtml(it.summary || "")}">${escapeHtml((it.summary || "").substring(0, 80))}</td>
-      <td><span class="tag ${tagCls}">${it.error ? "ERR" : it.classification || "OK"}</span></td>
+      <td><span class="tag ${tagCls}">${it.error ? "ERR" : escapeHtml(it.classification || "OK")}</span></td>
       <td style="font-size:0.78rem">${wtHtml}</td>
     </tr>`,
 		);
@@ -522,8 +522,8 @@ function updateLiveIteration(live) {
 				const dur = w.duration_seconds
 					? w.duration_seconds.toFixed(0) + "s"
 					: "...";
-				return `<div class="worker-card ${cls}" onclick="filterWorkerLogs('${w.id}')" title="Click to filter logs by Worker #${w.id}">
-      <div class="wid">Worker #${w.id}</div>
+				return `<div class="worker-card ${cls}" data-wid="${escapeHtml(w.id)}" onclick="filterWorkerLogs('${escapeHtml(w.id)}')" title="Click to filter logs by Worker #${escapeHtml(w.id)}">
+      <div class="wid">Worker #${escapeHtml(w.id)}</div>
       <div class="wstatus">${label}</div>
       <div class="wdur">${dur}</div>
     </div>`;
@@ -595,7 +595,7 @@ function filterWorkerLogs(wid) {
 		.forEach((c) => (c.style.outline = ""));
 	if (workerLogFilter) {
 		const card = document.querySelector(
-			`.worker-card[onclick*="${workerLogFilter}"]`,
+			`.worker-card[data-wid="${escapeHtml(workerLogFilter)}"]`,
 		);
 		if (card) card.style.outline = "2px solid var(--accent)";
 	}
@@ -696,7 +696,7 @@ function renderConfigGroups() {
 		configGroups
 			.map(
 				(g, i) =>
-					`<button class="config-group-btn${i === 0 ? " active" : ""}" data-group="${g.id}">${escapeHtml(g.name)}</button>`,
+					`<button class="config-group-btn${i === 0 ? " active" : ""}" data-group="${escapeHtml(g.id)}">${escapeHtml(g.name)}</button>`,
 			)
 			.join(""),
 	);
@@ -760,16 +760,16 @@ function renderConfigPanel(groupId) {
 				const desc = meta.description || "";
 				let input;
 				if (meta.type === "bool")
-					input = `<select name="${key}" id="cfg-${key}"><option value="false"${v === "false" ? " selected" : ""}>false</option><option value="true"${v === "true" ? " selected" : ""}>true</option></select>`;
+					input = `<select name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}"><option value="false"${v === "false" ? " selected" : ""}>false</option><option value="true"${v === "true" ? " selected" : ""}>true</option></select>`;
 				else if (meta.type === "select" && meta.options)
-					input = `<select name="${key}" id="cfg-${key}">${meta.options.map((o) => `<option value="${o}"${v === o ? " selected" : ""}>${o}</option>`).join("")}</select>`;
+					input = `<select name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}">${meta.options.map((o) => `<option value="${escapeHtml(o)}"${v === o ? " selected" : ""}>${escapeHtml(o)}</option>`).join("")}</select>`;
 				else if (meta.multiline)
-					input = `<textarea name="${key}" id="cfg-${key}" rows="3">${escapeHtml(v)}</textarea>`;
+					input = `<textarea name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}" rows="3">${escapeHtml(v)}</textarea>`;
 				else if (meta.type === "int" || meta.type === "float")
-					input = `<input type="number" name="${key}" id="cfg-${key}" value="${escapeHtml(v)}" step="${meta.type === "float" ? "0.1" : "1"}">`;
+					input = `<input type="number" name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}" value="${escapeHtml(v)}" step="${meta.type === "float" ? "0.1" : "1"}">`;
 				else
-					input = `<input type="text" name="${key}" id="cfg-${key}" value="${escapeHtml(v)}">`;
-				return `<div class="config-field"><label for="cfg-${key}">${meta.label || key}${req}</label><div class="field-desc">${desc}</div>${input}</div>`;
+					input = `<input type="text" name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}" value="${escapeHtml(v)}">`;
+				return `<div class="config-field"><label for="cfg-${escapeHtml(key)}">${escapeHtml(meta.label || key)}${req}</label><div class="field-desc">${desc}</div>${input}</div>`;
 			})
 			.join(""),
 	);
@@ -832,9 +832,9 @@ async function loadIterations(page = 0) {
 					const wtTitle = wt ? _wtTooltip(wt) : "";
 					const wtHtml =
 						wt && (wt.merged > 0 || wt.failed > 0)
-							? `<span class="tag tag-wt" title="${wtTitle}">wt:${wt.merged}✓ ${wt.failed}✗${wt.conflicts > 0 ? " " + wt.conflicts + "⚡" : ""}</span>`
+							? `<span class="tag tag-wt" title="${escapeHtml(wtTitle)}">wt:${wt.merged}✓ ${wt.failed}✗${wt.conflicts > 0 ? " " + wt.conflicts + "⚡" : ""}</span>`
 							: "";
-					return `<tr class="${cls}"><td>${it.n}</td><td style="white-space:nowrap;font-size:0.78rem;color:var(--fg-muted)">${formatTs(it.started_at)}</td><td>${it.duration_seconds || 0}s</td><td><span class="tag tag-info">${escapeHtml(it.task_type || "")}</span></td><td><span class="tag ${tagCls}">${it.error ? "ERR" : it.classification || "OK"}</span></td><td class="summary-col" title="${escapeHtml(it.summary || "")}">${escapeHtml((it.summary || "").substring(0, 100))}</td><td style="color:var(--danger);font-size:0.78rem">${it.error ? escapeHtml(String(it.error).substring(0, 60)) : ""}</td><td style="font-size:0.78rem">${wtHtml}</td></tr>`;
+					return `<tr class="${cls}"><td>${it.n}</td><td style="white-space:nowrap;font-size:0.78rem;color:var(--fg-muted)">${formatTs(it.started_at)}</td><td>${it.duration_seconds || 0}s</td><td><span class="tag tag-info">${escapeHtml(it.task_type || "")}</span></td><td><span class="tag ${tagCls}">${it.error ? "ERR" : escapeHtml(it.classification || "OK")}</span></td><td class="summary-col" title="${escapeHtml(it.summary || "")}">${escapeHtml((it.summary || "").substring(0, 100))}</td><td style="color:var(--danger);font-size:0.78rem">${it.error ? escapeHtml(String(it.error).substring(0, 60)) : ""}</td><td style="font-size:0.78rem">${wtHtml}</td></tr>`;
 				})
 				.join(""),
 		);
@@ -961,8 +961,8 @@ function renderWorkers(data) {
 						: w.status === "error"
 							? "Error"
 							: "Running";
-				return `<div class="worker-card-item ${cls}" onclick="showWorkerLog('${w.id}')">
-      <div class="wc-wid">Worker #${w.id}</div>
+				return `<div class="worker-card-item ${cls}" onclick="showWorkerLog('${escapeHtml(w.id)}')">
+      <div class="wc-wid">Worker #${escapeHtml(w.id)}</div>
       <div class="wc-status">${label}</div>
       <div class="wc-dur">${dur}</div>
       <div class="wc-lines">${termLines.length} lines</div>
@@ -1040,7 +1040,8 @@ function escapeHtml(s) {
 	if (!s) return "";
 	const d = document.createElement("div");
 	d.textContent = String(s);
-	return d.innerHTML; /* no-inner-html: reading SVG text content */
+	return d.innerHTML /* no-inner-html: reading SVG text content */
+		.replace(/'/g, "&#39;");
 }
 function updateConnectionStatus(ok) {
 	document.querySelector("#connection-indicator .conn-dot").className =

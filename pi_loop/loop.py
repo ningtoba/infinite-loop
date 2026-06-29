@@ -724,7 +724,7 @@ def run_loop(
                 _log(f"[ERROR-CMD] Failed: {e}")
 
         # Cooldown
-        _handle_cooldown(cooldown, cooldown_mode, None, "generic")
+        _handle_cooldown(cooldown, cooldown_mode, None, "generic", shutdown_event=_shutdown_requested)
 
         # Error recovery adaptation
         if primary_error_type:

@@ -192,7 +192,7 @@ class TestBuildCliArgs:
             "INFINITE_LOOP_PREFLIGHT_FAIL_FAST",
             "INFINITE_LOOP_DRY_RUN",
         ]
-        config = _mock_stored({k: "true" for k in bool_keys})
+        config = _mock_stored(dict.fromkeys(bool_keys, "true"))
         args = build_cli_args(config)
         expected_flags = {
             "--git",

@@ -424,6 +424,7 @@ def _get_cpu_percent():
             _last_cpu_total = total
             _last_cpu_idle = idle
             _last_cpu_time = now
+            return None
         return 0.0
     except (OSError, ValueError):
         return 0.0
@@ -474,8 +475,12 @@ def _get_disk_info():
 @app.get("/api/system")
 async def system_resources():
     """Get system resource usage."""
+    cpu_percent = _get_cpu_percent()
+    # On first call, no delta is available yet; fall back to 0.0 for the API response
+    if cpu_percent is None:
+        cpu_percent = 0.0
     return {
-        "cpu_percent": _get_cpu_percent(),
+        "cpu_percent": cpu_percent,
         "memory": _get_memory_info(),
         "disk": _get_disk_info(),
     }

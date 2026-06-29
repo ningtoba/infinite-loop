@@ -1,60 +1,10 @@
-# Dependabot configuration — automated dependency updates
-# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
-
 version: 2
 updates:
-  # pip / PyPI dependencies (pyproject.toml)
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "09:00"
-      timezone: "UTC"
     open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-      - "automated"
-    commit-message:
-      prefix: "chore"
-      prefix-development: "chore"
-      include: "scope"
-    # Group patch and minor updates into single PRs to reduce noise
-    groups:
-      dev-dependencies:
-        patterns:
-          - "pytest*"
-          - "ruff"
-          - "mypy"
-        update-types:
-          - "minor"
-          - "patch"
-      runtime-dependencies:
-        patterns:
-          - "fastapi"
-          - "uvicorn"
-        update-types:
-          - "minor"
-          - "patch"
-    ignore:
-      # Major version updates need manual review
-      - dependency-name: "fastapi"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "uvicorn"
-        update-types: ["version-update:semver-major"]
-
-  # GitHub Actions (self)
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "ci"
-    commit-message:
-      prefix: "ci"
-      include: "scope"
+    allow:
+      - dependency-type: "direct"

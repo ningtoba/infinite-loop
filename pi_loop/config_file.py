@@ -1,3 +1,4 @@
+import contextlib
 import json
 import logging
 import os
@@ -42,15 +43,46 @@ def load_config():
         with open(CONFIG_PATH) as f:
             return {**DEFAULTS, **json.load(f)}
     except (json.JSONDecodeError, OSError):
+        # Try backup
+        backup = CONFIG_PATH.with_suffix(CONFIG_PATH.suffix + ".bak")
+        if backup.exists():
+            logger.warning("Config corrupted at %s, restoring backup from %s", CONFIG_PATH, backup)
+            try:
+                with open(backup) as f:
+                    data = json.load(f)
+                # Attempt to write the restored data back atomically
+                _atomic_write(CONFIG_PATH, data)
+                return {**DEFAULTS, **data}
+            except (json.JSONDecodeError, OSError):
+                logger.warning("Backup config also corrupted at %s", backup)
         return dict(DEFAULTS)
+
+
+def _atomic_write(path, data):
+    """Write JSON data atomically: .tmp -> os.replace()."""
+    tmp_path = str(path) + ".tmp"
+    try:
+        with open(tmp_path, "w") as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except OSError:
+        # Clean up temp file on failure
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_path)
+        raise
 
 
 def save_config(config):
     ensure_config_dir()
     merged = {**DEFAULTS, **config}
     try:
-        with open(CONFIG_PATH, "w") as f:
-            json.dump(merged, f, indent=2)
+        # Keep previous good version as backup before overwriting
+        if CONFIG_PATH.exists():
+            backup = str(CONFIG_PATH) + ".bak"
+            os.replace(str(CONFIG_PATH), backup)
+        _atomic_write(CONFIG_PATH, merged)
     except OSError as e:
         logger.warning("Failed to write config to %s: %s", CONFIG_PATH, e)
     return merged

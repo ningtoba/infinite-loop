@@ -4,11 +4,11 @@ The web UI is the sole source of truth. Config is persisted via
 pi_loop.config_file (no .env file needed).
 """
 
-import json
 import logging
 from typing import Any
 
-from pi_loop.config_file import CONFIG_PATH, load_config
+from pi_loop.config import SENTINEL_PATH_DEFAULT
+from pi_loop.config_file import load_config
 from pi_loop.config_file import save_config as _save_config
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ CONFIG_DEFAULTS: dict[str, dict[str, Any]] = {
         "description": "Max chars of pi output to store in ledger.",
     },
     "INFINITE_LOOP_SHUTDOWN_SENTINEL": {
-        "default": "/tmp/infinite-loop-stop",
+        "default": SENTINEL_PATH_DEFAULT,
         "type": "string",
         "group": "iteration",
         "label": "Shutdown Sentinel",
@@ -252,13 +252,8 @@ def _read_stored() -> dict[str, str]:
     """Read stored config via pi_loop.config_file.load_config()."""
     try:
         stored = load_config()
-    except (json.JSONDecodeError, OSError) as exc:
+    except Exception as exc:
         logger.error("Failed to read config file: %s; using defaults", exc)
-        # Rename corrupt file so it doesn't keep failing
-        if CONFIG_PATH.exists():
-            backup = CONFIG_PATH.with_suffix(".json.corrupt")
-            CONFIG_PATH.rename(backup)
-            logger.info("Renamed corrupt config to %s", backup)
         stored = {}
 
     config: dict[str, str] = {}

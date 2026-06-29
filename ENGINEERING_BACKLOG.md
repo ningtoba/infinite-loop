@@ -10,12 +10,12 @@
 | Severity | Count |
 |----------|-------|
 | 🔴 **P0 — Critical** | 1 |
-| 🟠 **P1 — High** | 8 |
+| 🟠 **P1 — High** | 6 |
 | 🟡 **P2 — Medium** | 17 |
 | 🔵 **P3 — Low** | 10 |
 | ⚪ **P4 — Wishlist** | 3 |
 | ✅ **Completed** | 28 |
-| **Total Active** | **39** |
+| **Total Active** | **37** |
 
 | Category | Count |
 |----------|-------|
@@ -28,7 +28,7 @@
 | Documentation | 2 |
 | CI/CD | 2 |
 | Developer Experience | 3 |
-| Dependencies | 4 |
+| Dependencies | 2 |
 | Code Cleanup | 8 |
 | Feature | 3 |
 | Observability | 2 |
@@ -198,16 +198,14 @@
 | **Impact** | Two CI runs at different times can produce different dependency trees. No pinned hashes for supply-chain verification. Reproducibility is impossible. |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
-**Reasoning:** There is no `requirements.txt`, `Pipfile.lock`, or `poetry.lock`. CI uses `pip install -e ".[test,dev]"` with `cache: pip`, but every install pulls the latest compatible versions within the declared ranges. This means different CI runs (or developer installs at different times) get different transitive dependency versions.
-
-**Research notes:** Recommended approaches: (1) Generate `requirements.txt` with `pip freeze > requirements.txt`, commit it, and use `pip install -r requirements.txt` in CI. (2) Switch to `pip-tools` with `requirements.in`/`requirements-dev.in` compiling to locked `.txt` files. (3) Use `uv` for faster lock + sync. Simplest path: generate a lock file and add a CI step that verifies it's up to date.
+**Fix applied:** Generated `requirements.txt` (52 deps) and `requirements-dev.txt` (89 deps) via pip-compile. `verify-lock` Makefile target and CI step ensure lock files stay fresh. CI installs from locked files.
 
 **Affected files:**
 
-- `pyproject.toml`
-- New `requirements.txt` or equivalent lock file
+- `requirements.txt`, `requirements-dev.txt` (new)
+- `.github/workflows/ci.yml`, `Makefile`
 
 ### DEPS-002 — chromadb CRITICAL CVE in shared venv
 
@@ -216,19 +214,17 @@
 | **Title** | chromadb CRITICAL CVE (CVE-2026-45829) present in shared virtual environment |
 | **Category** | Dependencies |
 | **Priority** | 🟠 P1 — High |
-| **Impact** | Pre-authentication code injection vulnerability. An unauthenticated attacker can execute arbitrary code via `/api/v2/tenants/{tenant}/databases/{db}/collections` endpoint. No fix available for any version ≥1.0.0. |
+| **Impact** | Pre-authentication code injection vulnerability. Eliminated by venv rebuild. |
 | **Effort** | Small |
-| **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Dependencies** | DEPS-001 |
+| **Status** | ✅ Done |
 
-**Reasoning:** `chromadb` 1.5.9 is installed in the project's `.venv` (apparently from another project sharing the same venv). It has CVE-2026-45829 rated CRITICAL with no patched version available. While `chromadb` is NOT a declared dependency of this project and is not imported anywhere, its presence in the shared venv is a security risk — especially if the project is ever deployed.
-
-**Research notes:** Fix: (1) Rebuild the virtual environment from scratch with `pip install -e ".[test,dev]"` only — this will exclude chromadb and 130+ other unused packages. (2) Consider using a project-specific venv or `uv venv` for isolation. (3) Add a CI check that `pip list` doesn't contain unexpected packages.
+**Fix applied:** Rebuilt `.venv` from scratch: 201 packages → 35 pure project deps. Removed chromadb 1.5.9 (CVE-2026-45829), torch 2.12.1, transformers 5.12.1, gradio, opencv, scikit-learn, and 125+ other packages. Added httpx2 test dependency for FastAPI TestClient compatibility.
 
 **Affected files:**
 
 - `.venv/` (rebuild)
-- `Makefile` (add `venv-clean` target)
+- `pyproject.toml` (added httpx2 to test deps)
 
 ### TEST-002 — 34% of functions lack complete type hints
 
@@ -871,19 +867,14 @@ Only `_MAX_VALIDATION_DEPTH = 50` in `validation.py:10` is properly named.
 | **Title** | Virtual environment has 133 unused packages from other projects |
 | **Category** | Dependencies |
 | **Priority** | 🔵 P3 — Low |
-| **Impact** | Bloated venv (torch, transformers, chromadb, gradio, etc.) wastes disk space and increases attack surface. chromadb has a CRITICAL CVE. |
-| **Effort** | Small |
-| **Dependencies** | DEPS-002 |
-| **Status** | ⏳ Pending |
+| **Dependency** | DEPS-002 |
+| **Status** | ✅ Superseded by DEPS-002 |
 
-**Reasoning:** The `.venv` contains 201 packages total, but only ~67 are project dependencies or their transitive deps. The remaining ~133 packages (torch 2.12.1, transformers 5.12.1, chromadb 1.5.9, gradio, scikit-learn, pandas, numpy, opencv, etc.) are from other projects sharing the same workspace. This wastes ~3-5GB of disk and introduces the chromadb CVE.
-
-**Research notes:** Fix: Rebuild the venv from scratch: `rm -rf .venv && python -m venv .venv && source .venv/bin/activate && pip install -e ".[test,dev]"`. Consider using `uv venv` for faster venv creation and `uv pip install` for faster installs.
+**Fix applied:** Rebuilt venv from scratch as part of DEPS-002. 201 packages → 35.
 
 **Affected files:**
 
 - `.venv/` (rebuild)
-- `Makefile` (add `venv-clean` target)
 
 ### CLEANUP-008 — Hardcoded `[TERM (worker #1)]` prefix in HTML dashboard
 
@@ -1051,7 +1042,7 @@ The **pi-loop** (hermes-loop) repository is a well-structured, actively maintain
 | `tests/` | — | 1 | 2 | — | 3 |
 | `Makefile` | — | 1 | — | 1 | 2 |
 | `.github/workflows/ci.yml` | — | 1 | 2 | — | 3 |
-| `pyproject.toml` | — | 1 | — | 1 | 2 |
+| `pyproject.toml` | — | 0 | — | 1 | 1 |
 
 ### Key Metrics
 
@@ -1061,7 +1052,7 @@ The **pi-loop** (hermes-loop) repository is a well-structured, actively maintain
 | **Test count** | 404 (all passing, 0.53s) |
 | **Test coverage** | 83% file coverage (19/23 modules) |
 | **Active backlog items** | 40 |
-| **Completed this iteration** | 29 |
+| **Completed this iteration** | 31 |
 | **Functions with >100 lines** | 12 |
 | **Longest function** | `run_loop()` — 435 lines, 71 parameters |
 | **Total commits** | 191 (all by `ningtoba`) |

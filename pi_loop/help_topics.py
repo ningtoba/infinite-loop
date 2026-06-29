@@ -39,7 +39,7 @@ def _introspection_flags() -> dict[str, str]:
 def _list_flags(show_help: bool = True, parser=None) -> None:
     """Print all CLI flags organized by group. Used by --list-flags / --list-groups."""
     if parser is None:
-        from .cli import _create_parser
+        from .parser import _create_parser
 
         parser = _create_parser(for_introspection=True)
 
@@ -371,7 +371,7 @@ def _run_doctor() -> None:
 def _explain_flag(flag_name: str, parser=None) -> None:
     """Show detailed help for a single CLI flag."""
     if parser is None:
-        from .cli import _create_parser
+        from .parser import _create_parser
 
         parser = _create_parser(for_introspection=True)
 
@@ -407,7 +407,7 @@ def _explain_flag(flag_name: str, parser=None) -> None:
 def _help_topic(topic: str, parser=None) -> None:
     """Show all flags in a single argument group."""
     if parser is None:
-        from .cli import _create_parser
+        from .parser import _create_parser
 
         parser = _create_parser(for_introspection=True)
 

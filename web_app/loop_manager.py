@@ -385,10 +385,91 @@ class LoopManager:
                 self._add_log("error", f"Stream reader crashed ({name}): {e}")
                 break
 
+    def _handle_event(self, event: dict, ts: str) -> None:
+        """Handle a structured ``[EVENT]`` NDJSON line.
+
+        This is the fast path — the event dict has already been parsed
+        from JSON, so no regex is needed.  Falls back to the regex
+        parser when the event type is unknown.
+        """
+        event_type = event.get("type", "")
+
+        if event_type == "spawn":
+            wid = str(event.get("worker_id", ""))
+            if wid:
+                self._worker_states[wid] = {
+                    "id": wid,
+                    "status": "running",
+                    "started_at": ts,
+                }
+                if wid not in self._worker_logs:
+                    self._worker_logs[wid] = []
+
+        elif event_type == "worker_response":
+            wid = str(event.get("worker_id", ""))
+            if wid:
+                self._worker_states[wid] = {
+                    "id": wid,
+                    "status": event.get("status", "ok"),
+                    "duration_seconds": event.get("duration"),
+                    "completed_at": ts,
+                }
+
+        elif event_type == "term":
+            wid = str(event.get("worker_id", ""))
+            line = event.get("line", "")
+            if wid:
+                if wid not in self._worker_term:
+                    self._worker_term[wid] = []
+                self._worker_term[wid].append(line)
+                if len(self._worker_term[wid]) > 2000:
+                    self._worker_term[wid] = self._worker_term[wid][-2000:]
+
+        elif event_type == "iteration_start":
+            it_num = event.get("n", 0)
+            if self._live_iteration.get("n") != it_num:
+                self._live_iteration = {
+                    "n": it_num,
+                    "workers": [],
+                    "started_at": ts,
+                }
+                self._worker_states = {}
+                self._worker_logs = {}
+
+        elif event_type == "iteration_complete":
+            self._live_iteration["duration_seconds"] = event.get("duration_seconds")
+            if event.get("has_error"):
+                self._live_iteration["error_type"] = event.get("error_type")
+
+        elif event_type == "heartbeat":
+            self._live_iteration["elapsed_seconds"] = event.get("elapsed_seconds")
+
+        elif event_type == "error_type":
+            self._live_iteration["error_type"] = event.get("error_type")
+
+        elif event_type == "shutdown":
+            self._live_iteration["stop_reason"] = event.get("reason", "")
+
     def _parse_daemon_line(self, text: str) -> None:
-        """Parse daemon stdout for live iteration/worker progress and per-worker logs."""
+        """Parse daemon stdout for live iteration/worker progress and per-worker logs.
+
+        Fast path: if the line starts with ``[EVENT]``, parse the JSON and
+        call ``_handle_event()`` directly without any regex.
+        Slow (but compatible) path: strip ANSI codes and apply the existing
+        regex patterns.
+        """
         ts = datetime.now(timezone.utc).isoformat()
 
+        # ── Fast path: structured [EVENT] JSON ──
+        if text.startswith("[EVENT] "):
+            try:
+                event_data = json.loads(text[len("[EVENT] ") :])
+                self._handle_event(event_data, ts)
+                return
+            except (json.JSONDecodeError, TypeError):
+                pass  # Malformed — fall through to regex
+
+        # ── Slow (compatible) path: regex ──
         # Iteration start — only match daemon's actual iteration header line.
         # Format: "[HH:MM:SS] Iteration N" where the line starts with a
         # timestamp or is preceded by a separator/blank line context.

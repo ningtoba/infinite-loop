@@ -7,7 +7,8 @@ and integrates with the pi coding agent as a background worker.
 
 from .cli import main
 from .config import VERSION
+from .events import emit_event
 
 __version__ = VERSION
 
-__all__ = ["VERSION", "__version__", "main"]
+__all__ = ["VERSION", "__version__", "main", "emit_event"]

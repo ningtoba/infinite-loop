@@ -299,6 +299,79 @@ class TestLoopManagerParseDaemonLine:
         assert "Building project..." in mgr._worker_term["1"][0]
 
 
+class TestLoopManagerStructuredEvents:
+    """Tests for structured [EVENT] NDJSON parsing (BUG-003 fast path)."""
+
+    def test_parses_structured_spawn_event(self):
+        """_parse_daemon_line handles [EVENT] spawn JSON."""
+        mgr = LoopManager()
+        mgr._parse_daemon_line('[EVENT] {"type": "spawn", "worker_id": 1, "goal": "test"}')
+        assert "1" in mgr._worker_states
+        assert mgr._worker_states["1"]["status"] == "running"
+
+    def test_parses_structured_worker_response(self):
+        """_parse_daemon_line handles [EVENT] worker_response JSON."""
+        mgr = LoopManager()
+        mgr._parse_daemon_line('[EVENT] {"type": "worker_response", "worker_id": 2, "duration": 15.5, "status": "ok"}')
+        assert mgr._worker_states["2"]["status"] == "ok"
+        assert mgr._worker_states["2"]["duration_seconds"] == 15.5
+
+    def test_parses_structured_term(self):
+        """_parse_daemon_line handles [EVENT] term JSON."""
+        mgr = LoopManager()
+        mgr._parse_daemon_line('[EVENT] {"type": "term", "worker_id": 1, "line": "Building project..."}')
+        assert "1" in mgr._worker_term
+        assert "Building project..." in mgr._worker_term["1"][0]
+
+    def test_parses_structured_iteration_start(self):
+        """_parse_daemon_line handles [EVENT] iteration_start JSON."""
+        mgr = LoopManager()
+        mgr._parse_daemon_line('[EVENT] {"type": "iteration_start", "n": 42}')
+        assert mgr._live_iteration.get("n") == 42
+
+    def test_parses_structured_iteration_complete(self):
+        """_parse_daemon_line handles [EVENT] iteration_complete JSON."""
+        mgr = LoopManager()
+        mgr._live_iteration = {"n": 1, "workers": []}
+        mgr._parse_daemon_line(
+            '[EVENT] {"type": "iteration_complete", "n": 1, "duration_seconds": 12.5, "has_error": false}'
+        )
+        assert mgr._live_iteration.get("duration_seconds") == 12.5
+
+    def test_parses_structured_error_type(self):
+        """_parse_daemon_line handles [EVENT] error_type JSON."""
+        mgr = LoopManager()
+        mgr._parse_daemon_line('[EVENT] {"type": "error_type", "error_type": "timeout"}')
+        assert mgr._live_iteration.get("error_type") == "timeout"
+
+    def test_parses_structured_shutdown(self):
+        """_parse_daemon_line handles [EVENT] shutdown JSON."""
+        mgr = LoopManager()
+        mgr._parse_daemon_line('[EVENT] {"type": "shutdown", "reason": "stopped: max_iterations (10)"}')
+        assert mgr._live_iteration.get("stop_reason") == "stopped: max_iterations (10)"
+
+    def test_fallback_to_regex_when_no_event_prefix(self):
+        """Existing regex parsing still works for non-event lines."""
+        mgr = LoopManager()
+        mgr._parse_daemon_line("[SPAWN (worker #1)] pi --mode json -- test goal")
+        assert "1" in mgr._worker_states
+
+    def test_fallback_on_malformed_event_json(self):
+        """Falls back to regex when [EVENT] prefix has invalid JSON."""
+        mgr = LoopManager()
+        # No crash — gracefully falls through to regex path
+        mgr._parse_daemon_line("[EVENT] not-json-at-all")
+        # Should not have set any state from the malformed event
+        assert mgr._live_iteration == {} or mgr._live_iteration.get("workers") == []
+
+    def test_structured_heartbeat(self):
+        """_handle_event can process heartbeat events."""
+        mgr = LoopManager()
+        mgr._live_iteration = {"n": 42, "workers": []}
+        mgr._parse_daemon_line('[EVENT] {"type": "heartbeat", "elapsed_seconds": 30}')
+        assert mgr._live_iteration.get("elapsed_seconds") == 30
+
+
 class TestLoopManagerReadStream:
     @pytest.mark.asyncio
     async def test_reads_lines(self):

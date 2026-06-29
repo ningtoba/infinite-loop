@@ -25,6 +25,7 @@ from .color_utils import colorizer
 from .config import VERSION, LoopConfig, _get_data_dir
 from .error_recovery import _adapt_to_error, _set_originals
 from .error_utils import _suggest_actionable_fix
+from .events import emit_event
 from .file_utils import _log, write_ledger, write_status_file
 from .functions import (
     _build_progressive_context,
@@ -101,6 +102,7 @@ def _execute_task(
         cmd.extend(["--append-system-prompt", context])
 
     print(f"[SPAWN (worker #{worker_id})] pi --mode json -- {goal[:60]}")
+    emit_event("spawn", worker_id=worker_id, goal=goal[:120], cmd=" ".join(cmd))
     sys.stdout.flush()
 
     start_time = time.time()
@@ -112,6 +114,7 @@ def _execute_task(
 
     def _term(line: str) -> None:
         sys.stdout.write(f"[TERM (worker #{worker_id})] {line}\n")
+        emit_event("term", worker_id=worker_id, line=line)
         sys.stdout.flush()
 
     while attempts < max_attempts:
@@ -229,8 +232,14 @@ def _execute_task(
             if proc.stderr:
                 stderr_text = proc.stderr.read()
 
-            print(
-                f"[WORKER (worker #{worker_id})] Response in {duration:.1f}s (status={'ok' if proc.returncode == 0 else 'failed'})"
+            status_str = "ok" if proc.returncode == 0 else "failed"
+            print(f"[WORKER (worker #{worker_id})] Response in {duration:.1f}s (status={status_str})")
+            emit_event(
+                "worker_response",
+                worker_id=worker_id,
+                duration=round(duration, 1),
+                status=status_str,
+                returncode=proc.returncode,
             )
             sys.stdout.flush()
 
@@ -367,6 +376,12 @@ def _shutdown(
         if last_error is not None:
             kwargs["last_error"] = last_error
         _write_status_file(status_file, **kwargs)
+    emit_event(
+        "shutdown",
+        reason=stop_reason,
+        iteration_count=iteration_count,
+        last_error=last_error,
+    )
     _print_shutdown_summary(state, iteration_count, stop_reason, goal=goal, git=git, workers=workers)
 
 
@@ -566,6 +581,11 @@ def run_loop(
 
         iteration_count += 1
         iteration_start_time = datetime.now(timezone.utc).isoformat()
+        emit_event(
+            "iteration_start",
+            n=iteration_count,
+            goal=goal[:200],
+        )
 
         if quiet:
             _log(f"[ITER #{iteration_count}] {goal[:80]}{'...' if len(goal) > 80 else ''}")
@@ -655,6 +675,12 @@ def run_loop(
         from .error_utils import classify_error
 
         primary_error_type = classify_error(combined_error)
+        if primary_error_type:
+            emit_event(
+                "error_type",
+                error_type=primary_error_type,
+                iteration_n=iteration_count,
+            )
 
         # Build record
         record = {
@@ -710,6 +736,13 @@ def run_loop(
 
         status_icon = "✓" if combined_error is None else "✗"
         _log(f"{status_icon} Iteration {iteration_count} ({total_duration}s): {combined_summary[:100]}")
+        emit_event(
+            "iteration_complete",
+            n=iteration_count,
+            duration_seconds=total_duration,
+            has_error=combined_error is not None,
+            error_type=primary_error_type,
+        )
 
         # Suggestion
         suggestion = _suggest_actionable_fix(

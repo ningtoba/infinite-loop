@@ -4,6 +4,10 @@ Simplified task execution loop that spawns subprocess workers and tracks
 progress in a JSON ledger.
 """
 
+# ruff: noqa: ARG001 — many run_loop() params are part of the 71-param
+# signature tracked as TECHDEPT-001; fixing unused args requires the
+# LoopConfig dataclass refactor.
+
 import json
 import os
 import subprocess
@@ -14,7 +18,7 @@ from contextlib import suppress
 from datetime import datetime, timezone
 
 from .color_utils import colorizer
-from .config import DEFAULT_CONVERGENCE_THRESHOLD, DEFAULT_CONVERGENCE_WINDOW, VERSION
+from .config import DEFAULT_CONVERGENCE_THRESHOLD, DEFAULT_CONVERGENCE_WINDOW, VERSION, _get_data_dir
 from .error_recovery import _adapt_to_error, _set_originals
 from .error_utils import _suggest_actionable_fix
 from .file_utils import _log, write_ledger, write_status_file
@@ -258,6 +262,7 @@ def _print_shutdown_summary(
     workers: int = 1,
 ) -> None:
     """Print a comprehensive shutdown summary banner."""
+    data_dir = _get_data_dir()
     iters = state.get("iterations", [])
     total = iteration_count
     total_dur = state.get("stats", {}).get("total_duration_seconds", 0)
@@ -290,7 +295,7 @@ def _print_shutdown_summary(
 
     _log("")
     _log(f"  {c.group_title('Next steps:')}")
-    _log(f"    {c.dim('View ledger:')}     cat /tmp/infinite-loop-state.json | python3 -m json.tool")
+    _log(f"    {c.dim('View ledger:')}     cat {data_dir}/infinite-loop-state.json | python3 -m json.tool")
     _log(f'    {c.dim("Re-run:")}          pi-loop --goal "..." --run')
     _log(f"    {c.dim('Help:')}            pi-loop --help")
     _log(f"{c.header('══════════════════════════════════════════════')}")

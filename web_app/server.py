@@ -455,7 +455,7 @@ async def _status_poller():
             mitigations = str(status.get("mitigations", {}))
             worker_term = status.get("worker_term", {})
             # Hash the last 3 lines of each worker to detect content changes
-            term_content_hash = "".join("".join(v[-3:]) for v in sorted(worker_term.items(), key=lambda x: x[0]))
+            term_content_hash = "".join("".join(lines[-3:]) for _, lines in sorted(worker_term.items()))
             log_count = len(status.get("recent_logs", []))
             latest = status.get("latest_iteration", {}) or {}
             latest_sig = "|".join(

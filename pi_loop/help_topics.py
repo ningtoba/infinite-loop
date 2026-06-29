@@ -13,7 +13,7 @@ import sys
 from datetime import datetime, timezone
 
 from .color_utils import colorizer
-from .config import LEDGER_PATH, VERSION
+from .config import LEDGER_PATH, VERSION, _get_data_dir
 from .file_utils import extract_json_from_output, read_ledger, write_ledger
 
 
@@ -84,6 +84,7 @@ def _list_flags(show_help: bool = True, parser=None) -> None:
 
 def _list_examples() -> None:
     """Print categorized usage examples. Used by --examples flag."""
+    data_dir = _get_data_dir()
     header = f"pi-loop v{VERSION} — Usage Examples"
     print()
     print(f"  {colorizer.colorize(header, 'bold', 'white')}")
@@ -135,20 +136,20 @@ def _list_examples() -> None:
     _cmd('pi-loop --goal "Run tests" --notify-ntfy my-alerts --run')
     print()
     _comment("Real-time HTML dashboard + JSON status file")
-    _cmd('pi-loop --goal "Refactor" --status-html /tmp/dash.html --status-file /tmp/status.json --run')
+    _cmd(f'pi-loop --goal "Refactor" --status-html {data_dir}/dash.html --status-file {data_dir}/status.json --run')
     print()
 
     _section("Monitoring & Control")
     _comment("Follow iteration progress in real-time")
-    _cmd("tail -f /tmp/infinite-loop.log")
+    _cmd(f"tail -f {data_dir}/infinite-loop.log")
     print()
     _comment("Check the full iteration ledger")
-    _cmd("cat /tmp/infinite-loop-state.json | python3 -m json.tool")
+    _cmd(f"cat {data_dir}/infinite-loop-state.json | python3 -m json.tool")
     print()
     _comment("Control a running daemon")
-    _cmd("echo 'stop'    > /tmp/infinite-loop-stop")
-    _cmd("echo 'pause'   > /tmp/infinite-loop-stop")
-    _cmd("echo 'resume'  > /tmp/infinite-loop-stop")
+    _cmd(f"echo 'stop'    > {data_dir}/infinite-loop-stop")
+    _cmd(f"echo 'pause'   > {data_dir}/infinite-loop-stop")
+    _cmd(f"echo 'resume'  > {data_dir}/infinite-loop-stop")
     print()
 
     _section("Advanced Patterns")

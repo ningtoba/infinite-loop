@@ -10,8 +10,10 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
+from .config import _get_data_dir
+
 # Default status file path (overridable via PI_LOOP_STATUS_FILE)
-STATUS_FILE_DEFAULT = os.environ.get("PI_LOOP_STATUS_FILE", "/tmp/loop-status.json")
+STATUS_FILE_DEFAULT = os.environ.get("PI_LOOP_STATUS_FILE", os.path.join(_get_data_dir(), "loop-status.json"))
 
 
 def write_status(

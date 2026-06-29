@@ -5,7 +5,7 @@ import os
 import socket as _sock
 import sys
 
-from .config import SENTINEL_PATH_DEFAULT
+from .config import SENTINEL_PATH_DEFAULT, _get_data_dir
 from .file_utils import _log
 
 
@@ -32,7 +32,7 @@ class PreflightChecker:
             goals_file=self._args.goals_file or "",
             schema_file=self._args.output_schema_file or "",
             check_git=getattr(self._args, "git", False),
-            check_disk=getattr(self._args, "log_file", "") or "/tmp",
+            check_disk=getattr(self._args, "log_file", "") or _get_data_dir(),
             fail_fast=self._fail_fast,
         )
 
@@ -132,7 +132,9 @@ class PreflightChecker:
             return False, f"invalid schema file: {e}"
 
     @staticmethod
-    def check_disk_space(path: str = "/tmp", min_gb: float = 0.5) -> tuple[bool, str]:
+    def check_disk_space(path: str | None = None, min_gb: float = 0.5) -> tuple[bool, str]:
+        if path is None:
+            path = _get_data_dir()
         """Check minimum free disk space (Linux statvfs)."""
         try:
             if hasattr(os, "statvfs"):

@@ -11,11 +11,11 @@
 | Severity | Count |
 |----------|-------|
 | 🔴 **Critical** | 3 |
-| 🟠 **High** | 10 |
-| 🟡 **Medium** | 18 |
-| 🔵 **Low** | 12 |
-| ✅ **Completed** | 30 |
-| **Total Active** | **43** |
+| 🟠 **High** | 9 |
+| 🟡 **Medium** | 17 |
+| 🔵 **Low** | 10 |
+| ✅ **Completed** | 34 |
+| **Total Active** | **39** |
 
 | Category | Count |
 |----------|-------|
@@ -123,7 +123,7 @@
 | **Dependencies** | None |
 | **Status** | ⏳ Pending |
 
-**Reasoning:** `run_loop()` accepts 60+ parameters covering config, paths, notifications, git, convergence, cooldown, error handling, and more. Makes the function nearly impossible to test, reason about, or document. The function signature spans ~60 lines.
+**Reasoning:** `run_loop()` accepts 60+ parameters covering config, paths, notifications, git, convergence, cooldown, error handling, and more. Makes the function nearly impossible to test, reason about, or document. The function signature spans ~60 lines. Many of these (91+) are never used inside the function body.
 
 **Affected files:**
 

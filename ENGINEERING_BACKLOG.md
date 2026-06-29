@@ -10,11 +10,11 @@
 | Severity | Count |
 |----------|-------|
 | 🔴 **Critical** | 2 |
-| 🟠 **High** | 13 |
-| 🟡 **Medium** | 20 |
-| 🔵 **Low** | 16 |
-| ✅ **Completed** | 20 |
-| **Total Active** | **51** |
+| 🟠 **High** | 11 |
+| 🟡 **Medium** | 19 |
+| 🔵 **Low** | 13 |
+| ✅ **Completed** | 24 |
+| **Total Active** | **45** |
 
 | Category | Count |
 |----------|-------|
@@ -769,7 +769,7 @@
 - `Makefile`
 - `pyproject.toml`
 
-### CICD-006 — No Dependabot/Renovate configuration
+### CICD-006 — No Dependabot/Renovate configuration ✅
 
 | Field | Value |
 |-------|-------|
@@ -778,9 +778,11 @@
 | **Impact** | No automated security updates for dependencies |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
-**Reasoning:** No automated dependency update configuration exists. Dependencies (FastAPI, uvicorn, pytest, ruff) won't get automatic PRs for security updates. Should add `.github/dependabot.yml` for GitHub-native updates.
+**Reasoning:** No automated dependency update configuration existed. Dependencies (FastAPI, uvicorn, pytest, ruff) weren't getting automatic PRs for security updates.
+
+**Fix applied:** Created `.github/dependabot.yml` with weekly pip updates (patch/minor grouped, major ignored), weekly GitHub Actions updates, labeled and scoped for clean changelogs.
 
 **Affected files:**
 
@@ -913,6 +915,25 @@
 
 - `pi_loop/loop.py` (lines ~191–227)
 
+### CLEANUP-001 — Duplicated content_block_stop handler in _execute_task ✅
+
+| Field | Value |
+|-------|-------|
+| **Category** | Code Cleanup |
+| **Priority** | 🟡 Medium |
+| **Impact** | Double-processing of tool results in terminal output |
+| **Effort** | Small |
+| **Dependencies** | None |
+| **Status** | ✅ Done |
+
+**Reasoning:** The `_execute_task` function in `loop.py` had TWO identical blocks handling `content_block_stop` events. The first (incorrectly placed before `text_delta` handling) rendered tool results twice.
+
+**Fix applied:** Removed the first duplicate handler. Completed 2026-06-29.
+
+**Affected files:**
+
+- `pi_loop/loop.py`
+
 ### CLEANUP-002 — Duplicate worker_term append logic in loop_manager.py
 
 | Field | Value |
@@ -947,7 +968,7 @@
 
 - `pi_loop/loop.py` (line ~308)
 
-### CLEANUP-004 — Hardcoded 'worker #1' string
+### CLEANUP-004 — Hardcoded 'worker #1' string ✅
 
 | Field | Value |
 |-------|-------|
@@ -956,13 +977,15 @@
 | **Impact** | Multiple workers all show as '#1' in terminal output |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
-**Reasoning:** The string `"worker #1"` is hardcoded in `_execute_task` print statements. When `--workers > 1` is used, all worker terminal output shows as `worker #1`.
+**Reasoning:** The string `"worker #1"` was hardcoded in `_execute_task` print statements. When `--workers > 1` is used, all worker terminal output showed as `worker #1`.
+
+**Fix applied:** Added `worker_id: int = 1` parameter to `_execute_task()` and replaced `"worker #1"` with `f"worker #{worker_id}"`. Default 1 preserves single-worker behavior.
 
 **Affected files:**
 
-- `pi_loop/loop.py` (line ~47)
+- `pi_loop/loop.py`
 
 ### CLEANUP-005 — Unused _lastWorkerLogCounts
 
@@ -1241,7 +1264,7 @@
 
 - `web_app/server.py` (`_get_memory_info()`)
 
-### RELIABILITY-004 — _get_cpu_percent() first-read returns 0% always
+### RELIABILITY-004 — _get_cpu_percent() first-read returns 0% always ✅
 
 | Field | Value |
 |-------|-------|
@@ -1250,13 +1273,15 @@
 | **Impact** | "0%" CPU shown on initial page load until next poll cycle |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
-**Reasoning:** The first call to `_get_cpu_percent()` always returns 0.0 because no delta exists yet. Could return `None` so the UI shows "..." instead of 0% on first load.
+**Reasoning:** The first call to `_get_cpu_percent()` always returned 0.0 because no delta for comparison existed.
+
+**Fix applied:** Pre-warm CPU deltas at module import time by reading `/proc/stat` twice with a 1-sample loop. The first call now returns a real value.
 
 **Affected files:**
 
-- `web_app/server.py` (`_get_cpu_percent()`)
+- `web_app/server.py`
 
 ---
 
@@ -1361,9 +1386,9 @@
 
 | File | Active Issues |
 |------|--------------|
-| `pi_loop/loop.py` | 10 (BUG-001✅, TECHDEBT-001, TECHDEBT-002, TECHDEBT-004, TECHDEBT-011, REFACTOR-001, REFACTOR-002, REFACTOR-003, CLEANUP-001, CLEANUP-003, CLEANUP-004, ARCH-001✅, ARCH-003, FEATURE-004, SCALE-001✅) |
+| `pi_loop/loop.py` | 9 (BUG-001✅, TECHDEBT-001, TECHDEBT-002✅, TECHDEBT-004✅, TECHDEBT-011✅, REFACTOR-001, REFACTOR-002✅, REFACTOR-003, CLEANUP-001✅, CLEANUP-003, CLEANUP-004✅, ARCH-001✅, ARCH-003, FEATURE-004, SCALE-001✅) |
 | `web_app/loop_manager.py` | 7 (BUG-002, BUG-003, BUG-004, BUG-005, CLEANUP-002, ARCH-004, AUTO-001, SCALE-001✅) |
-| `web_app/server.py` | 8 (PERF-001, PERF-003, SECURITY-001, SECURITY-002, SECURITY-003, RELIABILITY-002, RELIABILITY-003, RELIABILITY-004, FEATURE-002) |
+| `web_app/server.py` | 7 (PERF-001✅, PERF-003✅, SECURITY-001✅, SECURITY-002, SECURITY-003, RELIABILITY-002, RELIABILITY-003, RELIABILITY-004✅, FEATURE-002) |
 | `web_app/config_manager.py` | 3 (TECHDEBT-003, RELIABILITY-001, SECURITY-001) |
 | `web_app/static/app.js` | 6 (DX-004, PERF-004, PERF-005, CLEANUP-005, CLEANUP-006, CLEANUP-007, TECHDEBT-012, FEATURE-003) |
 | `web_app/static/index.html` | 3 (DX-005, DOC-002, CLEANUP-008) |
@@ -1375,7 +1400,7 @@
 | `pi_loop/env_utils.py` | 1 (TECHDEBT-005) |
 | `pi_loop/validation.py` | 1 (TECHDEBT-003) |
 | `pi_loop/system_utils.py` | 0 (candidate for ARCH-005) |
-| `.github/workflows/ci.yml` | 3 (CICD-001✅, CICD-004✅, CICD-005✅, CICD-006, CICD-007) |
+| `.github/workflows/ci.yml` | 2 (CICD-001✅, CICD-004✅, CICD-005✅, CICD-006✅, CICD-007) |
 | `Makefile` | 2 (DX-002, DX-003) |
 | `pyproject.toml` | 2 (DEP-001✅, DEP-002) |
 | `tests/` | 1 (TEST-002) |
@@ -1394,10 +1419,14 @@
 | CICD-003 | Missing dev/test dependencies | CI/CD | ✅ |
 | CICD-004 | No Python version matrix in CI | CI/CD | ✅ |
 | CICD-005 | Add mypy type-checking to CI pipeline | CI/CD | ✅ |
+| CICD-006 | Dependabot configuration | CI/CD | ✅ |
 | DX-001 | No ruff / mypy config in pyproject.toml | DX | ✅ |
 | DEP-001 | Add pyproject.toml [tool.ruff.lint] section | Dependencies | ✅ |
 | SCALE-001 | Worker terminal state lost on navigation | Scalability | ✅ |
 | FEATURE-001 | CI pipeline with test + lint + type-check | Features | ✅ |
+| CLEANUP-001 | Duplicated content_block_stop handler | Code Cleanup | ✅ |
+| CLEANUP-004 | Hardcoded 'worker #1' string | Code Cleanup | ✅ |
+| RELIABILITY-004 | CPU first-read returns 0% | Reliability | ✅ |
 
 ---
 

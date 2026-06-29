@@ -4,9 +4,10 @@ Simplified task execution loop that spawns subprocess workers and tracks
 progress in a JSON ledger.
 """
 
-# ruff: noqa: ARG001 — many run_loop() params are part of the 71-param
+# ruff: noqa: ARG001, F841 — many run_loop() params are part of the 71-param
 # signature tracked as TECHDEPT-001; fixing unused args requires the
-# LoopConfig dataclass refactor.
+# LoopConfig dataclass refactor. F841 covers dead local assignments from
+# the cfg.* local-extraction block.
 
 import json
 import os
@@ -18,7 +19,7 @@ from contextlib import suppress
 from datetime import datetime, timezone
 
 from .color_utils import colorizer
-from .config import DEFAULT_CONVERGENCE_THRESHOLD, DEFAULT_CONVERGENCE_WINDOW, VERSION, _get_data_dir
+from .config import VERSION, LoopConfig, _get_data_dir
 from .error_recovery import _adapt_to_error, _set_originals
 from .error_utils import _suggest_actionable_fix
 from .file_utils import _log, write_ledger, write_status_file
@@ -334,83 +335,91 @@ def _shutdown(
 
 
 def run_loop(
-    goal: str,
-    context: str,
-    workdir: str | None,
-    sentinel_path: str,
-    max_iterations: int,
-    compact_every: int,
-    retry_delay: int,
-    session_timeout: int,
+    cfg: "LoopConfig",
     state: dict,
-    status_file: str = "",
-    max_idle_iterations: int = 0,
-    evolve: bool = False,
-    git: bool = False,
-    git_commit: bool = False,
-    workers: int = 1,
-    notify_cmd: str | None = None,
-    max_output_chars: int = 2000,
-    profile: str = "",
-    model: str = "",
-    provider: str = "",
-    http_callback: str = "",
-    http_callback_secret: str = "",
-    keep_iterations: int = 0,
-    archive_dir: str = "",
-    archive_retention: int = 30,
-    archive_max_size: int = 0,
-    max_retries: int = 0,
-    on_error_cmd: str | None = None,
-    tag: str = "",
-    prompt_suffix: str = "",
-    no_tool_shortcut: bool = False,
-    max_turns: int = 500,
-    auto_toolsets: bool = True,
-    failure_learning: bool = True,
-    html_dashboard: str = "",
-    webhook_port: int = 0,
-    watch_dir: str = "",
-    watch_poll: float = 5.0,
-    cooldown: int = 0,
-    goals_file: str = "",
-    stop_at_goals_end: bool = False,
-    output_schema: dict | None = None,
-    cooldown_mode: str = "fixed",
-    convergence_threshold: float = DEFAULT_CONVERGENCE_THRESHOLD,
-    convergence_window: int = DEFAULT_CONVERGENCE_WINDOW,
-    convergence_stop: bool = False,
-    store_git_diff: bool = False,
-    startup_delay: float = 0.0,
-    notify_desktop: bool = False,
-    notify_on_completion: bool = False,
-    notify_pushbullet: str = "",
-    notify_ntfy: str = "",
-    notify_ntfy_server: str = "https://ntfy.sh",
-    use_library: bool = False,
-    pass_session_id: bool = False,
-    checkpoints: bool = False,
-    resume: bool = False,
-    resume_session_id: str = "",
-    skills: str = "",
-    ignore_rules: bool = False,
-    yolo: bool = False,
-    ignore_user_config: bool = False,
-    spawn_source: str = "",
-    safe_mode: bool = False,
-    accept_hooks: bool = False,
-    worktree: bool = False,
-    continue_session: bool = False,
-    track_goals: bool = False,
-    reset_goals: bool = False,
-    heartbeat_timeout: int = 0,
-    quiet: bool = False,
-    force_reset: bool = False,
-    json_logs: bool = False,
 ) -> None:
+    """Main task-execution loop.
+
+    Accepts a ``LoopConfig`` dataclass (see pi_loop.config) and a mutable
+    ``state`` dict.  All per-iteration configuration lives on ``cfg``.
+    """
     global _shutdown_requested
 
     _shutdown_requested.clear()
+
+    # ── Extract locals from config (for minimal diff vs old signature) ──
+    goal = cfg.goal
+    context = cfg.context
+    workdir = cfg.workdir
+    sentinel_path = cfg.sentinel_path
+    max_iterations = cfg.max_iterations
+    compact_every = cfg.compact_every
+    retry_delay = cfg.retry_delay
+    session_timeout = cfg.session_timeout
+    status_file = cfg.status_file
+    max_idle_iterations = cfg.max_idle_iterations
+    evolve = cfg.evolve
+    git = cfg.git
+    git_commit = cfg.git_commit
+    workers = cfg.workers
+    notify_cmd = cfg.notify_cmd
+    max_output_chars = cfg.max_output_chars
+    profile = cfg.profile
+    model = cfg.model
+    provider = cfg.provider
+    http_callback = cfg.http_callback
+    http_callback_secret = cfg.http_callback_secret
+    keep_iterations = cfg.keep_iterations
+    archive_dir = cfg.archive_dir
+    archive_retention = cfg.archive_retention
+    archive_max_size = cfg.archive_max_size
+    max_retries = cfg.max_retries
+    on_error_cmd = cfg.on_error_cmd
+    tag = cfg.tag
+    prompt_suffix = cfg.prompt_suffix
+    no_tool_shortcut = cfg.no_tool_shortcut
+    max_turns = cfg.max_turns
+    auto_toolsets = cfg.auto_toolsets
+    failure_learning = cfg.failure_learning
+    html_dashboard = cfg.html_dashboard
+    webhook_port = cfg.webhook_port
+    watch_dir = cfg.watch_dir
+    watch_poll = cfg.watch_poll
+    cooldown = cfg.cooldown
+    goals_file = cfg.goals_file
+    stop_at_goals_end = cfg.stop_at_goals_end
+    output_schema = cfg.output_schema
+    cooldown_mode = cfg.cooldown_mode
+    convergence_threshold = cfg.convergence_threshold
+    convergence_window = cfg.convergence_window
+    convergence_stop = cfg.convergence_stop
+    store_git_diff = cfg.store_git_diff
+    startup_delay = cfg.startup_delay
+    notify_desktop = cfg.notify_desktop
+    notify_on_completion = cfg.notify_on_completion
+    notify_pushbullet = cfg.notify_pushbullet
+    notify_ntfy = cfg.notify_ntfy
+    notify_ntfy_server = cfg.notify_ntfy_server
+    use_library = cfg.use_library
+    pass_session_id = cfg.pass_session_id
+    checkpoints = cfg.checkpoints
+    resume = cfg.resume
+    resume_session_id = cfg.resume_session_id
+    skills = cfg.skills
+    ignore_rules = cfg.ignore_rules
+    yolo = cfg.yolo
+    ignore_user_config = cfg.ignore_user_config
+    spawn_source = cfg.spawn_source
+    safe_mode = cfg.safe_mode
+    accept_hooks = cfg.accept_hooks
+    worktree = cfg.worktree
+    continue_session = cfg.continue_session
+    track_goals = cfg.track_goals
+    reset_goals = cfg.reset_goals
+    heartbeat_timeout = cfg.heartbeat_timeout
+    quiet = cfg.quiet
+    force_reset = cfg.force_reset
+    json_logs = cfg.json_logs
 
     _set_originals(session_timeout, cooldown, use_library, workers)
 

@@ -1,6 +1,9 @@
 """Constants, paths, and defaults for the pi-loop package."""
 
+import dataclasses
 import os
+from dataclasses import dataclass
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Unified path resolution
@@ -295,3 +298,140 @@ HEARTBEAT_KILL_GRACE = 5  # seconds between SIGTERM and SIGKILL
 
 # Version
 VERSION = "14.39.0"
+
+
+# ---------------------------------------------------------------------------
+# LoopConfig — single-source-of-truth for run_loop parameters
+# ---------------------------------------------------------------------------
+# Encapsulates the 71 positional/keyword parameters that run_loop() previously
+# accepted as a sprawling signature.  All callers build a LoopConfig once and
+# pass it as the first argument (plus the mutable `state` dict).
+#
+# Use LoopConfig.from_args(argparse.Namespace) to construct from CLI flags.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class LoopConfig:
+    """Configuration for a run_loop() invocation.
+
+    Every parameter has a default so you can construct partial configs for
+    testing.  Use ``from_args()`` to build a full config from CLI flags.
+    """
+
+    # ── Core ────────────────────────────────────────────────
+    goal: str = ""
+    context: str = ""
+    workdir: str | None = None
+    sentinel_path: str = SENTINEL_PATH_DEFAULT
+
+    # ── Iteration Control ───────────────────────────────────
+    max_iterations: int = 0
+    max_idle_iterations: int = 0
+    compact_every: int = 10
+    evolve: bool = False
+    convergence_stop: bool = False
+    convergence_threshold: float = DEFAULT_CONVERGENCE_THRESHOLD
+    convergence_window: int = DEFAULT_CONVERGENCE_WINDOW
+    cooldown: int = 0
+    cooldown_mode: str = "fixed"
+    startup_delay: float = 0.0
+    stop_at_goals_end: bool = False
+    goals_file: str = ""
+    track_goals: bool = False
+    reset_goals: bool = False
+
+    # ── Workers ─────────────────────────────────────────────
+    workers: int = 1
+    session_timeout: int = 7200
+    max_turns: int = 500
+    max_retries: int = 0
+    retry_delay: int = 5
+    max_output_chars: int = 2000
+    profile: str = ""
+    model: str = ""
+    provider: str = ""
+    prompt_suffix: str = ""
+    no_tool_shortcut: bool = False
+    auto_toolsets: bool = True
+    failure_learning: bool = True
+    skills: str = ""
+    use_library: bool = False
+    pass_session_id: bool = False
+    checkpoints: bool = False
+    resume: bool = False
+    resume_session_id: str = ""
+    continue_session: bool = False
+    output_schema: dict | None = None
+
+    # ── Git & Files ─────────────────────────────────────────
+    git: bool = False
+    git_commit: bool = False
+    store_git_diff: bool = False
+    worktree: bool = False
+    watch_dir: str = ""
+    watch_poll: float = 5.0
+
+    # ── Notifications & Callbacks ───────────────────────────
+    notify_cmd: str | None = None
+    on_error_cmd: str | None = None
+    notify_desktop: bool = False
+    notify_on_completion: bool = False
+    notify_pushbullet: str = ""
+    notify_ntfy: str = ""
+    notify_ntfy_server: str = "https://ntfy.sh"
+    http_callback: str = ""
+    http_callback_secret: str = ""
+
+    # ── Dashboards & Status ─────────────────────────────────
+    html_dashboard: str = ""
+    status_file: str = ""
+    webhook_port: int = 0
+
+    # ── Archiving ───────────────────────────────────────────
+    keep_iterations: int = 0
+    archive_dir: str = ""
+    archive_retention: int = 30
+    archive_max_size: int = 0
+
+    # ── Logging ─────────────────────────────────────────────
+    quiet: bool = False
+    json_logs: bool = False
+
+    # ── Safety ──────────────────────────────────────────────
+    safe_mode: bool = False
+    yolo: bool = False
+    ignore_rules: bool = False
+    ignore_user_config: bool = False
+    accept_hooks: bool = False
+    spawn_source: str = ""
+    tag: str = ""
+    heartbeat_timeout: int = 0
+
+    # ── Advanced ────────────────────────────────────────────
+    force_reset: bool = False
+
+    @classmethod
+    def from_args(cls, args: Any) -> "LoopConfig":
+        """Build a LoopConfig from an argparse.Namespace (or any object with
+        matching attributes).  Unknown attributes on *args* are silently
+        ignored; missing attributes fall back to the dataclass default."""
+        known = {f.name for f in cls.__dataclass_fields__.values()}
+        raw: dict[str, Any] = {name: getattr(args, name, None) for name in known}
+        # Strip out attributes set to None that have a non-None default
+        for f in cls.__dataclass_fields__.values():
+            if (
+                raw.get(f.name) is None
+                and f.default is not None
+                and not isinstance(f.default, dataclasses._MISSING_TYPE)
+            ):  # type: ignore[attr-defined]
+                raw[f.name] = f.default
+        return cls(**raw)
+
+    def __getitem__(self, key: str) -> Any:
+        """Allow dict-style access for backwards compatibility."""
+        return getattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Allow .get() for backwards compatibility with dict access."""
+        return getattr(self, key, default)

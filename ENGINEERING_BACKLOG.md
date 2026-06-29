@@ -10,18 +10,18 @@
 | Severity | Count |
 |----------|-------|
 | 🔴 **P0 — Critical** | 1 |
-| 🟠 **P1 — High** | 6 |
+| 🟠 **P1 — High** | 5 |
 | 🟡 **P2 — Medium** | 17 |
 | 🔵 **P3 — Low** | 10 |
 | ⚪ **P4 — Wishlist** | 3 |
 | ✅ **Completed** | 28 |
-| **Total Active** | **37** |
+| **Total Active** | **36** |
 
 | Category | Count |
 |----------|-------|
 | Bug | 3 |
 | Technical Debt | 6 |
-| Architecture | 4 |
+| Architecture | 3 |
 | Performance | 2 |
 | Security | 2 |
 | Testing | 5 |
@@ -154,17 +154,15 @@
 | **Title** | Circular import: cli.py ↔ help_topics.py |
 | **Category** | Architecture |
 | **Priority** | 🟠 P1 — High |
-| **Impact** | Fragile import chain that will break if import order changes. Confuses static analysis tools and IDE autocompletion. |
 | **Effort** | Medium |
 | **Dependencies** | None |
-| **Status** | ⏳ Pending |
+| **Status** | ✅ Done |
 
-**Reasoning:** `cli.py` imports `show_help_topics` from `help_topics.py`, and `help_topics.py` imports `build_parser` from `cli.py` (via `from .cli import _create_parser` at module level). This works only because both are lazily called (inside `main()` and `show_help_topics` function bodies), but it is fragile and confuses static analysis.
-
-**Research notes:** Fix options: (1) Move `_create_parser` into its own module (`parser.py`) that both `cli.py` and `help_topics.py` import from. (2) Pass the parser as a parameter rather than importing it. (3) Use lazy imports inside function bodies consistently.
+**Fix applied:** Extracted `_create_parser()` into `pi_loop/parser.py`. Both `cli.py` and `help_topics.py` now import from `parser.py`. The `cli._create_parser` entry point is kept as a thin re-export.
 
 **Affected files:**
 
+- `pi_loop/parser.py` (new)
 - `pi_loop/cli.py`
 - `pi_loop/help_topics.py`
 
@@ -388,8 +386,8 @@ When `state["mitigations"]` doesn't exist, a new `{}` dict is created, passed to
 | **Priority** | 🟡 P2 — Medium |
 | **Impact** | 474 lines of CLI introspection, shell completion, and help content with zero test coverage. This module has high churn risk as CLI flags change. |
 | **Effort** | Medium |
-| **Dependencies** | ARCH-002 |
-| **Status** | ❌ Blocked by ARCH-002 |
+| **Dependencies** | None (ARCH-002 resolved) |
+| **Status** | ⏳ Pending |
 
 **Reasoning:** `help_topics.py` is the largest untested module at 474 lines. It includes: `show_help_topics()` (topic dispatch), `_list_examples()` (CLI examples), `show_doctor_info()` (diagnostics), shell completion setup, and command listing. High complexity (uses subprocess, has broad except clauses). Breaking the circular import (ARCH-002) is a prerequisite for testing.
 
@@ -1022,7 +1020,8 @@ The **pi-loop** (hermes-loop) repository is a well-structured, actively maintain
 | File | P0 | P1 | P2 | P3 | Total Active |
 |------|----|----|----|----|-------------|
 | `pi_loop/loop.py` | 0 | 2 | 1 | 2 | 5 |
-| `pi_loop/help_topics.py` | 1 | — | 1 | — | 2 |
+| `pi_loop/help_topics.py` | 0 | — | 1 | — | 1 |
+| `pi_loop/cli.py` | 0 | 0 | 0 | 0 | 0 |
 | `pi_loop/preflight.py` | 1 | — | — | — | 1 |
 | `pi_loop/status.py` | 1 | — | — | — | 1 |
 | `pi_loop/validation.py` | — | — | 1 | — | 1 |
@@ -1052,7 +1051,7 @@ The **pi-loop** (hermes-loop) repository is a well-structured, actively maintain
 | **Test count** | 404 (all passing, 0.53s) |
 | **Test coverage** | 83% file coverage (19/23 modules) |
 | **Active backlog items** | 40 |
-| **Completed this iteration** | 31 |
+| **Completed this iteration** | 32 |
 | **Functions with >100 lines** | 12 |
 | **Longest function** | `run_loop()` — 435 lines, 71 parameters |
 | **Total commits** | 191 (all by `ningtoba`) |

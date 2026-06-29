@@ -11,6 +11,7 @@ from .config import (
     BASE_TOOLSETS,
     LEDGER_PATH,
     VERSION,
+    LoopConfig,
 )
 from .env_utils import (
     check_env_file,
@@ -209,81 +210,21 @@ def main() -> None:
             f"  {colorizer.dim('Sentinel:')} {colorizer.flag('echo stop >')} {colorizer.value(args.shutdown_sentinel)}"
         )
         _log("")
-        run_loop(
-            goal=args.goal,
-            context=resolved_context,
-            workdir=args.workdir or None,
-            sentinel_path=args.shutdown_sentinel,
-            max_iterations=args.max_iterations,
-            compact_every=args.compact_every,
-            retry_delay=args.retry_delay,
-            session_timeout=args.session_timeout,
-            state=state,
-            status_file=args.status_file,
-            max_idle_iterations=args.max_idle_iterations,
-            evolve=args.evolve,
-            git=args.git,
-            git_commit=args.git_commit,
-            workers=args.workers,
-            notify_cmd=args.notify_cmd or None,
-            max_output_chars=args.max_output_chars,
-            profile=args.profile,
-            model=args.model,
-            provider=args.provider,
-            http_callback=args.http_callback,
-            http_callback_secret=args.http_callback_secret,
-            keep_iterations=args.keep_iterations,
-            archive_dir=args.archive_dir,
-            archive_retention=args.archive_retention,
-            archive_max_size=args.archive_max_size,
-            max_retries=args.max_retries,
-            on_error_cmd=args.on_error_cmd or None,
-            tag=args.tag,
-            prompt_suffix=args.prompt_suffix,
-            no_tool_shortcut=args.no_tool_shortcut,
-            max_turns=args.max_turns,
-            auto_toolsets=not args.no_auto_toolsets,
-            failure_learning=not args.no_failure_learning,
-            html_dashboard=args.status_html,
-            webhook_port=args.webhook_port,
-            watch_dir=args.watch_dir,
-            watch_poll=args.watch_poll,
-            cooldown=args.cooldown,
-            goals_file=args.goals_file,
-            stop_at_goals_end=args.stop_at_goals_end,
-            output_schema=(json.loads(args.output_schema) if args.output_schema else None)
-            or (load_json_schema(args.output_schema_file) if args.output_schema_file else None),
-            cooldown_mode=args.cooldown_mode,
-            convergence_threshold=args.convergence_threshold,
-            convergence_window=args.convergence_window,
-            convergence_stop=args.convergence_stop,
-            store_git_diff=args.store_git_diff,
-            startup_delay=args.startup_delay,
-            notify_desktop=args.notify_desktop,
-            notify_on_completion=args.notify_on_completion,
-            notify_pushbullet=args.notify_pushbullet,
-            notify_ntfy=args.notify_ntfy,
-            notify_ntfy_server=args.notify_ntfy_server,
-            use_library=args.use_library,
-            pass_session_id=args.pass_session_id,
-            checkpoints=False,
-            resume=args.resume,
-            resume_session_id=state.get("resume_session_id", ""),
-            skills=args.skills,
-            ignore_rules=args.ignore_rules,
-            yolo=args.yolo,
-            ignore_user_config=args.ignore_user_config,
-            safe_mode=args.safe_mode,
-            accept_hooks=False,
-            worktree=args.worktree,
-            continue_session=args.continue_session,
-            track_goals=args.track_goals,
-            reset_goals=args.reset_goals,
-            heartbeat_timeout=args.heartbeat_timeout,
-            quiet=args.quiet,
-            force_reset=args.force_reset,
-            json_logs=args.json_logs,
+        cfg = LoopConfig.from_args(args)
+        cfg.context = resolved_context
+        cfg.workdir = args.workdir or None
+        cfg.notify_cmd = args.notify_cmd or None
+        cfg.on_error_cmd = args.on_error_cmd or None
+        cfg.auto_toolsets = not args.no_auto_toolsets
+        cfg.failure_learning = not args.no_failure_learning
+        cfg.html_dashboard = args.status_html
+        cfg.output_schema = (json.loads(args.output_schema) if args.output_schema else None) or (
+            load_json_schema(args.output_schema_file) if args.output_schema_file else None
         )
+        cfg.checkpoints = False
+        cfg.resume_session_id = state.get("resume_session_id", "")
+        cfg.accept_hooks = False
+        run_loop(cfg, state)
 
     _log(f"[DONE] Daemon finished. Ledger at {LEDGER_PATH}")
 

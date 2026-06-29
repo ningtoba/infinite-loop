@@ -248,6 +248,23 @@ _last_cpu_total: int | None = None
 _last_cpu_idle: int | None = None
 _last_cpu_time: float = 0.0
 
+# Pre-warm: read /proc/stat twice at import to seed the first delta
+for _i in range(2):
+    try:
+        with open("/proc/stat") as _f:
+            _parts = _f.readline().split()
+        if len(_parts) >= 5:
+            _idle = int(_parts[4])
+            _total = sum(int(_p) for _p in _parts[1:] if _p.isdigit())
+            _now = time.monotonic()
+            if _last_cpu_total is not None:
+                break
+            _last_cpu_total = _total
+            _last_cpu_idle = _idle
+            _last_cpu_time = _now
+    except (OSError, ValueError):
+        break
+
 
 def _get_cpu_percent():
     """Get CPU usage percentage from /proc/stat using delta between reads."""

@@ -7,7 +7,7 @@ from unittest import mock
 
 import pytest
 
-from pi_loop.help_topics import (
+from omp_loop.help_topics import (
     _explain_flag,
     _help_topic,
     _list_examples,
@@ -16,7 +16,7 @@ from pi_loop.help_topics import (
     _run_doctor,
     _run_healthcheck,
 )
-from pi_loop.parser import _create_parser
+from omp_loop.parser import _create_parser
 
 
 # ── Helpers ─────────────────────────────────────────────
@@ -137,7 +137,7 @@ class TestListExamples:
         captured = capsys.readouterr()
         out = captured.out
         assert "Usage Examples" in out
-        assert "pi-loop" in out
+        assert "omp-loop" in out
         assert "--goal" in out
         assert "--run" in out
 
@@ -230,8 +230,8 @@ class TestRunDoctor:
             mock.patch("os.path.exists") as mock_exists,
             mock.patch.dict(os.environ, {}, clear=True),
         ):
-            mock_which.side_effect = lambda cmd: f"/usr/bin/{cmd}" if cmd in ("pi", "git") else None
-            mock_run.return_value = mock.Mock(stdout="pi 0.1.0", returncode=0)
+            mock_which.side_effect = lambda cmd: f"/usr/bin/{cmd}" if cmd in ("omp", "git") else None
+            mock_run.return_value = mock.Mock(stdout="omp 0.1.0", returncode=0)
             mock_exists.return_value = False
             _run_doctor()
         captured = capsys.readouterr()
@@ -240,16 +240,18 @@ class TestRunDoctor:
         assert "Python:" in out
 
     def test_doctor_missing_pi(self, capsys):
-        """Doctor handles missing pi binary."""
+        """Doctor handles missing omp binary."""
         with (
             mock.patch("shutil.which") as mock_which,
             mock.patch("subprocess.run") as mock_run,
             mock.patch("os.path.exists") as mock_exists,
+            mock.patch("os.path.getsize") as mock_getsize,
             mock.patch.dict(os.environ, {}, clear=True),
         ):
             mock_which.side_effect = lambda cmd: "/usr/bin/git" if cmd == "git" else None
             mock_run.return_value = mock.Mock(stdout="git 2.40", returncode=0)
             mock_exists.return_value = True
+            mock_getsize.return_value = 1024
             _run_doctor()
         captured = capsys.readouterr()
         out = captured.out
@@ -271,11 +273,11 @@ class TestRunHealthcheck:
         with (
             mock.patch("shutil.which") as mock_which,
             mock.patch("os.path.exists") as mock_exists,
-            mock.patch("pi_loop.help_topics.extract_json_from_output") as mock_extract,
-            mock.patch("pi_loop.help_topics.write_ledger") as mock_write,
-            mock.patch("pi_loop.help_topics.read_ledger") as mock_read,
+            mock.patch("omp_loop.help_topics.extract_json_from_output") as mock_extract,
+            mock.patch("omp_loop.help_topics.write_ledger") as mock_write,
+            mock.patch("omp_loop.help_topics.read_ledger") as mock_read,
         ):
-            mock_which.side_effect = lambda cmd: f"/usr/bin/{cmd}" if cmd in ("pi", "git") else None
+            mock_which.side_effect = lambda cmd: f"/usr/bin/{cmd}" if cmd in ("omp", "git") else None
             mock_exists.return_value = True
             mock_extract.return_value = {"test": True}
             mock_write.return_value = None
@@ -297,13 +299,13 @@ class TestRunHealthcheck:
         assert args[0] == 0
 
     def test_healthcheck_critical(self, capsys, _mock_exit):
-        """Healthcheck reports critical status when pi is missing."""
+        """Healthcheck reports critical status when omp is missing."""
         with (
             mock.patch("shutil.which") as mock_which,
             mock.patch("os.path.exists") as mock_exists,
-            mock.patch("pi_loop.help_topics.extract_json_from_output") as mock_extract,
-            mock.patch("pi_loop.help_topics.write_ledger") as mock_write,
-            mock.patch("pi_loop.help_topics.read_ledger") as mock_read,
+            mock.patch("omp_loop.help_topics.extract_json_from_output") as mock_extract,
+            mock.patch("omp_loop.help_topics.write_ledger") as mock_write,
+            mock.patch("omp_loop.help_topics.read_ledger") as mock_read,
         ):
             mock_which.return_value = None  # nothing on PATH
             mock_exists.return_value = False

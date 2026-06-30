@@ -1,4 +1,4 @@
-"""Constants, paths, and defaults for the pi-loop package."""
+"""Constants, paths, and defaults for the omp-loop package."""
 
 import dataclasses
 import os
@@ -8,7 +8,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 # Unified path resolution
 # ---------------------------------------------------------------------------
-# All runtime file paths derive from PI_LOOP_DATA_DIR (default /tmp) so that
+# All runtime file paths derive from OMP_LOOP_DATA_DIR (default /tmp) so that
 # a single env var override moves ledger, lock, sentinel, heartbeat dir,
 # log file, etc. This is critical for:
 #   - running multiple instances on the same host (different data dirs)
@@ -17,17 +17,18 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 
+
 def _get_data_dir() -> str:
-    """Return the base data directory, respecting PI_LOOP_DATA_DIR env var."""
-    return os.environ.get("PI_LOOP_DATA_DIR", "/tmp")
+    """Return the base data directory, respecting OMP_LOOP_DATA_DIR env var."""
+    return os.environ.get("OMP_LOOP_DATA_DIR", "/tmp")
 
 
 def _resolve_path(env_var: str, default_name: str) -> str:
     """Resolve a path from an optional specific env var, else data_dir + name.
 
     Priority:
-      1. Specific env var (e.g. PI_LOOP_LEDGER_PATH) if set and non-empty
-      2. os.path.join(PI_LOOP_DATA_DIR or /tmp, default_name)
+      1. Specific env var (e.g. OMP_LOOP_LEDGER_PATH) if set and non-empty
+      2. os.path.join(OMP_LOOP_DATA_DIR or /tmp, default_name)
     """
     explicit = os.environ.get(env_var, "")
     if explicit:
@@ -36,12 +37,11 @@ def _resolve_path(env_var: str, default_name: str) -> str:
 
 
 # Paths
-LEDGER_PATH = _resolve_path("PI_LOOP_LEDGER_PATH", "infinite-loop-state.json")
-LOCK_PATH = _resolve_path("PI_LOOP_LOCK_PATH", "infinite-loop-state.lock")
-SENTINEL_PATH_DEFAULT = _resolve_path("PI_LOOP_SENTINEL_PATH", "infinite-loop-stop")
+LEDGER_PATH = _resolve_path("OMP_LOOP_LEDGER_PATH", "infinite-loop-state.json")
+LOCK_PATH = _resolve_path("OMP_LOOP_LOCK_PATH", "infinite-loop-state.lock")
+SENTINEL_PATH_DEFAULT = _resolve_path("OMP_LOOP_SENTINEL_PATH", "infinite-loop-stop")
 STATUS_FILE_DEFAULT = ""  # no status file by default
-DEFAULT_LOG_FILE = _resolve_path("PI_LOOP_WEB_LOG", "infinite-loop-web.log")
-
+DEFAULT_LOG_FILE = _resolve_path("OMP_LOOP_WEB_LOG", "infinite-loop-web.log")
 # Logging
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 LOG_DATE_FORMAT = "%H:%M:%S"
@@ -290,8 +290,7 @@ TASK_PATTERNS = {
     },
 }
 
-# Heartbeat constants for session self-healing
-HEARTBEAT_DIR = os.environ.get("PI_LOOP_HEARTBEAT_DIR", _get_data_dir())
+HEARTBEAT_DIR = os.environ.get("OMP_LOOP_HEARTBEAT_DIR", _get_data_dir())
 HEARTBEAT_PREFIX = "infinite-loop-heartbeat-"
 HEARTBEAT_INTERVAL = 30  # seconds between heartbeat writes
 HEARTBEAT_GRACE_FACTOR = 2.0  # grace = timeout * 2

@@ -21,7 +21,7 @@ ast-serialize==0.5.0
 authlib==1.7.2
     # via safety
 bandit==1.9.4
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 build==1.5.0
     # via pip-tools
 certifi==2026.6.17
@@ -53,7 +53,7 @@ dparse==0.6.4
     #   safety
     #   safety-schemas
 fastapi==0.138.1
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 filelock==3.29.4
     # via
     #   python-discovery
@@ -73,7 +73,7 @@ httptools==0.8.0
 httpx==0.28.1
     # via safety
 httpx2==2.5.0
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 identify==2.6.19
     # via pre-commit
 idna==3.18
@@ -100,7 +100,7 @@ marshmallow==4.3.0
 mdurl==0.1.2
     # via markdown-it-py
 mypy==2.1.0
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 mypy-extensions==1.1.0
     # via mypy
 nltk==3.9.4
@@ -118,7 +118,7 @@ packaging==26.2
 pathspec==1.1.1
     # via mypy
 pip-tools==7.5.3
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 platformdirs==4.10.0
     # via
     #   python-discovery
@@ -128,7 +128,7 @@ pluggy==1.6.0
     #   pytest
     #   pytest-cov
 pre-commit==4.6.0
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 pycparser==3.0
     # via cffi
 pydantic==2.13.4
@@ -148,16 +148,16 @@ pyproject-hooks==1.2.0
     #   pip-tools
 pytest==9.1.1
     # via
-    #   pi-loop (pyproject.toml)
+    #   omp-loop (pyproject.toml)
     #   pytest-asyncio
     #   pytest-cov
     #   pytest-timeout
 pytest-asyncio==1.4.0
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 pytest-cov==7.1.0
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 pytest-timeout==2.4.0
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 python-discovery==1.4.2
     # via virtualenv
 python-dotenv==1.2.2
@@ -178,9 +178,9 @@ ruamel-yaml==0.19.1
     #   safety
     #   safety-schemas
 ruff==0.15.20
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 safety==3.8.1
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 safety-schemas==0.0.16
     # via safety
 shellingham==1.5.4
@@ -216,7 +216,7 @@ typing-inspection==0.4.2
     #   fastapi
     #   pydantic
 uvicorn==0.49.0
-    # via pi-loop (pyproject.toml)
+    # via omp-loop (pyproject.toml)
 uvloop==0.22.1
     # via uvicorn
 virtualenv==21.5.1

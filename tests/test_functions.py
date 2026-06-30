@@ -1,8 +1,8 @@
-"""Tests for pi_loop.functions — goal loading, startup banner, cycling, context, cooldown."""
+"""Tests for omp_loop.functions — goal loading, startup banner, cycling, context, cooldown."""
 
 from unittest.mock import MagicMock, patch
 
-from pi_loop.functions import (
+from omp_loop.functions import (
     _build_progressive_context,
     _cycle_goal,
     _handle_cooldown,
@@ -118,7 +118,7 @@ class TestBuildProgressiveContext:
 class TestHandleCooldown:
     def test_no_cooldown_no_sleep(self):
         """_handle_cooldown with cooldown=0 does not sleep."""
-        with patch("pi_loop.functions.time.sleep") as mock_sleep:
+        with patch("omp_loop.functions.time.sleep") as mock_sleep:
             _handle_cooldown(0, "fixed", MagicMock(), "research")
         mock_sleep.assert_not_called()
 
@@ -126,13 +126,13 @@ class TestHandleCooldown:
         """_handle_cooldown with adaptive mode uses eta_tracker."""
         eta = MagicMock()
         eta.avg_duration.return_value = 100.0
-        with patch("pi_loop.functions.time.sleep") as mock_sleep:
+        with patch("omp_loop.functions.time.sleep") as mock_sleep:
             _handle_cooldown(5, "adaptive", eta, "research")
         assert mock_sleep.call_count == 10
 
     def test_fixed_cooldown_sleeps(self):
         """_handle_cooldown with fixed cooldown > 0 sleeps."""
-        with patch("pi_loop.functions.time.sleep") as mock_sleep:
+        with patch("omp_loop.functions.time.sleep") as mock_sleep:
             _handle_cooldown(3, "fixed", MagicMock(), "research")
         assert mock_sleep.call_count == 3
 
@@ -169,12 +169,12 @@ class TestLogStartupBanner:
 
     def test_does_not_crash(self):
         """_log_startup_banner runs without error."""
-        with patch("pi_loop.functions._log"):
+        with patch("omp_loop.functions._log"):
             _log_startup_banner(**self.min_kwargs)
 
     def test_quiet_mode_shows_compact(self):
         """_log_startup_banner with quiet=True shows compact one-line status."""
-        with patch("pi_loop.functions._log") as mock_log:
+        with patch("omp_loop.functions._log") as mock_log:
             _log_startup_banner(**self.min_kwargs, quiet=True)
             assert mock_log.call_count > 0
 
@@ -182,5 +182,5 @@ class TestLogStartupBanner:
         """_log_startup_banner with git and multiple workers."""
         kwargs = dict(self.min_kwargs)
         kwargs.update({"git": True, "git_commit": True, "workers": 3, "evolve": True})
-        with patch("pi_loop.functions._log"):
+        with patch("omp_loop.functions._log"):
             _log_startup_banner(**kwargs)

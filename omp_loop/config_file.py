@@ -6,7 +6,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CONFIG_DIR = Path.home() / ".config" / "pi-loop"
+CONFIG_DIR = Path.home() / ".config" / "omp-loop"
 CONFIG_PATH = CONFIG_DIR / "config.json"
 
 DEFAULTS = {

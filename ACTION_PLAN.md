@@ -1,6 +1,6 @@
 # Action Plan — Top 10 Prioritized Items
 
-> Execution plan for **pi-loop** v14.39.0 engineering backlog.
+> Execution plan for **omp-loop** v14.39.0 engineering backlog.
 > Items ranked by **value/effort ratio** and ordered for minimal blocking dependencies.
 > Generated: 2026-06-30
 
@@ -89,7 +89,7 @@ These are high-impact, low-effort items that deliver immediate value. All can be
 |-------|-------|
 | **ID** | CI-CD-001 |
 | **Value/Effort** | **3.0** (Impact 3 ÷ Effort 1) |
-| **Status** | ✅ **Completed** — Verified: `make test` includes `--cov=pi_loop --cov=web_app --cov-report=term-missing`. CI has coverage threshold, XML artifact upload, and Codecov integration. |
+| **Status** | ✅ **Completed** — Verified: `make test` includes `--cov=omp_loop --cov=web_app --cov-report=term-missing`. CI has coverage threshold, XML artifact upload, and Codecov integration. |
 | **Est. Time** | 30 minutes |
 
 ---
@@ -109,7 +109,7 @@ These are high-impact, low-effort items that deliver immediate value. All can be
 | **Effort** | 2 (Small, <2 hr) |
 | **Dependencies** | None |
 | **Est. Time** | 1-2 hours |
-| **Why Now** | `subprocess.run(on_error_cmd, shell=True)` on a user-configurable command is intentional but under-protected. If `~/.config/pi-loop/config.json` is compromised, arbitrary shell commands execute with daemon privileges. |
+| **Why Now** | `subprocess.run(on_error_cmd, shell=True)` on a user-configurable command is intentional but under-protected. If `~/.config/omp-loop/config.json` is compromised, arbitrary shell commands execute with daemon privileges. |
 
 **Steps:**
 
@@ -118,7 +118,7 @@ These are high-impact, low-effort items that deliver immediate value. All can be
 3. Add a startup WARNING log when `on_error_cmd` is configured
 4. Document the risk explicitly in README security section
 
-**Files:** `pi_loop/loop.py` (line 727), `README.md`
+**Files:** `omp_loop/loop.py` (line 727), `README.md`
 
 ---
 
@@ -143,7 +143,7 @@ These are high-impact, low-effort items that deliver immediate value. All can be
 4. Add correlation ID per daemon run (generated at startup, logged in every event)
 5. Migrate `print()` calls incrementally, starting with iteration lifecycle events
 
-**Files:** `pi_loop/file_utils.py`, `pi_loop/loop.py`, `pi_loop/error_recovery.py`, `pi_loop/git_utils.py`, `pi_loop/heartbeat.py`, `web_app/loop_manager.py`
+**Files:** `omp_loop/file_utils.py`, `omp_loop/loop.py`, `omp_loop/error_recovery.py`, `omp_loop/git_utils.py`, `omp_loop/heartbeat.py`, `web_app/loop_manager.py`
 
 ---
 
@@ -202,7 +202,7 @@ These are high-impact, low-effort items that deliver immediate value. All can be
 3. Extract cooldown logic into `CooldownManager`
 4. Main loop body becomes a readable pipeline of extracted functions
 
-**Files:** `pi_loop/loop.py`, new `pi_loop/executor.py`, new `pi_loop/convergence.py`, new `pi_loop/notifications.py`
+**Files:** `omp_loop/loop.py`, new `omp_loop/executor.py`, new `omp_loop/convergence.py`, new `omp_loop/notifications.py`
 
 ---
 

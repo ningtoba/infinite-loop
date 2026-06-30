@@ -1,6 +1,6 @@
 """Tests for _recalc_stats."""
 
-from pi_loop.stats import _recalc_stats
+from omp_loop.stats import _recalc_stats
 
 
 def test_empty_iterations():

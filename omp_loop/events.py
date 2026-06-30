@@ -1,4 +1,4 @@
-"""Structured event emitter for pi-loop daemon.
+"""Structured event emitter for omp-loop daemon.
 
 Provides ``emit_event()`` which writes NDJSON lines with the ``[EVENT]``
 prefix so that ``LoopManager._parse_daemon_line()`` can triage them

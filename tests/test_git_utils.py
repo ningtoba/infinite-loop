@@ -1,9 +1,9 @@
-"""Tests for pi_loop.git_utils — git state capture and auto-commit."""
+"""Tests for omp_loop.git_utils — git state capture and auto-commit."""
 
 import subprocess
 from unittest.mock import MagicMock, patch
 
-from pi_loop.git_utils import _capture_git_state, _git_auto_commit
+from omp_loop.git_utils import _capture_git_state, _git_auto_commit
 
 
 class TestCaptureGitState:

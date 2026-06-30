@@ -123,7 +123,7 @@ def _suggest_actionable_fix(
         tips = [
             "Suggestions:",
             "  • Check network connectivity and API endpoint availability",
-            "  • Verify the pi provider config is correct",
+            "  \u2022 Verify the omp provider config is correct",
             "  • Add --retry-delay 30 to wait between retries on network failures",
             "  • Run with --preflight to check the environment before the loop starts",
         ]

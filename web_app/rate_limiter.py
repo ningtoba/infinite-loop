@@ -1,4 +1,4 @@
-"""Sliding-window rate limiter using asyncio for the pi-loop web API."""
+"""Sliding-window rate limiter using asyncio for the omp-loop web API."""
 
 import asyncio
 import logging

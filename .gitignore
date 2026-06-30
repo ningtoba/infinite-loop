@@ -30,7 +30,7 @@ Thumbs.db
 # Secret scanning exclusions (detect-secrets baseline)
 .secrets.baseline
 
-# pi-loop runtime artifacts (user-specific)
+# omp-loop runtime artifacts (user-specific)
 /tmp/infinite-loop-state.json
 /tmp/infinite-loop-stop
 /tmp/infinite-loop-*.log

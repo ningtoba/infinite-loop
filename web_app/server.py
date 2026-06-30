@@ -1,10 +1,11 @@
-"""FastAPI web server for the pi-loop web UI."""
+"""FastAPI web server for the omp-loop web UI."""
 
 import asyncio
 import contextlib
 import json
 import logging
 import os
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -18,8 +19,8 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from pi_loop.config import LEDGER_PATH, LOCK_PATH
-from pi_loop.config_file import CONFIG_PATH
+from omp_loop.config import LEDGER_PATH, LOCK_PATH
+from omp_loop.config_file import CONFIG_PATH
 
 from .config_manager import (
     CONFIG_GROUPS,
@@ -67,7 +68,7 @@ logger = logging.getLogger(__name__)
 # ── Rate limiters ──────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="pi-loop Web UI",
+    title="omp-loop Web UI",
     description="Web interface for managing the Infinite Loop Daemon",
     version="1.0.0",
 )
@@ -106,8 +107,8 @@ async def api_key_auth(request: Request, call_next):
     if not path.startswith("/api/"):
         return await call_next(request)
 
-    # Always allow health checks
-    if path == "/api/health":
+    # Always allow health checks and SSE streams (EventSource can't send auth headers)
+    if path in ("/api/health", "/api/live", "/api/sse/stream"):
         return await call_next(request)
 
     auth_header = request.headers.get("Authorization", "")
@@ -135,7 +136,7 @@ async def rate_limit_middleware(request: Request, call_next):
     Exempt: /api/health, all non-/api paths.
 
     Rate limiting uses a sliding window per client IP and is independent
-    of authentication — it applies even when PI_LOOP_API_KEY is unset.
+    of authentication — it applies even when OMP_LOOP_API_KEY is unset.
     """
     path = request.url.path
 
@@ -185,10 +186,10 @@ async def rate_limit_middleware(request: Request, call_next):
 
 
 # CORS — restrict to localhost by default for security.
-# Override via PI_LOOP_CORS_ORIGINS env var (comma-separated) for
+# Override via OMP_LOOP_CORS_ORIGINS env var (comma-separated) for
 # production deployments that need cross-origin access.
 _cors_origins = os.environ.get(
-    "PI_LOOP_CORS_ORIGINS",
+    "OMP_LOOP_CORS_ORIGINS",
     "http://localhost:8090",
 ).split(",")
 logger = logging.getLogger(__name__)
@@ -200,7 +201,7 @@ for origin in _cors_origins:
     if stripped == "*":
         logger.warning(
             "CORS origin '*' is permissive and should not be used in production. "
-            "Set PI_LOOP_CORS_ORIGINS to a comma-separated list of explicit origins."
+            "Set OMP_LOOP_CORS_ORIGINS to a comma-separated list of explicit origins."
         )
     _cleaned_origins.append(stripped)
 
@@ -258,8 +259,8 @@ async def index():
             return HTMLResponse(content)
         except OSError as e:
             logger.warning("Failed to read static index.html: %s", e)
-            return HTMLResponse("<h1>pi-loop Web UI</h1><p>Static files not found.</p>")
-    return HTMLResponse("<h1>pi-loop Web UI</h1><p>Static files not found.</p>")
+            return HTMLResponse("<h1>omp-loop Web UI</h1><p>Static files not found.</p>")
+    return HTMLResponse("<h1>omp-loop Web UI</h1><p>Static files not found.</p>")
 
 
 # ── Config API ──────────────────────────────────────────────────────────────
@@ -315,7 +316,7 @@ async def preview_cli_args():
     """Preview the CLI arguments that would be used to start the daemon."""
     config = get_raw_config()
     cli_args = build_cli_args(config)
-    return {"args": cli_args, "command": "python3 -m pi_loop " + " ".join(cli_args)}
+    return {"args": cli_args, "command": "python3 -m omp_loop " + " ".join(cli_args)}
 
 
 # ── Loop Control API ────────────────────────────────────────────────────────
@@ -450,7 +451,8 @@ async def health():
 # ── System Resources ─────────────────────────────────────────────────────────
 
 
-# CPU delta tracking for accurate utilization
+# CPU delta tracking for accurate utilization (L-4: threading.Lock for concurrent reads)
+_cpu_lock = threading.Lock()
 _last_cpu_total: int | None = None
 _last_cpu_idle: int | None = None
 _last_cpu_time: float = 0.0
@@ -485,20 +487,21 @@ def _get_cpu_percent():
         total = sum(int(p) for p in parts[1:] if p.isdigit())
         now = time.monotonic()
 
-        if _last_cpu_total is not None and _last_cpu_idle is not None:
-            delta_total = total - _last_cpu_total
-            delta_idle = idle - _last_cpu_idle
-            _last_cpu_total = total
-            _last_cpu_idle = idle
-            _last_cpu_time = now
-            if delta_total > 0:
-                return round(100.0 * (delta_total - delta_idle) / delta_total, 1)
-        else:
-            # First read — no delta yet
-            _last_cpu_total = total
-            _last_cpu_idle = idle
-            _last_cpu_time = now
-            return None
+        with _cpu_lock:
+            if _last_cpu_total is not None and _last_cpu_idle is not None:
+                delta_total = total - _last_cpu_total
+                delta_idle = idle - _last_cpu_idle
+                _last_cpu_total = total
+                _last_cpu_idle = idle
+                _last_cpu_time = now
+                if delta_total > 0:
+                    return round(100.0 * (delta_total - delta_idle) / delta_total, 1)
+            else:
+                # First read — no delta yet
+                _last_cpu_total = total
+                _last_cpu_idle = idle
+                _last_cpu_time = now
+                return None
         return 0.0
     except (OSError, ValueError):
         return 0.0
@@ -579,7 +582,7 @@ async def _broadcast_sse(data: dict[str, Any]) -> None:
 
 async def _sse_stream_impl(request: Request):
     """SSE endpoint implementation shared by /api/live and /live."""
-    q: asyncio.Queue = asyncio.Queue(maxsize=32)
+    q: asyncio.Queue = asyncio.Queue(maxsize=512)
 
     async def event_generator():
         # Only register queue when the generator actually starts (M-3).
@@ -654,7 +657,9 @@ async def _status_poller():
     while True:
         await asyncio.sleep(2)
         if not _sse_clients:
-            last_log_count = 0
+            # Don't reset last_log_count — when clients reconnect, they get
+            # full status via the init event.  Only reset the hash so the
+            # first status after reconnect is broadcast regardless.
             last_status_hash = ""
             await asyncio.sleep(1)  # Quick retry when idle
             continue
@@ -741,7 +746,7 @@ def main():
     except (ValueError, TypeError):
         default_port = 8090
 
-    parser = argparse.ArgumentParser(description="pi-loop Web UI Server")
+    parser = argparse.ArgumentParser(description="omp-loop Web UI Server")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0) — all interfaces")
     parser.add_argument(
         "--port",
@@ -759,7 +764,7 @@ def main():
 
     # Read API key once at startup (SEC-004) — closes over os.environ so
     # per-request middleware never reads env vars.
-    _raw_key = os.environ.get("PI_LOOP_API_KEY", "")
+    _raw_key = os.environ.get("OMP_LOOP_API_KEY", "")
     if _raw_key:
         _API_KEY = _raw_key
         print("  [AUTH] API key authentication enabled")
@@ -769,10 +774,10 @@ def main():
 
     # Set env path if provided
     if args.env:
-        os.environ["PI_LOOP_ENV_PATH"] = args.env
+        os.environ["OMP_LOOP_ENV_PATH"] = args.env
 
     print("╔══════════════════════════════════════════════╗")
-    print("║  pi-loop Web UI                           ║")
+    print("║  omp-loop Web UI                           ║")
     print(f"║  Starting server on {args.host}:{args.port}                        ║")
     print("╚══════════════════════════════════════════════╝")
 

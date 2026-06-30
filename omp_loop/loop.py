@@ -96,21 +96,19 @@ def _execute_task(
     retry_delay: int = 5,
     worker_id: int = 1,
 ) -> dict:
-    """Execute a single task via pi subprocess with --mode json.
+    """Execute a single task via omp subprocess with --mode json.
 
     Streams NDJSON events (thinking, tool calls, responses) line-by-line
     with [TERM (worker #1)] prefix so the web UI's xterm.js terminal
-    shows a rich real-time view of the entire pi session.
+    shows a rich real-time view of the entire omp session.
     Returns a result dict with 'output' (final assistant text), 'error',
     'duration_seconds', etc.
     """
-    cmd = ["pi", "-a", "--mode", "json", goal]
+    cmd = ["omp", "-a", "--mode", "json", goal]
     if context:
         cmd.extend(["--append-system-prompt", context])
 
-    print(f"[SPAWN (worker #{worker_id})] pi --mode json -- {goal[:60]}")
-    emit_event("spawn", worker_id=worker_id, goal=goal[:120], cmd=" ".join(cmd))
-    sys.stdout.flush()
+    print(f"[SPAWN (worker #{worker_id})] omp --mode json -- {goal[:60]}")
 
     start_time = time.time()
     attempts = 0
@@ -143,7 +141,7 @@ def _execute_task(
             )
 
             if proc.stdout is None:
-                raise RuntimeError("pi subprocess has no stdout pipe")
+                raise RuntimeError("omp subprocess has no stdout pipe")
 
             # Drain stderr concurrently in a daemon thread to prevent
             # deadlock when the subprocess fills the ~64KB stderr pipe
@@ -298,8 +296,7 @@ def _execute_task(
 
         except FileNotFoundError:
             return {
-                "output": "",
-                "error": "'pi' binary not found on PATH",
+                "error": "'omp' binary not found on PATH",
                 "duration_seconds": round(time.time() - start_time, 1),
                 "returncode": -1,
             }
@@ -368,9 +365,8 @@ def _print_shutdown_summary(
 
     _log("")
     _log(f"  {c.group_title('Next steps:')}")
-    _log(f"    {c.dim('View ledger:')}     cat {data_dir}/infinite-loop-state.json | python3 -m json.tool")
-    _log(f'    {c.dim("Re-run:")}          pi-loop --goal "..." --run')
-    _log(f"    {c.dim('Help:')}            pi-loop --help")
+    _log(f'    {c.dim("Re-run:")}          omp-loop --goal "..." --run')
+    _log(f"    {c.dim('Help:')}            omp-loop --help")
     _log(f"{c.header('══════════════════════════════════════════════')}")
     _log("")
 
@@ -418,7 +414,7 @@ def run_loop(
 ) -> None:
     """Main task-execution loop.
 
-    Accepts a ``LoopConfig`` dataclass (see pi_loop.config) and a mutable
+    Accepts a ``LoopConfig`` dataclass (see omp_loop.config) and a mutable
     ``state`` dict.  All per-iteration configuration lives on ``cfg``.
     """
     global _shutdown_requested
@@ -793,7 +789,7 @@ def run_loop(
                 subprocess.run(
                     [
                         "notify-send",
-                        "pi-loop",
+                        "omp-loop",
                         combined_summary[:100] or f"Iteration {iteration_count}",
                     ],
                     timeout=5,
@@ -889,13 +885,13 @@ def run_loop(
             _recalc_stats(state)
             write_ledger(state)
 
-        # Evolve: check pi output for NEXT_GOAL: marker
+        # Evolve: check omp output for NEXT_GOAL: marker
         if evolve and not combined_error and len(goals_list) <= 1:
             _evolve_goal(result.get("output", ""), state, iteration_count)
 
 
 def _evolve_goal(output: str, state: dict, iteration: int) -> None:
-    """Check pi output for NEXT_GOAL: header, update state if found."""
+    """Check omp output for NEXT_GOAL: header, update state if found."""
     for line in output.split("\n"):
         if line.strip().upper().startswith("NEXT_GOAL:"):
             next_goal = line.split(":", 1)[1].strip()
@@ -920,7 +916,7 @@ def _build_dashboard_html(state: dict) -> str:
 
     status_label = html.escape(str(state.get("status", "unknown")))
     return f"""<!DOCTYPE html>
-<html><head><title>pi-loop Dashboard</title>
+<html><head><title>omp-loop Dashboard</title>
 <meta charset="utf-8"><meta http-equiv="refresh" content="5">
 <style>
 body {{ font-family: sans-serif; margin: 20px; }}
@@ -929,7 +925,7 @@ th, td {{ border: 1px solid #ccc; padding: 6px 12px; text-align: left; }}
 th {{ background: #f0f0f0; }}
 tr:nth-child(even) {{ background: #fafafa; }}
 </style></head><body>
-<h1>pi-loop Dashboard</h1>
+<h1>omp-loop Dashboard</h1>
 <p>Status: <strong>{status_label}</strong>
 | Iterations: {len(iters)}
 | Total: {state.get("stats", {}).get("total_duration_seconds", 0):.0f}s</p>

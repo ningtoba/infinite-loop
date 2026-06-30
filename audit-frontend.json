@@ -1,0 +1,68 @@
+{
+  "bugs": [
+    {
+      "id": "CROSS-1",
+      "severity": "high",
+      "file": "web_app/static/index.html",
+      "line": 1,
+      "description": "CSP 'unsafe-inline' required: 11 onclick attributes in HTML (controlLoop, resetLedger, saveConfig, resetConfig, toggleTheme, filterWorkerLogs, copyCliPreview) force script-src 'unsafe-inline', negating XSS protection. Dynamic onclick in renderWorkers appends handler via innerHTML, same CSP bypass.",
+      "fix": "Remove all onclick= from HTML. Use addEventListener in DOMContentLoaded. Bind event delegation via data-* attributes. Drop 'unsafe-inline' from CSP script-src."
+    },
+    {
+      "id": "CROSS-2",
+      "severity": "high",
+      "file": "web_app/static/index.html",
+      "line": 17,
+      "description": "Tablist nav missing arrow key navigation. nav[role='tablist'] has role='tablist' and aria-selected but no ArrowLeft/Right/Home/End key handlers per WAI-ARIA tab pattern. All tabs stay in Tab order (no tabindex='-1' for inactive tabs). Ctrl+1-6 shortcut exists but is invisible to AT users.",
+      "fix": "Add keydown listener on sidebar-nav: ArrowLeft/Right moves focus to prev/next tab + selects it; Home/End jumps to first/last. Set tabindex='-1' on inactive tabs, tabindex='0' on active."
+    },
+    {
+      "id": "CROSS-3",
+      "severity": "medium",
+      "file": "web_app/static/index.html",
+      "line": 17,
+      "description": "ARIA tabs missing aria-controls. Nav buttons have role='tab' and aria-selected but no aria-controls attribute pointing to their tabpanel ID. Tabpanel sections lack aria-labelledby backlink to their tab button. Screen readers cannot programmatically associate nav buttons with their panels.",
+      "fix": "Add aria-controls='tab-{name}' to each nav button. Add aria-labelledby='{button-id}' to each section[role='tabpanel']. Give nav buttons unique id attributes."
+    },
+    {
+      "id": "CROSS-4",
+      "severity": "high",
+      "file": "web_app/static/app.js",
+      "line": 139,
+      "description": "SSE reconnect does not reset iteration tracking state. On reconnect, sseSource.onerror closes and re-inits. The init event resends full status, but _lastSeenIterationCount retains its pre-disconnect value. If reconnect delivers a lower or stale count, rows are silently skipped (no repopulation). User sees a gap in the iteration table.",
+      "fix": "On sseSource.onopen (successful reconnect), reset _lastSeenIterationCount = 0 and trigger a full table fetch. Or adopt a sequence-ID approach and detect resync events."
+    },
+    {
+      "id": "CROSS-5",
+      "severity": "medium",
+      "file": "web_app/static/style.css",
+      "line": 775,
+      "description": "Mobile sidebar (max-width:768px) hides .sidebar-footer with display:none — removes connection status indicator and theme toggle button. No alternate placement in main content. Users on mobile cannot see connection state or switch themes.",
+      "fix": "Relocate compact connection indicator and theme toggle into the main-content top-bar on mobile. Use media query or matchMedia listener."
+    },
+    {
+      "id": "CROSS-6",
+      "severity": "high",
+      "file": "web_app/static/app.js",
+      "line": 135,
+      "description": "xterm lifecycle leak on tab switch: switchTab disposes terminals only when ENTERING the workers tab (showWorkerCards()). When LEAVING the workers tab, _workerTerminals survive with active DOM references and resize listeners. feedWorkerTerminal continues processing data on hidden terminals. Resize callback iterates over all terminals including disposed ones, throwing warnings.",
+      "fix": "In switchTab, if (currentTab was 'workers') { Object.values(_workerTerminals).forEach(t => t.term.dispose()); _workerTerminals = {}; } before switching away."
+    },
+    {
+      "id": "CROSS-7",
+      "severity": "medium",
+      "file": "web_app/static/app.js",
+      "line": 267,
+      "description": "No unsaved config change warning. switchTab calls flushConfigGroup() silently when leaving the config tab, discarding any uncommitted edits with no confirm dialog. The save button is in the config panel but users can Ctrl+1-6 or click a nav button and lose edits without warning.",
+      "fix": "Add dirty-state tracking: deep-copy configValues on switchTab entering config, compare on leave. If dirty, confirm() before switching. Reset dirty flag after saveConfig()."
+    },
+    {
+      "id": "CROSS-8",
+      "severity": "low",
+      "file": "web_app/static/app.js",
+      "line": 48,
+      "description": "Toast UX is incomplete: only showError() exists with .toast-error style. No showSuccess, showWarning, or showInfo. Success feedback uses showSavedMsg which is scoped to the config panel and fades via CSS class, not the toast system. Inconsistent UX across success/error paths.",
+      "fix": "Add showSuccess(), showWarning(), showInfo() using same toast-container but different CSS classes (.toast-success, .toast-warning, .toast-info). Replace alert()/showSavedMsg calls with appropriate toast variant."
+    }
+  ]
+}

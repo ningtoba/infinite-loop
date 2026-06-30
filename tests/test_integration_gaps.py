@@ -30,19 +30,19 @@ class TestCliIntrospectionFlags:
 
     def test_version_flag(self, capsys):
         """--version prints version and exits cleanly."""
-        from pi_loop.cli import main
-        from pi_loop.config import VERSION
+        from omp_loop.cli import main
+        from omp_loop.config import VERSION
 
-        with patch.object(sys, "argv", ["pi-loop", "--version"]):
+        with patch.object(sys, "argv", ["omp-loop", "--version"]):
             main()
         captured = capsys.readouterr()
         assert VERSION in captured.out
 
     def test_healthcheck_flag(self, capsys):
         """--healthcheck runs health check and exits with code 0."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
-        with patch.object(sys, "argv", ["pi-loop", "--healthcheck"]):
+        with patch.object(sys, "argv", ["omp-loop", "--healthcheck"]):
             with pytest.raises(SystemExit) as exc:
                 main()
             assert exc.value.code == 0
@@ -52,19 +52,19 @@ class TestCliIntrospectionFlags:
 
     def test_examples_flag(self, capsys):
         """--examples prints usage examples."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
-        with patch.object(sys, "argv", ["pi-loop", "--examples"]):
+        with patch.object(sys, "argv", ["omp-loop", "--examples"]):
             main()
         captured = capsys.readouterr()
-        assert "pi-loop" in captured.out
+        assert "omp-loop" in captured.out
         assert "--goal" in captured.out
 
     def test_list_flags(self, capsys):
         """--list-flags prints all available flags."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
-        with patch.object(sys, "argv", ["pi-loop", "--list-flags"]):
+        with patch.object(sys, "argv", ["omp-loop", "--list-flags"]):
             main()
         captured = capsys.readouterr()
         assert "--goal" in captured.out
@@ -72,20 +72,20 @@ class TestCliIntrospectionFlags:
 
     def test_list_groups(self, capsys):
         """--list-groups prints flag groups."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
-        with patch.object(sys, "argv", ["pi-loop", "--list-groups"]):
+        with patch.object(sys, "argv", ["omp-loop", "--list-groups"]):
             main()
         captured = capsys.readouterr()
         assert "core" in captured.out or "Core" in captured.out
 
     def test_dump_env(self, capsys):
         """--dump-env prints env vars and their current values."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
         with (
             patch.dict(os.environ, {"INFINITE_LOOP_GOAL": "test_goal"}, clear=True),
-            patch.object(sys, "argv", ["pi-loop", "--dump-env"]),
+            patch.object(sys, "argv", ["omp-loop", "--dump-env"]),
         ):
             main()
         captured = capsys.readouterr()
@@ -93,12 +93,12 @@ class TestCliIntrospectionFlags:
 
     def test_status_without_ledger(self, capsys):
         """--status shows status with default values when no ledger exists."""
-        from pi_loop import cli as cli_mod
+        from omp_loop import cli as cli_mod
 
         with (
-            patch.object(sys, "argv", ["pi-loop", "--status"]),
-            patch("pi_loop.cli.LEDGER_PATH", "/nonexistent/ledger.json"),
-            patch("pi_loop.cli.read_ledger", return_value=None),
+            patch.object(sys, "argv", ["omp-loop", "--status"]),
+            patch("omp_loop.cli.LEDGER_PATH", "/nonexistent/ledger.json"),
+            patch("omp_loop.cli.read_ledger", return_value=None),
         ):
             cli_mod.main()
         captured = capsys.readouterr()
@@ -106,9 +106,9 @@ class TestCliIntrospectionFlags:
 
     def test_doctor_flag(self, capsys):
         """--doctor runs diagnostic checks."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
-        with patch.object(sys, "argv", ["pi-loop", "--doctor"]):
+        with patch.object(sys, "argv", ["omp-loop", "--doctor"]):
             main()
         captured = capsys.readouterr()
         # Doctor produces diagnostics output (should not crash)
@@ -116,9 +116,9 @@ class TestCliIntrospectionFlags:
 
     def test_preflight_flag(self, capsys, tmp_path):
         """--preflight runs preflight checks and exits cleanly."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
-        with patch.object(sys, "argv", ["pi-loop", "--preflight", "--shutdown-sentinel", str(tmp_path / "sentinel")]):
+        with patch.object(sys, "argv", ["omp-loop", "--preflight", "--shutdown-sentinel", str(tmp_path / "sentinel")]):
             main()
         captured = capsys.readouterr()
         # Should produce output (preflight results)
@@ -126,18 +126,18 @@ class TestCliIntrospectionFlags:
 
     def test_help_topic(self, capsys):
         """--help-topic prints specific help topic."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
-        with patch.object(sys, "argv", ["pi-loop", "--help-topic", "convergence"]):
+        with patch.object(sys, "argv", ["omp-loop", "--help-topic", "convergence"]):
             main()
         captured = capsys.readouterr()
         assert captured.out is not None
 
     def test_explain_flag(self, capsys):
         """--explain prints explanation of a specific flag."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
-        with patch.object(sys, "argv", ["pi-loop", "--explain", "git"]):
+        with patch.object(sys, "argv", ["omp-loop", "--explain", "git"]):
             main()
         captured = capsys.readouterr()
         assert "--git" in captured.out or "git" in captured.out.lower()
@@ -148,17 +148,17 @@ class TestCliMainDispatch:
 
     def test_missing_goal_shows_help(self, capsys):
         """main() with no --goal and no introspection flag prints help."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
-        with patch.object(sys, "argv", ["pi-loop"]):
+        with patch.object(sys, "argv", ["omp-loop"]):
             main()
         captured = capsys.readouterr()
-        assert "usage:" in captured.out.lower() or "pi-loop" in captured.out
+        assert "usage:" in captured.out.lower() or "omp-loop" in captured.out
 
     def test_status_with_ledger(self, capsys, tmp_path):
         """--status shows ledger content when ledger exists."""
-        from pi_loop import cli as cli_mod
-        from pi_loop.file_utils import write_ledger
+        from omp_loop import cli as cli_mod
+        from omp_loop.file_utils import write_ledger
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()
@@ -175,10 +175,10 @@ class TestCliMainDispatch:
         )
 
         with (
-            patch.object(sys, "argv", ["pi-loop", "--status"]),
-            patch("pi_loop.cli.LEDGER_PATH", ledger_path),
+            patch.object(sys, "argv", ["omp-loop", "--status"]),
+            patch("omp_loop.cli.LEDGER_PATH", ledger_path),
             patch(
-                "pi_loop.cli.read_ledger",
+                "omp_loop.cli.read_ledger",
                 return_value={
                     "initial_command": "Test goal",
                     "status": "running",
@@ -194,8 +194,8 @@ class TestCliMainDispatch:
 
     def test_force_reset_removes_ledger(self, tmp_path):
         """--force-reset removes the existing ledger before starting."""
-        from pi_loop import cli as cli_mod
-        from pi_loop.file_utils import write_ledger
+        from omp_loop import cli as cli_mod
+        from omp_loop.file_utils import write_ledger
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()
@@ -216,7 +216,7 @@ class TestCliMainDispatch:
             sys,
             "argv",
             [
-                "pi-loop",
+                "omp-loop",
                 "--goal",
                 "New goal",
                 "--force-reset",
@@ -234,7 +234,7 @@ class TestCliContextFile:
 
     def test_context_file_loaded(self, tmp_path, capsys):
         """--context-file loads content from disk."""
-        from pi_loop import cli as cli_mod
+        from omp_loop import cli as cli_mod
 
         ctx_file = tmp_path / "ctx.txt"
         ctx_file.write_text("Be concise and use best practices")
@@ -244,7 +244,7 @@ class TestCliContextFile:
                 sys,
                 "argv",
                 [
-                    "pi-loop",
+                    "omp-loop",
                     "--goal",
                     "test",
                     "--context-file",
@@ -260,13 +260,13 @@ class TestCliContextFile:
 
     def test_missing_context_file_exits(self):
         """Missing --context-file prints error and exits."""
-        from pi_loop.cli import main
+        from omp_loop.cli import main
 
         with patch.object(
             sys,
             "argv",
             [
-                "pi-loop",
+                "omp-loop",
                 "--goal",
                 "test",
                 "--context-file",
@@ -283,7 +283,7 @@ class TestCliConfigFile:
 
     def test_config_file_loaded(self, tmp_path, capsys):
         """--config loads JSON from disk."""
-        from pi_loop import cli as cli_mod
+        from omp_loop import cli as cli_mod
 
         cfg_file = tmp_path / "config.json"
         cfg_file.write_text(json.dumps({"goal": "from file"}))
@@ -293,7 +293,7 @@ class TestCliConfigFile:
                 sys,
                 "argv",
                 [
-                    "pi-loop",
+                    "omp-loop",
                     "--goal",
                     "test",
                     "--config",
@@ -308,7 +308,7 @@ class TestCliConfigFile:
 
     def test_corrupt_config_file_does_not_crash(self, tmp_path, capsys):
         """Corrupt --config file logs warning and continues."""
-        from pi_loop import cli as cli_mod
+        from omp_loop import cli as cli_mod
 
         cfg_file = tmp_path / "bad_config.json"
         cfg_file.write_text("not json")
@@ -318,7 +318,7 @@ class TestCliConfigFile:
                 sys,
                 "argv",
                 [
-                    "pi-loop",
+                    "omp-loop",
                     "--goal",
                     "test",
                     "--config",
@@ -333,7 +333,7 @@ class TestCliConfigFile:
 
     def test_save_config_writes_file(self, tmp_path):
         """--save-config writes config dict to disk."""
-        from pi_loop import cli as cli_mod
+        from omp_loop import cli as cli_mod
 
         saved = tmp_path / "saved_config.json"
         with (
@@ -341,7 +341,7 @@ class TestCliConfigFile:
                 sys,
                 "argv",
                 [
-                    "pi-loop",
+                    "omp-loop",
                     "--goal",
                     "save-test",
                     "--git",
@@ -368,19 +368,19 @@ class TestClassifyErrorEdgeCases:
 
     def test_none_input(self):
         """classify_error returns None for None."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error(None) is None
 
     def test_empty_string(self):
         """classify_error returns None for empty string."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error("") is None
 
     def test_case_variations_timeout(self):
         """classify_error handles case variations for timeout keywords."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error("TIMEOUT") == "timeout"
         assert classify_error("TimeOut") == "timeout"
@@ -390,7 +390,7 @@ class TestClassifyErrorEdgeCases:
 
     def test_case_variations_network(self):
         """classify_error handles case variations for network keywords."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error("CONNECTION REFUSED") == "network"
         assert classify_error("Connection Refused") == "network"
@@ -400,7 +400,7 @@ class TestClassifyErrorEdgeCases:
 
     def test_network_status_codes(self):
         """HTTP status codes classified as network errors."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error("503 Service Unavailable") == "network"
         assert classify_error("502 Bad Gateway") == "network"
@@ -409,7 +409,7 @@ class TestClassifyErrorEdgeCases:
 
     def test_schema_errors(self):
         """classify_error returns 'schema' for schema-related errors."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error("Schema mismatch at field 'name'") == "schema"
         assert classify_error("ValidationError: invalid type") == "schema"
@@ -418,7 +418,7 @@ class TestClassifyErrorEdgeCases:
 
     def test_unknown_errors(self):
         """Unknown error strings return 'unknown'."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error("permission denied") == "unknown"
         assert classify_error("disk full") == "unknown"
@@ -427,7 +427,7 @@ class TestClassifyErrorEdgeCases:
 
     def test_network_url_error_keywords(self):
         """Network URL error keywords are detected."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error("could not resolve host") == "network"
         assert classify_error("getaddrinfo failed") == "network"
@@ -438,7 +438,7 @@ class TestClassifyErrorEdgeCases:
 
     def test_tls_ssl_errors(self):
         """TLS/SSL errors classified as network."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error("TLS handshake failed") == "network"
         assert classify_error("SSL certificate verify failed") == "network"
@@ -447,14 +447,14 @@ class TestClassifyErrorEdgeCases:
 
     def test_timeout_word_embedded(self):
         """'timeout' as a standalone word is still detected."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error("The request timed out and failed") == "timeout"
         assert classify_error("Task was killed by timeout handler") == "timeout"
 
     def test_connection_errors_without_keywords(self):
         """Connection-related but not matching keywords → unknown."""
-        from pi_loop.error_utils import classify_error
+        from omp_loop.error_utils import classify_error
 
         assert classify_error("connection broken") == "unknown"
         assert classify_error("connection lost") == "unknown"
@@ -465,7 +465,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_no_suggestion_for_success(self):
         """No suggestion for completed classifications."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type=None,
@@ -478,7 +478,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_no_suggestion_for_progress(self):
         """No suggestion for 'progress' classification."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type=None,
@@ -491,7 +491,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_timeout_suggestion(self):
         """Timeout error suggests increasing session timeout."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type="timeout",
@@ -505,7 +505,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_network_suggestion(self):
         """Network error suggests connectivity checks."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type="network",
@@ -519,7 +519,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_schema_suggestion(self):
         """Schema error suggests reviewing output schema."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type="schema",
@@ -533,7 +533,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_high_consecutive_errors(self):
         """3+ consecutive errors with stuck classification get escalation."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         # error_type=None so error-type branch doesn't short-circuit
         result = _suggest_actionable_fix(
@@ -548,7 +548,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_stuck_classification_no_git(self):
         """Stuck classification suggests --evolve when not enabled."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type=None,
@@ -563,7 +563,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_stuck_classification_with_git_convergence(self):
         """Stuck with convergence goal mentions threshold."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type=None,
@@ -578,7 +578,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_regression_suggests_git(self):
         """Regression classification suggests --git when not enabled."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type=None,
@@ -595,7 +595,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_regression_with_git_suggests_commit(self):
         """Regression with --git already enabled suggests --git-commit."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type=None,
@@ -612,7 +612,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_regression_all_enabled_returns_none(self):
         """Regression with all features already enabled returns None."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type=None,
@@ -628,7 +628,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_partial_classification(self):
         """Partial classification with an error type gives suggestion."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         # partial with an error type still returns error-type suggestion
         result = _suggest_actionable_fix(
@@ -643,7 +643,7 @@ class TestSuggestActionableFixIntegration:
 
     def test_unknown_classification(self):
         """'unknown' classification returns a mild tip."""
-        from pi_loop.error_utils import _suggest_actionable_fix
+        from omp_loop.error_utils import _suggest_actionable_fix
 
         result = _suggest_actionable_fix(
             error_type=None,
@@ -666,7 +666,7 @@ class TestColorizerIntegration:
 
     def test_never_mode_strips_color(self):
         """configure_color_mode('never') suppresses ANSI codes."""
-        from pi_loop.color_utils import colorizer, configure_color_mode
+        from omp_loop.color_utils import colorizer, configure_color_mode
 
         configure_color_mode("never")
         result = colorizer.ok("success")
@@ -676,7 +676,7 @@ class TestColorizerIntegration:
 
     def test_always_mode_emits_color(self):
         """configure_color_mode('always') emits ANSI codes even to pipe."""
-        import pi_loop.color_utils as cu
+        import omp_loop.color_utils as cu
 
         cu.configure_color_mode("always")
         result = cu.colorizer.ok("success")
@@ -686,7 +686,7 @@ class TestColorizerIntegration:
 
     def test_colorize_named_colors(self):
         """colorizer.colorize wraps text in named color."""
-        import pi_loop.color_utils as cu
+        import omp_loop.color_utils as cu
 
         cu.configure_color_mode("always")
         red_text = cu.colorizer.colorize("error", "red")
@@ -696,7 +696,7 @@ class TestColorizerIntegration:
 
     def test_colorize_multiple_names(self):
         """colorize accepts multiple color names."""
-        import pi_loop.color_utils as cu
+        import omp_loop.color_utils as cu
 
         cu.configure_color_mode("always")
         text = cu.colorizer.colorize("warning", "bold", "yellow")
@@ -705,7 +705,7 @@ class TestColorizerIntegration:
 
     def test_colorizer_convenience_methods(self):
         """Convenience methods ok/fail/warn/dim/header work correctly."""
-        import pi_loop.color_utils as cu
+        import omp_loop.color_utils as cu
 
         cu.configure_color_mode("always")
         assert "\033[1;92m" in cu.colorizer.ok("yes")
@@ -721,7 +721,7 @@ class TestColorizerIntegration:
 
     def test_no_color_env_var(self):
         """NO_COLOR env var disables color in auto mode."""
-        import pi_loop.color_utils as cu
+        import omp_loop.color_utils as cu
 
         with patch.dict(os.environ, {"NO_COLOR": "1"}):
             cu.configure_color_mode("auto")
@@ -730,7 +730,7 @@ class TestColorizerIntegration:
 
     def test_invalid_mode_defaults_to_auto(self):
         """Invalid mode string defaults to 'auto'."""
-        import pi_loop.color_utils as cu
+        import omp_loop.color_utils as cu
 
         cu.configure_color_mode("invalid_mode")
         # Should not crash — uses auto mode
@@ -739,7 +739,7 @@ class TestColorizerIntegration:
 
     def test_strip_ansi_utility(self):
         """Color mode 'never' strips ANSI codes from output."""
-        import pi_loop.color_utils as cu
+        import omp_loop.color_utils as cu
 
         cu.configure_color_mode("always")
         colored = cu.colorizer.ok("bold text")
@@ -751,7 +751,7 @@ class TestColorizerIntegration:
 
     def test_tag_output_smoke(self):
         """tag_ok and tag_fail produce different output."""
-        import pi_loop.color_utils as cu
+        import omp_loop.color_utils as cu
 
         cu.configure_color_mode("always")
         ok_mark = cu.colorizer.tag_ok()
@@ -767,7 +767,7 @@ class TestColorizerIntegration:
 class TestRunLoopExitConditions:
     """run_loop() terminates correctly under various exit conditions.
 
-    These tests use a mocked _execute_task to avoid executing the real 'pi'
+    These tests use a mocked _execute_task to avoid executing the real 'omp'
     binary, while leaving all other loop logic (sentinel, iteration counting,
     shutdown sequence) real.
     """
@@ -775,23 +775,23 @@ class TestRunLoopExitConditions:
     @pytest.fixture
     def _isolate_paths(self, tmp_path, monkeypatch):
         """Isolate ledger/lock/status to temp dir."""
-        monkeypatch.setenv("PI_LOOP_DATA_DIR", str(tmp_path))
-        monkeypatch.setenv("PI_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
-        monkeypatch.setenv("PI_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
+        monkeypatch.setenv("OMP_LOOP_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OMP_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
+        monkeypatch.setenv("OMP_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
         import importlib
 
-        from pi_loop import config as cfg_mod
+        from omp_loop import config as cfg_mod
 
         importlib.reload(cfg_mod)
-        from pi_loop import file_utils as fu_mod
+        from omp_loop import file_utils as fu_mod
 
         importlib.reload(fu_mod)
 
     def test_max_iterations_stops(self, _isolate_paths, tmp_path):
         """run_loop stops when iteration count reaches max_iterations."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.loop import run_loop
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.config import LoopConfig
+        from omp_loop.loop import run_loop
+        from omp_loop.state import load_or_create_ledger
 
         state = load_or_create_ledger("Max iteration test", "")
         cfg = LoopConfig(
@@ -803,7 +803,7 @@ class TestRunLoopExitConditions:
             workers=1,
         )
 
-        with patch("pi_loop.loop._execute_task") as mock_exec:
+        with patch("omp_loop.loop._execute_task") as mock_exec:
             mock_exec.return_value = {
                 "output": "Completed iteration",
                 "error": None,
@@ -817,9 +817,9 @@ class TestRunLoopExitConditions:
 
     def test_sentinel_stop(self, _isolate_paths, tmp_path):
         """run_loop stops when sentinel file is created."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.loop import run_loop
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.config import LoopConfig
+        from omp_loop.loop import run_loop
+        from omp_loop.state import load_or_create_ledger
 
         sentinel_path = str(tmp_path / "stop-sentinel")
         state = load_or_create_ledger("Sentinel stop test", "", sentinel_path=sentinel_path)
@@ -848,7 +848,7 @@ class TestRunLoopExitConditions:
                 "returncode": 0,
             }
 
-        with patch("pi_loop.loop._execute_task") as mock_exec:
+        with patch("omp_loop.loop._execute_task") as mock_exec:
             mock_exec.side_effect = _side_effect
             run_loop(cfg, state)
 
@@ -857,9 +857,9 @@ class TestRunLoopExitConditions:
 
     def test_error_mitigation_stop(self, _isolate_paths, tmp_path):
         """run_loop stops when mitigation reaches level >= 3."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.loop import run_loop
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.config import LoopConfig
+        from omp_loop.loop import run_loop
+        from omp_loop.state import load_or_create_ledger
 
         state = load_or_create_ledger("Error stop test", "")
         # Pre-seed error count so mitigation escalates quickly
@@ -874,7 +874,7 @@ class TestRunLoopExitConditions:
             cooldown=0,
         )
 
-        with patch("pi_loop.loop._execute_task") as mock_exec:
+        with patch("omp_loop.loop._execute_task") as mock_exec:
             mock_exec.return_value = {
                 "output": "",
                 "error": "timeout error",
@@ -890,9 +890,9 @@ class TestRunLoopExitConditions:
     def test_empty_max_iterations_runs_limited(self, _isolate_paths, tmp_path):
         """run_loop runs reasonable number when max_iterations is not set (default 50)."""
         # This test just verifies it doesn't infinite loop
-        from pi_loop.config import LoopConfig
-        from pi_loop.loop import run_loop
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.config import LoopConfig
+        from omp_loop.loop import run_loop
+        from omp_loop.state import load_or_create_ledger
 
         state = load_or_create_ledger("No max test", "")
         cfg = LoopConfig(
@@ -904,7 +904,7 @@ class TestRunLoopExitConditions:
             workers=1,
         )
 
-        with patch("pi_loop.loop._execute_task") as mock_exec:
+        with patch("omp_loop.loop._execute_task") as mock_exec:
             mock_exec.return_value = {
                 "output": "ok",
                 "error": None,
@@ -917,9 +917,9 @@ class TestRunLoopExitConditions:
 
     def test_idle_detection_stops(self, _isolate_paths, tmp_path):
         """run_loop stops when idle detection triggers."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.loop import run_loop
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.config import LoopConfig
+        from omp_loop.loop import run_loop
+        from omp_loop.state import load_or_create_ledger
 
         state = load_or_create_ledger("Idle stop test", "")
         cfg = LoopConfig(
@@ -937,8 +937,8 @@ class TestRunLoopExitConditions:
         git_state = {"diff_stat": "", "head": "abc123"}
 
         with (
-            patch("pi_loop.loop._execute_task") as mock_exec,
-            patch("pi_loop.loop._capture_git_state", return_value=git_state),
+            patch("omp_loop.loop._execute_task") as mock_exec,
+            patch("omp_loop.loop._capture_git_state", return_value=git_state),
         ):
             mock_exec.return_value = {
                 "output": "ok",
@@ -962,7 +962,7 @@ class TestEvolveGoal:
 
     def test_extracts_next_goal(self):
         """_evolve_goal extracts NEXT_GOAL: marker from output."""
-        from pi_loop.loop import _evolve_goal
+        from omp_loop.loop import _evolve_goal
 
         state = {}
         output = textwrap.dedent("""\
@@ -975,7 +975,7 @@ class TestEvolveGoal:
 
     def test_case_insensitive_prefix(self):
         """NEXT_GOAL marker is case-insensitive."""
-        from pi_loop.loop import _evolve_goal
+        from omp_loop.loop import _evolve_goal
 
         state = {}
         output = "next_goal: do something else\n"
@@ -984,7 +984,7 @@ class TestEvolveGoal:
 
     def test_no_marker_no_change(self):
         """No NEXT_GOAL marker leaves state unchanged."""
-        from pi_loop.loop import _evolve_goal
+        from omp_loop.loop import _evolve_goal
 
         state = {}
         _evolve_goal("Just regular output without marker", state, iteration=1)
@@ -992,7 +992,7 @@ class TestEvolveGoal:
 
     def test_empty_goal_after_marker(self):
         """Empty NEXT_GOAL value is ignored."""
-        from pi_loop.loop import _evolve_goal
+        from omp_loop.loop import _evolve_goal
 
         state = {}
         _evolve_goal("NEXT_GOAL:  \n", state, iteration=2)
@@ -1000,7 +1000,7 @@ class TestEvolveGoal:
 
     def test_multiple_markers_last_wins(self):
         """Multiple NEXT_GOAL markers — last non-empty one wins."""
-        from pi_loop.loop import _evolve_goal
+        from omp_loop.loop import _evolve_goal
 
         state = {}
         output = textwrap.dedent("""\
@@ -1013,7 +1013,7 @@ class TestEvolveGoal:
 
     def test_whitespace_around_value(self):
         """Whitespace around NEXT_GOAL value is stripped."""
-        from pi_loop.loop import _evolve_goal
+        from omp_loop.loop import _evolve_goal
 
         state = {}
         _evolve_goal("  NEXT_GOAL:   trim this   ", state, iteration=1)
@@ -1021,7 +1021,7 @@ class TestEvolveGoal:
 
     def test_colon_in_goal_body(self):
         """A colon in the goal value is preserved."""
-        from pi_loop.loop import _evolve_goal
+        from omp_loop.loop import _evolve_goal
 
         state = {}
         _evolve_goal("NEXT_GOAL: Fix bug: update schema", state, iteration=2)
@@ -1038,14 +1038,14 @@ class TestProgressiveContextEdgeCases:
 
     def test_empty_summaries(self):
         """Empty summaries list returns just the base context."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         ctx = _build_progressive_context("Base context", [])
         assert ctx == "Base context"
 
     def test_single_summary(self):
         """Single summary is included in context."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         ctx = _build_progressive_context("Base", ["First result"])
         assert "Base" in ctx
@@ -1053,7 +1053,7 @@ class TestProgressiveContextEdgeCases:
 
     def test_many_summaries_truncated(self):
         """Many summaries are truncated to last items."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         summaries = [f"Summary {i}" for i in range(100)]
         ctx = _build_progressive_context("Base", summaries)
@@ -1062,7 +1062,7 @@ class TestProgressiveContextEdgeCases:
 
     def test_summaries_with_special_chars(self):
         """Summaries with special characters are preserved."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         ctx = _build_progressive_context("Base", ["Line 1\nLine 2", "Tab\tseparated", "Unicode: ñño 😊"])
         assert "Unicode" in ctx
@@ -1071,7 +1071,7 @@ class TestProgressiveContextEdgeCases:
 
     def test_very_long_summaries(self):
         """Very long summaries are handled."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         long_summary = "x" * 10000
         ctx = _build_progressive_context("Base", [long_summary])
@@ -1088,7 +1088,7 @@ class TestPrintShutdownSummary:
 
     def test_default_output(self, capsys):
         """_print_shutdown_summary prints formatted summary."""
-        from pi_loop.loop import _print_shutdown_summary
+        from omp_loop.loop import _print_shutdown_summary
 
         state = {
             "status": "stopped: test",
@@ -1115,7 +1115,7 @@ class TestPrintShutdownSummary:
 
     def test_no_iterations(self, capsys):
         """Summary handles zero iterations."""
-        from pi_loop.loop import _print_shutdown_summary
+        from omp_loop.loop import _print_shutdown_summary
 
         state = {
             "status": "stopped: idle",
@@ -1131,7 +1131,7 @@ class TestPrintShutdownSummary:
 
     def test_all_errors(self, capsys):
         """Summary with all errors still renders."""
-        from pi_loop.loop import _print_shutdown_summary
+        from omp_loop.loop import _print_shutdown_summary
 
         state = {
             "status": "stopped: timeout-failure",
@@ -1157,7 +1157,7 @@ class TestPrintShutdownSummary:
 
     def test_minimal_state(self, capsys):
         """Summary handles minimal state with missing keys."""
-        from pi_loop.loop import _print_shutdown_summary
+        from omp_loop.loop import _print_shutdown_summary
 
         _print_shutdown_summary({"iterations": []}, iteration_count=0, stop_reason="stopped")
 
@@ -1175,8 +1175,8 @@ class TestShutdownExtended:
 
     def test_shutdown_without_status_file_entry(self, tmp_path):
         """_shutdown with write_status_file_entry=False."""
-        from pi_loop.file_utils import write_ledger
-        from pi_loop.loop import _shutdown
+        from omp_loop.file_utils import write_ledger
+        from omp_loop.loop import _shutdown
 
         state = {"total_iterations": 0, "status": "running"}
         write_ledger(state)
@@ -1192,7 +1192,7 @@ class TestShutdownExtended:
 
     def test_shutdown_with_last_error(self, tmp_path):
         """_shutdown includes last_error in status file."""
-        from pi_loop.loop import _shutdown
+        from omp_loop.loop import _shutdown
 
         state = {"total_iterations": 1, "status": "running"}
         status_file = str(tmp_path / "loop-status.json")
@@ -1270,15 +1270,15 @@ class TestExecuteTaskExtended:
     """Extended _execute_task edge cases beyond test_integration_deep.py."""
 
     @pytest.fixture(scope="module")
-    def mock_pi_path(self):
-        """Copy mock_pi.sh into a temp dir named 'pi' on PATH."""
-        mock_src = pathlib.Path(__file__).resolve().parent / "integration" / "mock_pi.sh"
-        assert mock_src.is_file(), f"mock_pi.sh not found at {mock_src}"
+    def mock_omp_path(self):
+        """Copy mock_omp.sh into a temp dir named 'omp' on PATH."""
+        mock_src = pathlib.Path(__file__).resolve().parent / "integration" / "mock_omp.sh"
+        assert mock_src.is_file(), f"mock_omp.sh not found at {mock_src}"
 
         tmpdir = pathlib.Path(tempfile.mkdtemp())
-        pi_bin = tmpdir / "pi"
-        shutil.copy2(str(mock_src), str(pi_bin))
-        pi_bin.chmod(0o755)
+        omp_bin = tmpdir / "omp"
+        shutil.copy2(str(mock_src), str(omp_bin))
+        omp_bin.chmod(0o755)
 
         old_path = os.environ.get("PATH", "")
         os.environ["PATH"] = f"{tmpdir}:{old_path}"
@@ -1287,8 +1287,8 @@ class TestExecuteTaskExtended:
         shutil.rmtree(str(tmpdir), ignore_errors=True)
 
     @pytest.fixture
-    def mock_pi_env(self, mock_pi_path):
-        _ = mock_pi_path
+    def mock_omp_env(self, mock_omp_path):
+        _ = mock_omp_path
         saved = {}
         active = {}
 
@@ -1307,13 +1307,13 @@ class TestExecuteTaskExtended:
             else:
                 os.environ[k] = saved[k]
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_retry_delay_on_failure(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_retry_delay_on_failure(self, mock_omp_env):
         """_execute_task retries with proper delay on failure."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
         start = time.time()
-        mock_pi_env({"MOCK_PI_EXIT_CODE": "1"})
+        mock_omp_env({"MOCK_PI_EXIT_CODE": "1"})
         result = _execute_task(
             goal="retry delay test",
             context="",
@@ -1327,13 +1327,13 @@ class TestExecuteTaskExtended:
         # Should have waited at least retry_delay (1s) between attempts
         assert elapsed >= 1.0
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_session_timeout_triggers(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_session_timeout_triggers(self, mock_omp_env):
         """_execute_task handles session timeout."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
         # Set a very short session timeout with a delay that exceeds it
-        mock_pi_env({"MOCK_PI_DELAY_S": "3"})
+        mock_omp_env({"MOCK_PI_DELAY_S": "3"})
         result = _execute_task(
             goal="timeout test",
             context="",
@@ -1344,12 +1344,12 @@ class TestExecuteTaskExtended:
         # Should have timed out
         assert result["error"] is not None
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_no_stdout_handling(self, mock_pi_env):
-        """_execute_task handles mock_pi with no stdout output."""
-        from pi_loop.loop import _execute_task
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_no_stdout_handling(self, mock_omp_env):
+        """_execute_task handles mock_omp with no stdout output."""
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({"MOCK_PI_NO_STDOUT": "1"})
+        mock_omp_env({"MOCK_PI_NO_STDOUT": "1"})
         result = _execute_task(
             goal="no stdout",
             context="",
@@ -1359,12 +1359,12 @@ class TestExecuteTaskExtended:
         rc = result["returncode"]
         assert result["error"] is not None or rc in {0, -1}
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_end_on_stderr(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_end_on_stderr(self, mock_omp_env):
         """_execute_task handles NDJSON events on stderr."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({"MOCK_PI_END_ON_STDERR": "1"})
+        mock_omp_env({"MOCK_PI_END_ON_STDERR": "1"})
         result = _execute_task(
             goal="stderr ndjson",
             context="",
@@ -1374,12 +1374,12 @@ class TestExecuteTaskExtended:
         # Should still produce some result
         assert result is not None
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_large_output_truncation(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_large_output_truncation(self, mock_omp_env):
         """_execute_task truncates output per max_output_chars."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({"MOCK_PI_OUTPUT_TEXT": "x" * 5000})
+        mock_omp_env({"MOCK_PI_OUTPUT_TEXT": "x" * 5000})
         result = _execute_task(
             goal="truncation test",
             context="",
@@ -1390,12 +1390,12 @@ class TestExecuteTaskExtended:
         assert result["error"] is None
         assert len(result["output"]) <= 100
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_empty_output(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_empty_output(self, mock_omp_env):
         """_execute_task handles empty output."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({"MOCK_PI_OUTPUT_TEXT": ""})
+        mock_omp_env({"MOCK_PI_OUTPUT_TEXT": ""})
         result = _execute_task(
             goal="empty output",
             context="",
@@ -1404,13 +1404,13 @@ class TestExecuteTaskExtended:
         )
         assert result["error"] is None or result["returncode"] == 0
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_various_tool_counts(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_various_tool_counts(self, mock_omp_env):
         """_execute_task handles varying tool call counts."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
         for tool_count in (0, 1, 3):
-            mock_pi_env({"MOCK_PI_TOOL_COUNT": str(tool_count)})
+            mock_omp_env({"MOCK_PI_TOOL_COUNT": str(tool_count)})
             result = _execute_task(
                 goal=f"tools {tool_count}",
                 context="",
@@ -1432,7 +1432,7 @@ class TestCooldownExtended:
         """_handle_cooldown with adaptive mode does not block."""
         import time
 
-        from pi_loop.functions import _handle_cooldown
+        from omp_loop.functions import _handle_cooldown
 
         start = time.time()
         _handle_cooldown(30, "adaptive", None, "research")
@@ -1441,7 +1441,7 @@ class TestCooldownExtended:
 
     def test_shutdown_event_aborts_fixed_cooldown(self):
         """_handle_cooldown aborts fixed cooldown on shutdown event."""
-        from pi_loop.functions import _handle_cooldown
+        from omp_loop.functions import _handle_cooldown
 
         event = threading.Event()
         event.set()
@@ -1457,7 +1457,7 @@ class TestCooldownExtended:
         """_handle_cooldown with 0 returns immediately."""
         import time
 
-        from pi_loop.functions import _handle_cooldown
+        from omp_loop.functions import _handle_cooldown
 
         start = time.time()
         _handle_cooldown(0, "fixed", None, "generic")
@@ -1466,7 +1466,7 @@ class TestCooldownExtended:
 
     def test_negative_cooldown_is_safe(self):
         """_handle_cooldown with negative cooldown is safe."""
-        from pi_loop.functions import _handle_cooldown
+        from omp_loop.functions import _handle_cooldown
 
         _handle_cooldown(-1, "fixed", None, "research")
 
@@ -1481,7 +1481,7 @@ class TestDashboardHtmlExtended:
 
     def test_state_with_no_status(self):
         """Dashboard handles state with no status key."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         html = _build_dashboard_html({"iterations": [], "stats": {}})
         assert "<!DOCTYPE html>" in html
@@ -1489,7 +1489,7 @@ class TestDashboardHtmlExtended:
 
     def test_iteration_with_missing_fields(self):
         """Dashboard handles iterations with missing fields."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         state = {
             "status": "running",
@@ -1505,7 +1505,7 @@ class TestDashboardHtmlExtended:
 
     def test_xss_prevention_in_summary(self):
         """Dashboard HTML-escapes malicious content in summaries."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         state = {
             "status": "running",
@@ -1525,7 +1525,7 @@ class TestDashboardHtmlExtended:
 
     def test_xss_in_status(self):
         """Dashboard HTML-escapes status label."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         state = {
             "status": "<script>alert('xss')</script>",
@@ -1537,7 +1537,7 @@ class TestDashboardHtmlExtended:
 
     def test_large_state_performance(self):
         """Dashboard handles 200 iterations without error."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         iters = [
             {
@@ -1572,23 +1572,23 @@ class TestIterationCompact:
 
     @pytest.fixture
     def _isolate_paths(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("PI_LOOP_DATA_DIR", str(tmp_path))
-        monkeypatch.setenv("PI_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
-        monkeypatch.setenv("PI_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
+        monkeypatch.setenv("OMP_LOOP_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OMP_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
+        monkeypatch.setenv("OMP_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
         import importlib
 
-        from pi_loop import config as cfg_mod
+        from omp_loop import config as cfg_mod
 
         importlib.reload(cfg_mod)
-        from pi_loop import file_utils as fu_mod
+        from omp_loop import file_utils as fu_mod
 
         importlib.reload(fu_mod)
 
     def test_keep_iterations_trims_old_entries(self, _isolate_paths, tmp_path):
         """run_loop trims old iterations when keep_iterations is set."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.loop import run_loop
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.config import LoopConfig
+        from omp_loop.loop import run_loop
+        from omp_loop.state import load_or_create_ledger
 
         state = load_or_create_ledger("Compact test", "")
         # Pre-seed many iterations to exercise compact logic
@@ -1607,7 +1607,7 @@ class TestIterationCompact:
             workers=1,
         )
 
-        with patch("pi_loop.loop._execute_task") as mock_exec:
+        with patch("omp_loop.loop._execute_task") as mock_exec:
             mock_exec.return_value = {
                 "output": "ok",
                 "error": None,
@@ -1630,18 +1630,18 @@ class TestIterationLifecycleIntegration:
     """Cross-module iteration lifecycle: context → execute → notifications.
 
     This validates the full data flow through _execute_task → result
-    processing → notification → cooldown with real mock_pi.sh.
+    processing → notification → cooldown with real mock_omp.sh.
     """
 
     @pytest.fixture(scope="module")
-    def mock_pi_path(self):
-        mock_src = pathlib.Path(__file__).resolve().parent / "integration" / "mock_pi.sh"
+    def mock_omp_path(self):
+        mock_src = pathlib.Path(__file__).resolve().parent / "integration" / "mock_omp.sh"
         assert mock_src.is_file()
 
         tmpdir = pathlib.Path(tempfile.mkdtemp())
-        pi_bin = tmpdir / "pi"
-        shutil.copy2(str(mock_src), str(pi_bin))
-        pi_bin.chmod(0o755)
+        omp_bin = tmpdir / "omp"
+        shutil.copy2(str(mock_src), str(omp_bin))
+        omp_bin.chmod(0o755)
 
         old_path = os.environ.get("PATH", "")
         os.environ["PATH"] = f"{tmpdir}:{old_path}"
@@ -1650,8 +1650,8 @@ class TestIterationLifecycleIntegration:
         shutil.rmtree(str(tmpdir), ignore_errors=True)
 
     @pytest.fixture
-    def mock_pi_env(self, mock_pi_path):
-        _ = mock_pi_path
+    def mock_omp_env(self, mock_omp_path):
+        _ = mock_omp_path
         saved = {}
         active = {}
 
@@ -1670,16 +1670,16 @@ class TestIterationLifecycleIntegration:
             else:
                 os.environ[k] = saved[k]
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_context_flow_to_execution(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_context_flow_to_execution(self, mock_omp_env):
         """Context is built and passed to _execute_task."""
-        from pi_loop.functions import _build_progressive_context
-        from pi_loop.loop import _execute_task
+        from omp_loop.functions import _build_progressive_context
+        from omp_loop.loop import _execute_task
 
         ctx = _build_progressive_context("Be concise", ["Previous result 1", "Previous result 2"])
         assert "Previous result 1" in ctx
 
-        mock_pi_env({})
+        mock_omp_env({})
         result = _execute_task(
             goal="context flow test",
             context=ctx,
@@ -1688,15 +1688,15 @@ class TestIterationLifecycleIntegration:
         )
         assert result["error"] is None
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_full_iteration_processing(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_full_iteration_processing(self, mock_omp_env):
         """Full iteration processing emulating one step of run_loop."""
 
-        from pi_loop.error_utils import _suggest_actionable_fix, classify_error
-        from pi_loop.functions import _build_progressive_context
-        from pi_loop.loop import _execute_task
+        from omp_loop.error_utils import _suggest_actionable_fix, classify_error
+        from omp_loop.functions import _build_progressive_context
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({})
+        mock_omp_env({})
 
         ctx = _build_progressive_context("", [])
         result = _execute_task(
@@ -1742,21 +1742,21 @@ class TestLoopConfigEdgeCases:
 
     def test_get_default_override(self):
         """LoopConfig.get() returns default for missing keys."""
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         cfg = LoopConfig(goal="test")
         assert cfg.get("nonexistent_key", "default_val") == "default_val"
 
     def test_sentinel_path_default(self):
         """Sentinel path default is None."""
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         cfg = LoopConfig(goal="test")
         assert cfg.sentinel_path is None
 
     def test_repr_includes_goal(self):
         """__repr__ includes the goal."""
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         cfg = LoopConfig(goal="my goal")
         r = repr(cfg)
@@ -1765,7 +1765,7 @@ class TestLoopConfigEdgeCases:
 
     def test_version_constant(self):
         """VERSION is a non-empty string."""
-        from pi_loop.config import VERSION
+        from omp_loop.config import VERSION
 
         assert isinstance(VERSION, str)
         assert len(VERSION) > 0
@@ -1782,13 +1782,13 @@ class TestEnvUtilsCrossModule:
 
     def test_goal_var_in_known(self):
         """INFINITE_LOOP_GOAL is in KNOWN_ENV_VARS."""
-        from pi_loop.env_utils import KNOWN_ENV_VARS
+        from omp_loop.env_utils import KNOWN_ENV_VARS
 
         assert "INFINITE_LOOP_GOAL" in KNOWN_ENV_VARS
 
     def test_known_vars_are_strings(self):
         """All KNOWN_ENV_VARS are strings."""
-        from pi_loop.env_utils import KNOWN_ENV_VARS
+        from omp_loop.env_utils import KNOWN_ENV_VARS
 
         for var in KNOWN_ENV_VARS:
             assert isinstance(var, str), f"{var} is not a string"

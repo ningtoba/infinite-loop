@@ -1,6 +1,6 @@
 """Tests for classify_error and _suggest_actionable_fix."""
 
-from pi_loop.error_utils import _suggest_actionable_fix, classify_error
+from omp_loop.error_utils import _suggest_actionable_fix, classify_error
 
 # ── classify_error ──────────────────────────────────────────────────────────
 

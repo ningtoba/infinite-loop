@@ -1,0 +1,27 @@
+{
+  "projectBankId": "omp",
+  "hindsight": {
+    "baseUrl": "http://localhost:8888"
+  },
+  "recall": {
+    "enabled": true,
+    "budget": "mid",
+    "maxTokens": 4096,
+    "types": ["observation"],
+    "projectQueryPreamble": "Project memory lookup for OMP (hermes-loop) — autonomous coding loop daemon architecture, task execution patterns, error recovery, and pi CLI integration."
+  },
+  "retain": {
+    "enabled": true,
+    "async": true,
+    "redactSecrets": true
+  },
+  "observations": {
+    "enabled": true
+  },
+  "userRetain": {
+    "mode": "explicit-only"
+  },
+  "globalRetain": {
+    "mode": "explicit-only"
+  }
+}

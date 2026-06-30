@@ -16,7 +16,7 @@ from web_app.config_manager import (
 
 
 def _mock_stored(overrides: dict[str, str] | None = None) -> dict[str, str]:
-    """Return a dict shaped like pi_loop.config_file.load_config() output."""
+    """Return a dict shaped like omp_loop.config_file.load_config() output."""
     defaults = {k: v["default"] for k, v in CONFIG_DEFAULTS.items()}
     if overrides:
         defaults.update(overrides)
@@ -52,7 +52,7 @@ class TestReadStored:
 
 
 class TestSaveConfig:
-    """save_config() — delegates to pi_loop.config_file.save_config."""
+    """save_config() — delegates to omp_loop.config_file.save_config."""
 
     def test_saves(self):
         """save_config calls the underlying _save_config with the dict."""

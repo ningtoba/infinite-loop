@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for pi-loop tests."""
+"""Shared pytest fixtures for omp-loop tests."""
 
 import os
 
@@ -6,7 +6,7 @@ import pytest
 
 # Prevent LoopManager from hydrating in-memory logs from the real production
 # log file during tests — otherwise test assertions on empty initial state fail.
-os.environ.setdefault("PI_LOOP_NO_HYDRATE", "1")
+os.environ.setdefault("OMP_LOOP_NO_HYDRATE", "1")
 
 
 @pytest.fixture
@@ -135,7 +135,7 @@ def valid_output():
 
 @pytest.fixture
 def sample_config():
-    """Return a config dict mimicking pi_loop.config constants."""
+    """Return a config dict mimicking omp_loop.config constants."""
     return {
         "VERSION": "14.39.0",
         "LEDGER_PATH": "/tmp/infinite-loop-state.json",

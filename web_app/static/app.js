@@ -1,4 +1,4 @@
-/* ── pi-loop Web UI — Application ──────────────────────────────────────── */
+/* ── omp-loop Web UI — Application ──────────────────────────────────────── */
 
 /** Safe HTML setter — clears and inserts trusted HTML */
 function setHTML(el, html) {
@@ -216,6 +216,14 @@ document.addEventListener("keydown", (e) => {
 		if (tabs[idx]) switchTab(tabs[idx]);
 	}
 });
+// Clean up SSE on page unload (L-1a)
+window.addEventListener("beforeunload", () => {
+	if (sseSource) {
+		sseSource.close();
+		sseSource = null;
+	}
+});
+
 // Debounced resize handler for xterm.js terminals
 let _resizeTimer;
 window.addEventListener("resize", () => {
@@ -233,8 +241,14 @@ window.addEventListener("resize", () => {
 
 function switchTab(tab, skipDirtyCheck) {
 	// If there are unsaved config changes, warn before navigating (M-7)
-	if (!skipDirtyCheck && _configDirty && currentTab !== "config" && tab !== "config") {
-		if (!confirm("You have unsaved configuration changes. Discard them?")) return;
+	if (
+		!skipDirtyCheck &&
+		_configDirty &&
+		currentTab !== "config" &&
+		tab !== "config"
+	) {
+		if (!confirm("You have unsaved configuration changes. Discard them?"))
+			return;
 		_configDirty = false;
 	}
 
@@ -344,6 +358,7 @@ function initSSE() {
 	sseSource.onerror = () => {
 		updateConnectionStatus(false);
 		if (sseSource) sseSource.close();
+		sseSource = null;
 		setTimeout(() => initSSE(), _sseNextRetry());
 	};
 }
@@ -439,6 +454,20 @@ function updateDashboard(data) {
 			_activeWorkerLog,
 			data.worker_term[_activeWorkerLog] || [],
 		);
+	}
+
+	// Refresh worker log list if viewing a worker detail
+	if (_activeWorkerLog !== null && data.worker_logs) {
+		const logs = data.worker_logs[_activeWorkerLog] || [];
+		const logContainer = document.getElementById("worker-log-list");
+		if (logContainer) {
+			logContainer.innerHTML = logs.map((entry) => {
+				const ts = entry.timestamp ? entry.timestamp.slice(11, 19) : "";
+				const msg = escapeHtml(entry.message);
+				return `<div class="wll-entry"><span class="wll-ts">${ts}</span><span class="wll-msg">${msg}</span></div>`;
+			}).join("");
+			logContainer.scrollTop = logContainer.scrollHeight;
+		}
 	}
 
 	// Append new log entries
@@ -919,7 +948,7 @@ function renderConfigPanel(groupId) {
 				else if (meta.multiline)
 					input = `<textarea name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}" rows="3">${escapeHtml(v)}</textarea>`;
 				else if (meta.type === "int" || meta.type === "float")
-					input = `<input type="number" name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}" value="${escapeHtml(v)}" step="${meta.type === "float" ? "0.1" : "1"}">`;
+					input = `<input type="number" name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}" value="${escapeHtml(v)}" step="${meta.type === "float" ? "any" : "1"}">`;
 				else
 					input = `<input type="text" name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}" value="${escapeHtml(v)}">`;
 				return `<div class="config-field"><label for="cfg-${escapeHtml(key)}">${escapeHtml(meta.label || key)}${req}</label><div class="field-desc">${desc}</div>${input}</div>`;
@@ -927,7 +956,7 @@ function renderConfigPanel(groupId) {
 			.join(""),
 	);
 }
-async async function saveConfig() {
+async function saveConfig() {
 	flushConfigGroup();
 	try {
 		const res = await fetch(API.config, {
@@ -1135,19 +1164,19 @@ function renderWorkers(data) {
 						: w.status === "error"
 							? "Error"
 							: "Running";
+				// Get last log entry for preview
+				const logs = (data.worker_logs || {})[w.id] || [];
+				const lastLog = logs.length > 0 ? logs[logs.length - 1].message : "";
+				const lastLogPreview = lastLog ? escapeHtml(lastLog.slice(0, 80) + (lastLog.length > 80 ? "..." : "")) : "";
+				// Show error info on error cards
+				const errInfo = w.status === "error" && w.duration_seconds
+					? ` (${dur})`
+					: "";
 				return `<div class="worker-card-item ${cls}" data-action="show-worker-log" data-wid="${escapeAttr(w.id)}">
       <div class="wc-wid">Worker #${escapeHtml(w.id)}</div>
-      <div class="wc-status">${label}</div>
+      <div class="wc-status">${label}${errInfo}</div>
       <div class="wc-dur">${dur}</div>
-      <div class="wc-lines">${termLines.length} lines</div>
-    </div>`;
-			})
-			.join(""),
-	);
-
-	// If viewing a worker, feed new terminal lines — now handled in updateDashboard
-}
-
+      <div class="wc-preview">${lastLogPreview || (termLines.length + " lines")}</div>
 function showWorkerLog(wid) {
 	// Dispose previous terminal before creating a new one (MEM-1)
 	if (_activeWorkerLog !== null && _workerTerminals[_activeWorkerLog]) {
@@ -1167,9 +1196,21 @@ function showWorkerLog(wid) {
 	const termLines = _allWorkerData
 		? (_allWorkerData.worker_term || {})[wid] || []
 		: [];
+	const logs = _allWorkerData
+		? (_allWorkerData.worker_logs || {})[wid] || []
+		: [];
 	document.getElementById("worker-log-title").textContent = "Worker #" + wid;
 	document.getElementById("worker-log-meta").textContent =
-		termLines.length + " lines";
+		termLines.length + " terminal lines, " + logs.length + " log entries";
+
+	// Render structured log list
+	const logContainer = document.getElementById("worker-log-list");
+	logContainer.innerHTML = logs.map((entry) => {
+		const ts = entry.timestamp ? entry.timestamp.slice(11, 19) : "";
+		const msg = escapeHtml(entry.message);
+		return `<div class="wll-entry"><span class="wll-ts">${ts}</span><span class="wll-msg">${msg}</span></div>`;
+	}).join("");
+	logContainer.scrollTop = logContainer.scrollHeight;
 
 	createWorkerTerminal(wid);
 }
@@ -1295,10 +1336,10 @@ function toggleTheme() {
 		!root.getAttribute("data-theme") ||
 		root.getAttribute("data-theme") === "dark";
 	root.setAttribute("data-theme", isDark ? "light" : "dark");
-	localStorage.setItem("pi-loop-theme", isDark ? "light" : "dark");
+	localStorage.setItem("omp-loop-theme", isDark ? "light" : "dark");
 }
 
 (() => {
-	const saved = localStorage.getItem("pi-loop-theme");
+	const saved = localStorage.getItem("omp-loop-theme");
 	if (saved) document.documentElement.setAttribute("data-theme", saved);
 })();

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# mock_pi.sh — A realistic mock of the `pi` binary for integration tests.
+# mock_omp.sh — A realistic mock of the `omp` binary for integration tests.
 #
-# Emits NDJSON on stdout matching the event stream that pi_loop/loop.py's
+# Emits NDJSON on stdout matching the event stream that omp_loop/loop.py's
 # _execute_task() function parses:
 #
 #   - message_update (text_delta, content_block_start, content_block_stop, usage)
@@ -10,16 +10,16 @@
 #
 # Supports environment variable overrides to simulate various scenarios:
 #
-#   MOCK_PI_EXIT_CODE     Exit code (default: 0)
-#   MOCK_PI_DELAY_S       Simulated processing delay (default: 0.1)
-#   MOCK_PI_OUTPUT_TEXT   Text content of the final assistant response
-#   MOCK_PI_LINE_PREFIX   Per-line text_delta content (default: "[mock]")
-#   MOCK_PI_LINE_COUNT    Number of text_delta lines (default: 2)
-#   MOCK_PI_TOOL_COUNT    Number of tool call/result pairs (default: 0)
-#   MOCK_PI_DISABLE_END   If set (any value), skips the message_end event
-#   MOCK_PI_END_ON_STDERR Emits the NDJSON to stderr instead of stdout
-#   MOCK_PI_STDERR_LINE   Print this text to stderr (simulates warnings/errors)
-#   MOCK_PI_NO_STDOUT     If set, do NOT write any NDJSON events to stdout
+#   MOCK_OMP_EXIT_CODE     Exit code (default: 0)
+#   MOCK_OMP_DELAY_S       Simulated processing delay (default: 0.1)
+#   MOCK_OMP_OUTPUT_TEXT   Text content of the final assistant response
+#   MOCK_OMP_LINE_PREFIX   Per-line text_delta content (default: "[mock]")
+#   MOCK_OMP_LINE_COUNT    Number of text_delta lines (default: 2)
+#   MOCK_OMP_TOOL_COUNT    Number of tool call/result pairs (default: 0)
+#   MOCK_OMP_DISABLE_END   If set (any value), skips the message_end event
+#   MOCK_OMP_END_ON_STDERR Emits the NDJSON to stderr instead of stdout
+#   MOCK_OMP_STDERR_LINE   Print this text to stderr (simulates warnings/errors)
+#   MOCK_OMP_NO_STDOUT     If set, do NOT write any NDJSON events to stdout
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
 		fi
 		;;
 	-q)
-		# pi -q "goal" syntax
+		# omp -q "goal" syntax
 		if [[ -n "${2:-}" ]]; then
 			goal="$2"
 			shift 2
@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
 		fi
 		;;
 	--goal)
-		# pi --goal "..." (alternative)
+		# omp --goal "..." (alternative)
 		if [[ -n "${2:-}" ]]; then
 			goal="$2"
 			shift 2
@@ -71,18 +71,18 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ---- Environment overrides with defaults ------------------------------------
-exit_code="${MOCK_PI_EXIT_CODE:-0}"
-delay_s="${MOCK_PI_DELAY_S:-0.1}"
-output_text="${MOCK_PI_OUTPUT_TEXT:-}"
-line_prefix="${MOCK_PI_LINE_PREFIX:-[mock]}"
-line_count="${MOCK_PI_LINE_COUNT:-2}"
-tool_count="${MOCK_PI_TOOL_COUNT:-0}"
-disable_end="${MOCK_PI_DISABLE_END:-}"
-use_stderr="${MOCK_PI_END_ON_STDERR:-}"
-stderr_line="${MOCK_PI_STDERR_LINE:-}"
-no_stdout="${MOCK_PI_NO_STDOUT:-}"
+exit_code="${MOCK_OMP_EXIT_CODE:-0}"
+delay_s="${MOCK_OMP_DELAY_S:-0.1}"
+output_text="${MOCK_OMP_OUTPUT_TEXT:-}"
+line_prefix="${MOCK_OMP_LINE_PREFIX:-[mock]}"
+line_count="${MOCK_OMP_LINE_COUNT:-2}"
+tool_count="${MOCK_OMP_TOOL_COUNT:-0}"
+disable_end="${MOCK_OMP_DISABLE_END:-}"
+use_stderr="${MOCK_OMP_END_ON_STDERR:-}"
+stderr_line="${MOCK_OMP_STDERR_LINE:-}"
+no_stdout="${MOCK_OMP_NO_STDOUT:-}"
 
-# Default output text when MOCK_PI_OUTPUT_TEXT is unset
+# Default output text when MOCK_OMP_OUTPUT_TEXT is unset
 if [[ -z "$output_text" ]]; then
 	output_text="Mock run completed for goal: ${goal:-unspecified}"
 fi

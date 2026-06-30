@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - feat: implement SEC-001 — Add API-key authentication middleware to all `/api/*` web endpoints
-- feat: auto-approve pi commands, add evolve next-goal detection
-- feat: restore and enhance web UI for pi-loop
+- feat: auto-approve omp commands, add evolve next-goal detection
+- feat: restore and enhance web UI for omp-loop
 - feat: add web UI, REST API, and Docker deployment for the infinite loop daemon
 - feat: real-time stderr token/progress reader + context-aware regression suggestions (v14.33.0)
 - feat: make video-analysis goal prompt bias-free — let research discover best tech
@@ -68,13 +68,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix: suppress noisy `thinking_delta` events, show clean tool/text output
 - fix: prevent zombie subprocess leak on timeout, fix Python 3.10 f-string compat
 - fix: remove `toolsets` kwarg from `run_loop` call causing `TypeError`
-- fix: strip dead hermes-era config flags, keep only working pi flags
+- fix: strip dead hermes-era config flags, keep only working omp flags
 - fix: show worker terminal data in Workers tab even after daemon stops
-- fix: remove `--tools` flag, pi uses full default toolset
-- fix: stream pi output line-by-line with `[TERM (worker #1)]` prefix
-- fix: stop passing `--tools` to pi with old hermes toolset names
-- fix: pi tool compat, worker lifecycle markers, lint warnings
-- fix: replace `pi -q` with `pi -p` for task execution (pi CLI has no `-q` flag)
+- fix: remove `--tools` flag, omp uses full default toolset
+- fix: stream omp output line-by-line with `[TERM (worker #1)]` prefix
+- fix: stop passing `--tools` to omp with old hermes toolset names
+- fix: omp tool compat, worker lifecycle markers, lint warnings
+- fix: replace `omp -q` with `omp -p` for task execution (omp CLI has no `-q` flag)
 - fix: remove hermes-era `--worker-url` flag from web app `loop_manager`, ensure `--run` is always passed on start
 - fix: missing `--max-output-chars` argparse definition causing `AttributeError`
 - fix: resolve all pyflakes warnings and subtle bugs across codebase
@@ -153,7 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - refactor: replace 71-param `run_loop` signature with `LoopConfig` dataclass
 - refactor: extract `_create_parser` to separate module, break circular import
 - refactor: remove `.env` dependency, rewrite README, add config file
-- refactor: convert from hermes-agent to pi coding agent
+- refactor: convert from hermes-agent to omp coding agent
 - refactor: switch config from `.env` to JSON — web UI is the sole source of truth
 - refactor: auto-generate `--list-flags` from argparse, eliminate hardcoded flag dict (v14.13.0)
 - refactor: 8051-line `launch-loop.py` into structured `hermes_loop/` package (v14.4.0)
@@ -195,7 +195,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [14.39.0] - 2026-06-30
 
-- Port from hermes-agent to pi coding agent with full web UI, REST API, and Docker support
+- Port from hermes-agent to omp coding agent with full web UI, REST API, and Docker support
 - Refactored monolithic `launch-loop.py` into modular `hermes_loop/` package
 - Replaced `.env` configuration with persistent JSON config via web UI
 - Added API-key authentication middleware for all `/api/*` endpoints
@@ -212,7 +212,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `pyproject.toml` with `console_scripts` entry point
 - Added `make check`, `make pre-commit`, shell tab-completion targets
 - Added Dependabot config for automated dependency updates
-- Initial release of the infinite-loop daemon refactored for the pi coding agent
+- Initial release of the infinite-loop daemon refactored for the omp coding agent
 
 [Unreleased]: https://github.com/nekophobia/hermes-loop/compare/v14.39.0...HEAD
 [14.39.0]: https://github.com/nekophobia/hermes-loop/releases/tag/v14.39.0

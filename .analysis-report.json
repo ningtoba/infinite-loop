@@ -11,7 +11,7 @@
         "Title says 'pi-loop' but remote is ningtoba/infinite-loop, local dir is hermes-loop",
         "References 480+ tests / 25+ test files — actual count is 838 tests across more files",
         "'cd pi-loop' assumes wrong directory name",
-        "Coverage recommendation uses pi_loop instead of hermes_loop",
+        "Coverage recommendation uses omp_loop instead of hermes_loop",
         "Mentions .env indirectly but project uses JSON config now",
         "Section says 'run.sh' in project-structure tree but run.sh was removed"
       ],
@@ -108,7 +108,7 @@
     "py_typed_missing_TOOL_003": {
       "exists": false,
       "severity": "missing",
-      "note": "No pi_loop/py.typed marker file. PEP 561 packages need this for mypy to type-check users of the package. Without it, mypy assumes the package is untyped."
+      "note": "No omp_loop/py.typed marker file. PEP 561 packages need this for mypy to type-check users of the package. Without it, mypy assumes the package is untyped."
     },
     "editorconfig_missing_TOOL_004": {
       "exists": false,
@@ -144,7 +144,7 @@
     },
     "SEC_001_http_callback_url_validation": {
       "status": "unresolved",
-      "code_location": "pi_loop/loop.py ~line 714",
+      "code_location": "omp_loop/loop.py ~line 714",
       "issue": "urllib.request.urlopen(http_callback) called without validating URL scheme. A file:// URL would read local files; data:// could trigger unexpected behavior (Bandit B310).",
       "fix_needed": "Add urlparse-based validation restricting schemes to http and https only. Reject file://, data://, ftp://, etc."
     },
@@ -154,7 +154,7 @@
     },
     "SEC_005_shell_true_guarding": {
       "status": "unresolved",
-      "code_location": "pi_loop/loop.py ~line 731",
+      "code_location": "omp_loop/loop.py ~line 731",
       "issue": "subprocess.run(on_error_cmd, shell=True, timeout=30) where on_error_cmd is user-configurable via config.json. No command logging, no length/character restrictions, no documented risk.",
       "fix_needed": "At minimum: (1) log command before execution at INFO level, (2) add length/character restrictions, (3) document risk in README, (4) warn on startup when configured.",
       "backlog_status": "Pending (Phase 2 in ACTION_PLAN)",
@@ -170,8 +170,8 @@
     "ENGINEERING_BACKLOG.md",
     "README.md",
     "bandit-report.json",
-    "pi_loop/loop.py",
-    "pi_loop/py.typed (missing)",
+    "omp_loop/loop.py",
+    "omp_loop/py.typed (missing)",
     ".editorconfig (missing)",
     "SECURITY.md (missing)",
     ".worktrees/hermes-bd038f68/",

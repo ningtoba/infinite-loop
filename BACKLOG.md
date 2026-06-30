@@ -1,6 +1,6 @@
 # Engineering Backlog
 
-> **pi-loop** (v14.39.0) — Autonomous task automation daemon  
+> **omp-loop** (v14.39.0) — Autonomous task automation daemon  
 > **Alias:** hermes-loop  
 > Comprehensive engineering backlog covering bugs, tech debt, features, testing, security, performance, documentation, and infrastructure.  
 > Generated: 2026-06-30
@@ -35,9 +35,9 @@
 
 ## Project Overview
 
-### What is pi-loop?
+### What is omp-loop?
 
-**pi-loop** is an autonomous task automation daemon that watches files, iteratively executes goals via the [pi coding agent](https://pi.ai), detects convergence, handles errors with severity-based recovery, and tracks everything in a JSON ledger. It provides both a CLI (`pi-loop`) and a FastAPI-based web dashboard (`pi-loop-web`).
+**omp-loop** is an autonomous task automation daemon that watches files, iteratively executes goals via the [omp coding agent](https://pi.ai), detects convergence, handles errors with severity-based recovery, and tracks everything in a JSON ledger. It provides both a CLI (`omp-loop`) and a FastAPI-based web dashboard (`omp-loop-web`).
 
 ### Tech Stack
 
@@ -59,14 +59,14 @@
 ```
 ┌─────────────────┐     ┌──────────────────────────┐     ┌─────────────────┐
 │    CLI Layer    │────▶│     Loop Engine          │────▶│    Web UI       │
-│  pi_loop/cli.py │     │  pi_loop/loop.py (core)  │     │  web_app/       │
-│  pi_loop/parser │     │  pi_loop/functions.py    │     │  server.py      │
-│                 │     │  pi_loop/error_recovery  │     │  loop_manager   │
-│                 │     │  pi_loop/state.py        │     │  config_manager │
-│                 │     │  pi_loop/heartbeat.py    │     │  rate_limiter   │
-│                 │     │  pi_loop/git_utils.py    │     └─────────────────┘
-│                 │     │  pi_loop/file_utils.py   │
-│                 │     │  pi_loop/config.py       │
+│  omp_loop/cli.py │     │  omp_loop/loop.py (core)  │     │  web_app/       │
+│  omp_loop/parser │     │  omp_loop/functions.py    │     │  server.py      │
+│                 │     │  omp_loop/error_recovery  │     │  loop_manager   │
+│                 │     │  omp_loop/state.py        │     │  config_manager │
+│                 │     │  omp_loop/heartbeat.py    │     │  rate_limiter   │
+│                 │     │  omp_loop/git_utils.py    │     └─────────────────┘
+│                 │     │  omp_loop/file_utils.py   │
+│                 │     │  omp_loop/config.py       │
 └─────────────────┘     └──────────────────────────┘
 ```
 
@@ -74,7 +74,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Source files | 31 (pi_loop: 23, web_app: 6, static: 1) |
+| Source files | 31 (omp_loop: 23, web_app: 6, static: 1) |
 | Test files | 28 (pytest) |
 | Total tests | 838 |
 | Lines of code (est.) | ~8,500 (source) + ~6,000 (tests) |
@@ -107,11 +107,11 @@
 |------|------|--------|
 | 🔴 | `run_loop()` has **19% test coverage** (435 lines, 60+ locals) | Any change risks regressions; refactoring blocked |
 | 🔴 | `loop_manager.py` regex-parses ANSI-colored stdout | Brittle — format changes silently break web UI |
-| 🔴 | No end-to-end integration test for `pi` subprocess | Core value prop has zero E2E verification |
+| 🔴 | No end-to-end integration test for `omp` subprocess | Core value prop has zero E2E verification |
 | 🟡 | `shell=True` on user-configurable error command | Config compromise → arbitrary command execution |
 | 🟡 | `LoopConfig` god dataclass with 71 fields | Monolithic, uses private `dataclasses._MISSING_TYPE` API |
 | 🟡 | CLI `main()` only 12% covered | 14+ introspection flags untested |
-| 🟡 | JSON extraction brace-depth counting breaks on string-literals | Silent corruption when pi output contains braces in strings |
+| 🟡 | JSON extraction brace-depth counting breaks on string-literals | Silent corruption when omp output contains braces in strings |
 
 ### Already Completed (from earlier iterations) ✅
 
@@ -129,7 +129,7 @@
 12. ✅ `py.typed` markers added (TOOL-003)
 13. ✅ `.editorconfig` added (TOOL-004)
 14. ✅ Pre-commit duality documented (TOOL-002)
-15. ✅ `PI_LOOP_API_KEY` read-once at startup (SEC-004)
+15. ✅ `OMP_LOOP_API_KEY` read-once at startup (SEC-004)
 16. ✅ `shell=True` guardrails for error cmd (SEC-001)
 
 ---
@@ -170,7 +170,7 @@
 | **Status** | In Progress |
 
 - **Description:** `LoopManager._parse_daemon_line()` strips ANSI codes with `_ANSI_ESCAPE.sub("", text)` then applies 6+ fragile regex patterns to extract worker status, duration, error type, heartbeat, and iteration data. Any log format change (timestamp prefix, bracket style, color scheme change) silently breaks all web UI parsers. This is a fundamental architectural flaw — the web UI should consume structured NDJSON events, not reverse-engineer human-readable log strings.
-- **Reasoning:** A single log format change by the daemon team (or a pi binary output format change) would completely disable the web UI's live monitoring. The current approach is a leaky abstraction that couples the web layer to display formatting.
+- **Reasoning:** A single log format change by the daemon team (or a omp binary output format change) would completely disable the web UI's live monitoring. The current approach is a leaky abstraction that couples the web layer to display formatting.
 - **Suggested Approach:** Phase 1: Write characterization tests capturing current regex behavior with representative log lines. Phase 2: Implement structured event emission from the daemon (OBS-001). Phase 3: Migrate `LoopManager` to consume structured events, keeping regex parsing as fallback.
 - **Affected Files:** `web_app/loop_manager.py` (`_parse_daemon_line`, `_ANSI_ESCAPE`, `_parse_daemon_stdout`)
 
@@ -187,10 +187,10 @@
 | **Dependencies** | None |
 | **Status** | Pending |
 
-- **Description:** `extract_json_from_output()` in `file_utils.py` uses simple brace-depth counting (`{` = +1, `}` = -1) with no awareness of JSON string literals. If pi output contains `{` or `}` inside a quoted JSON string (e.g., `"output": "if (x) { y }"`), the brace counter desyncs and extraction returns a partial or corrupted JSON object. Both forward and reverse scan strategies are affected.
-- **Reasoning:** This is the critical data path — every pi subprocess output goes through this function. A single malformed extraction corrupts the iteration ledger entry. Since pi outputs frequently contain code with braces, this is a realistic failure mode.
+- **Description:** `extract_json_from_output()` in `file_utils.py` uses simple brace-depth counting (`{` = +1, `}` = -1) with no awareness of JSON string literals. If omp output contains `{` or `}` inside a quoted JSON string (e.g., `"output": "if (x) { y }"`), the brace counter desyncs and extraction returns a partial or corrupted JSON object. Both forward and reverse scan strategies are affected.
+- **Reasoning:** This is the critical data path — every omp subprocess output goes through this function. A single malformed extraction corrupts the iteration ledger entry. Since omp outputs frequently contain code with braces, this is a realistic failure mode.
 - **Suggested Approach:** Add string-literal awareness during brace scanning: skip counting braces inside quoted strings (respecting escape sequences like `\"`). Replace the O(n²) `list.insert(0, ch)` reverse scan with a single forward pass using a stack-based approach. Add comprehensive test cases.
-- **Affected Files:** `pi_loop/file_utils.py:extract_json_from_output()`, `tests/test_file_utils.py`
+- **Affected Files:** `omp_loop/file_utils.py:extract_json_from_output()`, `tests/test_file_utils.py`
 
 ---
 
@@ -208,7 +208,7 @@
 - **Description:** `_generate_completion()` in `cli.py` filters flags with `if not f.startswith("--")` when building `_zsh_flags`. This discards all long flags (e.g., `--goal`, `--max-iterations`, `--workers`), producing completions with only short flags (`-g`, `-m`). Auto-generated zsh completions are missing ~80% of available flags.
 - **Reasoning:** Zsh users relying on tab completion get no help for the most commonly used flags. Developers adding new flags must remember to update completions, but the broken filter means no long flag would ever appear regardless.
 - **Suggested Approach:** Fix the filter condition to exclude only help flags (`--help`, `-h`) instead of all `--` flags. Add a test case for completion output verification.
-- **Affected Files:** `pi_loop/cli.py` (`_generate_completion`, ~line 119)
+- **Affected Files:** `omp_loop/cli.py` (`_generate_completion`, ~line 119)
 
 ---
 
@@ -226,7 +226,7 @@
 - **Description:** `_monitor_heartbeat()` sleeps for `HEARTBEAT_POLL_INTERVAL` (5 seconds) between heartbeat checks. Any iteration completion is detected up to 5 seconds late because the poll cycle must complete before the next heartbeat check. For short iterations (<2s), this doubles the latency.
 - **Reasoning:** Users running the daemon with short goals experience noticeable lag between iteration completion and the next iteration starting. This is especially problematic for interactive or demo usage where responsiveness matters.
 - **Suggested Approach:** Use `threading.Event.wait(timeout=interval)` with a set-able event for shutdown notification, reducing effective latency to near-zero while maintaining the poll interval.
-- **Affected Files:** `pi_loop/heartbeat.py` (`_monitor_heartbeat`, ~line 67)
+- **Affected Files:** `omp_loop/heartbeat.py` (`_monitor_heartbeat`, ~line 67)
 
 ---
 
@@ -244,7 +244,7 @@
 - **Description:** `FileLock.__enter__` busy-waits for a lock with `time.sleep(0.1)` — a fixed 100ms interval until the timeout expires. Under contention (multi-worker), this creates unnecessary CPU wakeups. No exponential backoff, no jitter.
 - **Reasoning:** With `--workers N` (N > 1), multiple processes contend for the ledger lock. Fixed 100ms sleep means every retry cycle has deterministic collisions. This directly impacts parallel execution efficiency.
 - **Suggested Approach:** Implement exponential backoff starting at 10ms, doubling per retry, with ±20% random jitter, capped at ~1s max interval.
-- **Affected Files:** `pi_loop/file_utils.py` (`FileLock.__enter__`, lines ~39-48)
+- **Affected Files:** `omp_loop/file_utils.py` (`FileLock.__enter__`, lines ~39-48)
 
 ---
 
@@ -259,10 +259,10 @@
 | **Dependencies** | None |
 | **Status** | Pending |
 
-- **Description:** `config_file.py:save_config()` catches `OSError: pass` — any filesystem error during config write is discarded with no log, no warning, no user feedback. If `~/.config/pi-loop/` doesn't exist or is read-only, the user's config changes silently disappear.
+- **Description:** `config_file.py:save_config()` catches `OSError: pass` — any filesystem error during config write is discarded with no log, no warning, no user feedback. If `~/.config/omp-loop/` doesn't exist or is read-only, the user's config changes silently disappear.
 - **Reasoning:** Users who modify config via the web UI or CLI and see "saved" but whose changes are silently ignored will experience confusing behavior. Config writes are infrequent enough that logging is zero-cost.
 - **Suggested Approach:** Log at WARNING level with the error detail before `pass`. Add atomic write pattern (write to `.tmp` then `os.rename`).
-- **Affected Files:** `pi_loop/config_file.py` (`save_config`, line 49)
+- **Affected Files:** `omp_loop/config_file.py` (`save_config`, line 49)
 
 ---
 
@@ -298,7 +298,7 @@
 - **Description:** `_generate_completion()` has a Python < 3.12 workaround (`_zsh_sep = chr(92) + chr(10) + "        "`) for f-string backslash limitations. Given Python 3.10+ requirement, this legacy hack is inscrutable. Minimum Python is 3.10 but this workaround is only needed below 3.12.
 - **Reasoning:** This is dead code for the 3.12+ use case and confusing for anyone reading the function. Fix it when fixing the long-flag exclusion bug (BUG-003).
 - **Suggested Approach:** Replace with f-string `\n` directly (requires Python 3.12+). Bundle with BUG-003 fix.
-- **Affected Files:** `pi_loop/cli.py` (`_generate_completion`)
+- **Affected Files:** `omp_loop/cli.py` (`_generate_completion`)
 
 ---
 
@@ -316,7 +316,7 @@
 - **Description:** In `preflight.py`, `check_disk_space()` has its docstring positioned after the function body's first `if` block instead of at the top of the method. This makes the docstring invisible to `help()` and IDE tooltips.
 - **Reasoning:** Minor issue but breaks tooltip-based documentation for one of the preflight check methods.
 - **Suggested Approach:** Move the docstring to the first line of the method body.
-- **Affected Files:** `pi_loop/preflight.py` (`check_disk_space`, ~line 100)
+- **Affected Files:** `omp_loop/preflight.py` (`check_disk_space`, ~line 100)
 
 ---
 
@@ -333,11 +333,11 @@
 | **Dependencies** | None |
 | **Status** | ✅ Completed (2026-06-30) |
 
-- **Description:** `loop.py` runs `subprocess.run(on_error_cmd, shell=True, timeout=30)` where `on_error_cmd` is user-configurable via `config.json` or `--on-error-cmd` flag. If an attacker gains write access to `~/.config/pi-loop/config.json`, they can execute arbitrary shell commands. This is an intentional feature but has insufficient guardrails.
+- **Description:** `loop.py` runs `subprocess.run(on_error_cmd, shell=True, timeout=30)` where `on_error_cmd` is user-configurable via `config.json` or `--on-error-cmd` flag. If an attacker gains write access to `~/.config/omp-loop/config.json`, they can execute arbitrary shell commands. This is an intentional feature but has insufficient guardrails.
 - **Reasoning:** The bandit scan flagged this as HIGH severity. While it's intentional, missing guardrails (no command validation, no character restrictions, no length limit, no audit logging) make it a viable attack vector. This is the #1 security risk in the project.
 - **Suggested Approach:** (1) Log the full command before execution at INFO level for audit trail. (2) Validate command length (reject >500 chars) and reject shell metacharacters (`;`, `|`, `` ` ``, `$()`) unless explicitly needed. (3) Add a startup WARNING log when `on_error_cmd` is configured. (4) Document the risk explicitly in README security section.
 - **Resolution:** Added `_validate_on_error_cmd()` with length check (500 char limit), shell metacharacter rejection, and metacharacter bypass flag (`--allow-error-metachars`). Added startup WARNING log. Updated README with security implications documentation.
-- **Affected Files:** `pi_loop/loop.py` (line 727), `README.md`
+- **Affected Files:** `omp_loop/loop.py` (line 727), `README.md`
 
 ---
 
@@ -353,7 +353,7 @@
 | **Status** | Pending |
 
 - **Description:** `.gitignore` has `.env` commented out with the note `# config_file used instead`. While the project does use JSON config files, if a developer creates a `.env` file locally with secrets (API keys, callback secrets), those secrets would be committed to git. This is defense-in-depth — the cost is zero.
-- **Reasoning:** The project uses `PI_LOOP_API_KEY` for web auth. A developer testing the web UI might create a `.env` for convenience and accidentally commit it. The `.env` gitignore entry is standard practice in the Python ecosystem.
+- **Reasoning:** The project uses `OMP_LOOP_API_KEY` for web auth. A developer testing the web UI might create a `.env` for convenience and accidentally commit it. The `.env` gitignore entry is standard practice in the Python ecosystem.
 - **Suggested Approach:** Uncomment `.env` and add `.env.*` (covers `.env.local`, `.env.production`). Add a comment explaining this is a safety net even though `.env` is not the primary config mechanism.
 - **Affected Files:** `.gitignore`
 
@@ -389,7 +389,7 @@
 | **Status** | Pending |
 
 - **Description:** The FastAPI server adds `CORSMiddleware` with `allow_origins=["*"]`. While the server defaults to localhost-only binding, if a user configures `--host 0.0.0.0`, any website can make API requests to the daemon (though API-key auth mitigates this partially).
-- **Reasoning:** With API-key auth enabled, this is mitigated. But if auth is disabled (no `PI_LOOP_API_KEY` set), any website could control the daemon via the exposed API across origins. The CORS permissiveness is the only layer of defense for an unauthenticated setup.
+- **Reasoning:** With API-key auth enabled, this is mitigated. But if auth is disabled (no `OMP_LOOP_API_KEY` set), any website could control the daemon via the exposed API across origins. The CORS permissiveness is the only layer of defense for an unauthenticated setup.
 - **Suggested Approach:** Restrict CORS to the origin the server is running on (or localhost). When `--host 0.0.0.0` is used, require explicit `--cors-origins` flag with a comma-separated list. Keep `*` only as fallback for localhost-only mode.
 - **Affected Files:** `web_app/server.py` (CORS middleware config)
 
@@ -409,7 +409,7 @@
 - **Description:** `file_utils.py:check_sentinel()` reads the full contents of the sentinel file into memory with `f.read()`. An attacker who can write to `/tmp/` could create a very large sentinel file, causing the daemon to allocate excessive memory.
 - **Reasoning:** Low risk because sentinel file write requires local access. But this is a simple hardening opportunity — bound the read to a reasonable size.
 - **Suggested Approach:** Read only the first 1KB of the sentinel file. Use `f.read(1024)` instead of `f.read()`.
-- **Affected Files:** `pi_loop/file_utils.py` (`check_sentinel`, `check_sentinel_no_remove`)
+- **Affected Files:** `omp_loop/file_utils.py` (`check_sentinel`, `check_sentinel_no_remove`)
 
 ---
 
@@ -429,7 +429,7 @@
 - **Description:** `run_loop()` in `loop.py` (~435 lines) handles: subprocess spawning, iteration lifecycle, error classification, recovery adaptation, notification dispatch (desktop, HTTP callback, ntfy), dashboard HTML generation, goal evolution, convergence detection, cooldown handling, heartbeat management, ledger pruning, and git auto-commit. It has 60+ local variables and 20+ condition branches. The `# ruff: noqa: ARG001, F841` at the top acknowledges unused local assignments. Test coverage is ~19% because mocking 60+ variables is impractical.
 - **Reasoning:** Every new feature touches `run_loop()`, increasing its complexity and regression risk. It cannot be meaningfully tested as-is. Decomposition is the prerequisite for: integration tests (TEST-002), state machine (ARCH-002), structured logging (OBS-001), and confident iteration on any loop behavior.
 - **Suggested Approach:** Phase 1: Write characterization tests for current behavior. Extract pure functions: convergence check, termination check, progress classification. Extract I/O-bound operations: `_emit_notifications()`, `_apply_recovery()`, `_build_dashboard_html()`. Each extraction is a separate commit with passing tests. Phase 2: Create `IterationContext` dataclass, `TaskExecutor` class, `CooldownManager` class. Phase 3: Refactor main loop body into a readable pipeline.
-- **Affected Files:** `pi_loop/loop.py`, new `pi_loop/executor.py`, new `pi_loop/convergence.py`
+- **Affected Files:** `omp_loop/loop.py`, new `omp_loop/executor.py`, new `omp_loop/convergence.py`
 
 ---
 
@@ -447,7 +447,7 @@
 - **Description:** The main loop is a `while True` with ad-hoc condition checks for shutdown, pause, cooldown, etc. States (running, paused, cooldown, error, stopping) are managed via scattered boolean flags and sentinel file checks. There's no single source of truth for current state, making it hard to add new states (draining, backoff, maintenance).
 - **Reasoning:** Adding features like "graceful shutdown on worker drain" or "maintenance mode" requires threading new booleans through the entire loop. A state machine makes transitions explicit, testable, and prevents illegal state transitions.
 - **Suggested Approach:** Introduce a `LoopStateMachine` class with explicit enum states and defined transitions. Each state has `enter()` and `exit()` hooks. Replace scattered `if` checks with `state_machine.transition_to()` calls.
-- **Affected Files:** `pi_loop/loop.py`, new `pi_loop/state_machine.py`
+- **Affected Files:** `omp_loop/loop.py`, new `omp_loop/state_machine.py`
 
 ---
 
@@ -465,7 +465,7 @@
 - **Description:** `LoopConfig` is a single dataclass spanning iteration control, worker config, git settings, notifications, archiving, logging, safety, and advanced options. It violates the Single Responsibility Principle. `from_args()` imports `dataclasses._MISSING_TYPE` — a private API. When a field is added, all consumers must be checked for compatibility.
 - **Reasoning:** The use of private API (`dataclasses._MISSING_TYPE`) means it can break on any Python version update. Adding a new config option requires touching the dataclass, the parser, and potentially multiple consumers. This is a maintenance bottleneck.
 - **Suggested Approach:** Split into focused configs: `IterationConfig`, `WorkerConfig`, `GitConfig`, `NotificationConfig`, `ArchiveConfig`, `SafetyConfig`. Compose in a top-level `AppConfig`. Keep backward compatibility via `__getattr__` delegation to child configs.
-- **Affected Files:** `pi_loop/config.py` (LoopConfig dataclass, lines ~68-179), `pi_loop/loop.py`, `pi_loop/cli.py`
+- **Affected Files:** `omp_loop/config.py` (LoopConfig dataclass, lines ~68-179), `omp_loop/loop.py`, `omp_loop/cli.py`
 
 ---
 
@@ -483,7 +483,7 @@
 - **Description:** `system_utils.py` reads `/proc/[pid]/status` and `/proc/[pid]/stat` for CPU/memory tracking. `server.py` reads `/proc/stat` and `/proc/meminfo`. `status.py` uses `os.sysconf_names["SC_CLK_TCK"]`. All of these are Linux-specific. The daemon cannot run on macOS or BSD without errors.
 - **Reasoning:** The project's README and `pyproject.toml` don't mention Linux as a requirement. macOS is a common development platform. This silently fails with cryptic errors on non-Linux systems.
 - **Suggested Approach:** Abstract a `SystemResourceProvider` interface with `LinuxProvider` (current), `macOSProvider` (using `sysctl`/`ps`), and `NoopProvider` (returns defaults). Auto-detect platform at import time. Mark platform-specific tests with `@pytest.mark.skipif` for non-Linux.
-- **Affected Files:** `pi_loop/system_utils.py`, `pi_loop/status.py`, `web_app/server.py`
+- **Affected Files:** `omp_loop/system_utils.py`, `omp_loop/status.py`, `web_app/server.py`
 
 ---
 
@@ -501,13 +501,13 @@
 - **Description:** `config_file.py` caches loaded config in a module-level `_config: dict[str, str] = {}` variable. Functions `get()`, `get_bool()`, `load_config()` all mutate and read this global. This is not thread-safe and makes testing fragile (tests must carefully reset state).
 - **Reasoning:** Module-level mutable state is a well-known antipattern. Tests in `test_config_file.py` already work around it. With the web UI's async nature, concurrent access to cached config could cause race conditions.
 - **Suggested Approach:** Replace with a `ConfigStore` class that holds the config dict and provides the same API. Create a module-level singleton for backward compatibility, but allow tests and the web UI to create isolated instances.
-- **Affected Files:** `pi_loop/config_file.py`
+- **Affected Files:** `omp_loop/config_file.py`
 
 ---
 
 ### 🧪 Testing & Quality
 
-#### TEST-001 — Zero end-to-end integration tests for pi subprocess lifecycle
+#### TEST-001 — Zero end-to-end integration tests for omp subprocess lifecycle
 
 | Field | Value |
 |-------|-------|
@@ -518,10 +518,10 @@
 | **Dependencies** | None (can use `mock_pi.sh` which already exists) |
 | **Status** | Pending |
 
-- **Description:** The core value proposition (subprocess task execution via `pi`) has zero end-to-end verification. All 838 tests are unit tests that mock subprocess calls. A `pi` binary change (flag rename, output format change, `mode=json` breaking change) goes undetected until production. Only `test_pi_smoke.py` checks that `pi` is on PATH — nothing tests actual output parsing.
-- **Reasoning:** This is the #1 testing gap. The entire daemon exists to manage pi subprocesses, but there is no test that actually runs the end-to-end flow. A mock pi binary (`tests/integration/mock_pi.sh`) exists but is only used by deep integration tests, not by `test_loop.py` or `test_integration.py`.
-- **Suggested Approach:** Expand `mock_pi.sh` to emit realistic NDJSON output with configurable delay/errors. Create dedicated integration tests: single iteration success, convergence detection, error recovery with injected failures, sentinel stop/pause, multi-worker patterns. Mark with `@pytest.mark.integration`. Run as a separate CI job.
-- **Affected Files:** `tests/integration/mock_pi.sh`, new `tests/integration/test_subprocess_lifecycle.py`, `.github/workflows/ci.yml`
+- **Description:** The core value proposition (subprocess task execution via `omp`) has zero end-to-end verification. All 838 tests are unit tests that mock subprocess calls. A `omp` binary change (flag rename, output format change, `mode=json` breaking change) goes undetected until production. Only `test_omp_smoke.py` checks that `omp` is on PATH — nothing tests actual output parsing.
+- **Reasoning:** This is the #1 testing gap. The entire daemon exists to manage omp subprocesses, but there is no test that actually runs the end-to-end flow. A mock omp binary (`tests/integration/mock_omp.sh`) exists but is only used by deep integration tests, not by `test_loop.py` or `test_integration.py`.
+- **Suggested Approach:** Expand `mock_omp.sh` to emit realistic NDJSON output with configurable delay/errors. Create dedicated integration tests: single iteration success, convergence detection, error recovery with injected failures, sentinel stop/pause, multi-worker patterns. Mark with `@pytest.mark.integration`. Run as a separate CI job.
+- **Affected Files:** `tests/integration/mock_omp.sh`, new `tests/integration/test_subprocess_lifecycle.py`, `.github/workflows/ci.yml`
 
 ---
 
@@ -539,7 +539,7 @@
 - **Description:** Only `_execute_task`, `_evolve_goal`, `_build_dashboard_html`, and `_request_shutdown` are tested. The main `run_loop()` function (435 lines), sentinel polling, worker management, convergence detection, checkpointing, and cooldown enforcement are untested. Any refactoring of the core loop risks undetected regressions.
 - **Reasoning:** This is the most critical code path in the entire application with the lowest coverage. The function is too large to mock effectively, creating a vicious cycle: low coverage prevents refactoring, and the monolithic function prevents adding coverage.
 - **Suggested Approach:** Start with exit-early conditions (sentinel file → clean shutdown, max iterations → stop, convergence → settle). Test iteration lifecycle with mocked `_execute_task`. Write characterization tests before refactoring (capture current behavior, then refactor against captured behavior).
-- **Affected Files:** `pi_loop/loop.py`, `tests/test_loop.py`
+- **Affected Files:** `omp_loop/loop.py`, `tests/test_loop.py`
 
 ---
 
@@ -557,7 +557,7 @@
 - **Description:** Only `_create_parser()` is tested in `test_cli.py`. The `main()` function (~200 lines with 14+ introspection flags, config loading, daemon dispatch) is untested. Command dispatch, help topic rendering, doctor output, healthcheck formatting, status display — all have no test coverage.
 - **Reasoning:** The CLI is the primary user interface. Broken introspection flags (`--status`, `--doctor`, `--preflight`) don't crash but produce confusing output. These are the first things a user tries when diagnosing issues.
 - **Suggested Approach:** Refactor `main()` to accept an argument list for easier testing. Test each introspection flag independently. Test config file loading with valid/invalid/missing files. Use `capsys` fixture to capture stdout.
-- **Affected Files:** `pi_loop/cli.py`, `tests/test_cli.py`
+- **Affected Files:** `omp_loop/cli.py`, `tests/test_cli.py`
 
 ---
 
@@ -575,7 +575,7 @@
 - **Description:** `FileWatcherTrigger` class with 5 methods and polling logic has no dedicated test file. The file watching functionality (polling directory changes, triggering iterations) is entirely untested. With 0% coverage, any regression in file watching goes undetected.
 - **Reasoning:** File watching is a core feature (the daemon "watches files"). A regression here means the daemon stops reacting to file changes without any test catching it. The class is small and well-encapsulated — easy to test.
 - **Suggested Approach:** Create `tests/test_file_watcher.py`. Use `tmp_path` fixtures to create temporary directory structures. Test: directory creation/deletion triggers, file modification detection, polling interval behavior, edge cases (empty directory, permission errors).
-- **Affected Files:** `pi_loop/file_watcher.py`, new `tests/test_file_watcher.py`
+- **Affected Files:** `omp_loop/file_watcher.py`, new `tests/test_file_watcher.py`
 
 ---
 
@@ -649,7 +649,7 @@
 - **Description:** `_build_dashboard_html()` reconstructs the entire 50-iteration HTML table every iteration, including serializing all iteration records to HTML strings. Fine for current scale (<100 iterations), but O(n) in iterations and O(n²) in total data processed across all calls. For long-running daemons with thousands of iterations, this becomes a noticeable lag on each iteration cycle.
 - **Reasoning:** As the daemon runs for hours or days, each iteration gets slower as the iteration history grows. The 50-iteration hard cap mitigates this somewhat, but rebuilding even 50 rows per iteration is wasteful.
 - **Suggested Approach:** Implement incremental rendering: only append new rows instead of rebuilding. Consider switching to client-side rendering (web API provides JSON, JS renders the table). Cap the total rows to a configurable limit.
-- **Affected Files:** `pi_loop/loop.py` (`_build_dashboard_html`)
+- **Affected Files:** `omp_loop/loop.py` (`_build_dashboard_html`)
 
 ---
 
@@ -667,7 +667,7 @@
 - **Description:** `FileWatcherTrigger.check_change()` calls `sorted(p.rglob("*"))` which scans the entire directory tree and sorts all entries — O(n log n) where n = number of files. For large source trees (e.g., a monorepo with node_modules), this is prohibitively slow on every poll interval.
 - **Reasoning:** Users watching large directories will experience significant poll latency. The `rglob` also picks up irrelevant files (`.git`, `node_modules`, `__pycache__`), wasting cycles.
 - **Suggested Approach:** Filter `rglob` to relevant file patterns (`.py`, `.md`, `.yaml`, `.json`). Use `os.stat` mtime comparison instead of full content hashing. Consider adding `watchdog` as optional dependency for OS-level file system notifications.
-- **Affected Files:** `pi_loop/file_watcher.py`
+- **Affected Files:** `omp_loop/file_watcher.py`
 
 ---
 
@@ -703,7 +703,7 @@
 - **Description:** `extract_json_from_output()` first attempts a reverse scan (building `json_chars` with repeated list `insert(0, ch)` — O(n²) due to left-insert). If that fails, it falls back to a forward scan. For large outputs with no JSON, every character is processed twice with O(n²) insert in the first pass.
 - **Reasoning:** This is a correctness bug (BUG-002) first, performance issue second. Fix the correctness first, then optimize.
 - **Suggested Approach:** Use a single forward pass with stack-based brace tracking (instead of counter + `insert(0, ch)`). Fix the string-literal awareness bug at the same time. Eliminate the reverse-scan fallback.
-- **Affected Files:** `pi_loop/file_utils.py:extract_json_from_output()`
+- **Affected Files:** `omp_loop/file_utils.py:extract_json_from_output()`
 
 ---
 
@@ -721,7 +721,7 @@
 - **Description:** `_colorize_log_tags()` iterates over 20+ regex patterns and applies `re.sub()` for each one on every log message. For high-frequency log messages, this is wasteful — most patterns don't match but still incur regex compilation and matching overhead.
 - **Reasoning:** Minor optimization. Colorization is a display concern that shouldn't be a performance bottleneck.
 - **Suggested Approach:** Pre-compile all regex patterns at module load time. Use a single-pass scanner instead of sequential substitutions. Skip colorization when output is not a TTY.
-- **Affected Files:** `pi_loop/file_utils.py` (`_colorize_log_tags`)
+- **Affected Files:** `omp_loop/file_utils.py` (`_colorize_log_tags`
 
 ---
 
@@ -757,7 +757,7 @@
 | **Status** | Pending |
 
 - **Description:** Coverage settings are partially in `pyproject.toml` but `[tool.coverage.run]` and `[tool.coverage.report]` sections should be fully defined there for consistent behavior across local runs and CI.
-- **Reasoning:** Currently, `make test` explicitly passes `--cov=pi_loop --cov=web_app` flags. Centralizing in `pyproject.toml` ensures consistent coverage behavior regardless of how tests are invoked.
+- **Reasoning:** Currently, `make test` explicitly passes `--cov=omp_loop --cov=web_app` flags. Centralizing in `pyproject.toml` ensures consistent coverage behavior regardless of how tests are invoked.
 - **Suggested Approach:** Add full `[tool.coverage.run]` section with source, omit, and concurrency settings. Add `[tool.coverage.report]` with fail_under, exclude_lines, and precision. Remove redundant CLI flags from Makefile.
 - **Affected Files:** `pyproject.toml`, `Makefile`
 
@@ -801,7 +801,7 @@
 
 ### 📚 Documentation
 
-#### DOC-001 — README missing Swagger UI link, screenshot, and pi version requirement
+#### DOC-001 — README missing Swagger UI link, screenshot, and omp version requirement
 
 | Field | Value |
 |-------|-------|
@@ -812,9 +812,9 @@
 | **Dependencies** | None |
 | **Status** | Pending |
 
-- **Description:** README lacks: (1) link to auto-generated FastAPI `/docs` OpenAPI endpoint, (2) screenshot or preview of the web UI dashboard, (3) minimum required `pi` coding agent version, (4) note that `pi` must be on PATH. These are the first things a new user looks for.
-- **Reasoning:** First impressions matter. A screenshot immediately communicates the web UI's capabilities. Missing requirement info causes confusing errors for new users who haven't installed `pi`.
-- **Suggested Approach:** Add a "Prerequisites" section with `pi` version requirement and PATH note. Add a link to `/docs` after the web UI features section. Add a screenshot of the dashboard.
+- **Description:** README lacks: (1) link to auto-generated FastAPI `/docs` OpenAPI endpoint, (2) screenshot or preview of the web UI dashboard, (3) minimum required `omp` coding agent version, (4) note that `omp` must be on PATH. These are the first things a new user looks for.
+- **Reasoning:** First impressions matter. A screenshot immediately communicates the web UI's capabilities. Missing requirement info causes confusing errors for new users who haven't installed `omp`.
+- **Suggested Approach:** Add a "Prerequisites" section with `omp` version requirement and PATH note. Add a link to `/docs` after the web UI features section. Add a screenshot of the dashboard.
 - **Affected Files:** `README.md`
 
 ---
@@ -869,7 +869,7 @@
 - **Description:** `functions.py` has two module-level functions (`set_max_output_chars`, `get_max_output_chars`) with zero docstrings. These manage mutable global state — exactly the kind of code that needs clear documentation about side effects.
 - **Reasoning:** Minor gap. These functions manage global state and should explain why they exist and what happens when the limit is exceeded.
 - **Suggested Approach:** Add docstrings explaining what they do, what the default value is, and that they modify module-level global state (and why).
-- **Affected Files:** `pi_loop/functions.py` (lines ~18, ~22)
+- **Affected Files:** `omp_loop/functions.py` (lines ~18, ~22)
 
 ---
 
@@ -884,9 +884,9 @@
 | **Dependencies** | None |
 | **Status** | Pending |
 
-- **Description:** There are no architecture decision records. Key decisions (why `LoopConfig` is a single dataclass, why `pi` is spawned as subprocess instead of imported, why Starlette was chosen over other frameworks) are not documented. The `REFACTOR_PLAN.md` and `ARCHITECTURE.md` capture some design intent, but forward-looking decisions are lost.
-- **Reasoning:** The project has undergone significant evolution (hermes-agent → pi-agent, monolithic → package). Without ADRs, new contributors and agents lack context for design decisions.
-- **Suggested Approach:** Create a `docs/adr/` directory with initial ADRs for: (1) why subprocess-based pi integration, (2) LoopConfig design rationale, (3) JSON ledger schema design, (4) web UI SSE architecture.
+- **Description:** There are no architecture decision records. Key decisions (why `LoopConfig` is a single dataclass, why `omp` is spawned as subprocess instead of imported, why Starlette was chosen over other frameworks) are not documented. The `REFACTOR_PLAN.md` and `ARCHITECTURE.md` capture some design intent, but forward-looking decisions are lost.
+- **Reasoning:** The project has undergone significant evolution (hermes-agent → omp-agent, monolithic → package). Without ADRs, new contributors and agents lack context for design decisions.
+- **Suggested Approach:** Create a `docs/adr/` directory with initial ADRs for: (1) why subprocess-based omp integration, (2) LoopConfig design rationale, (3) JSON ledger schema design, (4) web UI SSE architecture.
 - **Affected Files:** new `docs/adr/` directory
 
 ---
@@ -978,10 +978,10 @@
 | **Dependencies** | None |
 | **Status** | Pending |
 
-- **Description:** `pi_loop/status.py:write_status()` writes a comprehensive status JSON file (pid, version, uptime, iteration count, last error). `pi_loop/file_utils.py:write_status_file()` writes a lightweight one-liner JSON. Both write JSON status about the same daemon process but with different schemas and from different call sites inside `run_loop()`. Adding a field requires updating both — a maintenance liability.
+- **Description:** `omp_loop/status.py:write_status()` writes a comprehensive status JSON file (pid, version, uptime, iteration count, last error). `omp_loop/file_utils.py:write_status_file()` writes a lightweight one-liner JSON. Both write JSON status about the same daemon process but with different schemas and from different call sites inside `run_loop()`. Adding a field requires updating both — a maintenance liability.
 - **Reasoning:** This is a clear case of copy-paste duplication. The lightweight writer adds no value — both are consumed by the web UI's `loop_manager.py` which reads the richer status anyway.
 - **Suggested Approach:** Unify into `status.py:write_status()`. Have `file_utils.py` import and call it, or remove the lightweight variant and update `run_loop()` call sites.
-- **Affected Files:** `pi_loop/status.py`, `pi_loop/file_utils.py:write_status_file()`, `pi_loop/loop.py`
+- **Affected Files:** `omp_loop/status.py`, `omp_loop/file_utils.py:write_status_file()`, `omp_loop/loop.py`
 
 ---
 
@@ -999,7 +999,7 @@
 - **Description:** `_suggest_actionable_fix()` (~130 lines) uses deeply nested if/elif chains for every error-type × classification combination. Some branches return `None` after assembling tips that are then discarded (e.g., the regression branch). The complexity makes it hard to test exhaustively and hard to add new error patterns.
 - **Reasoning:** This function is a maintenance bottleneck. Adding a new error type requires understanding 130 lines of conditionals. A data-driven approach would make it trivially extensible.
 - **Suggested Approach:** Replace with a lookup table (dict mapping `(error_type, progress_classification) → suggestion_template`). Each entry is a standalone data item, easy to test and extend. This also makes the function pure and testable without mocks.
-- **Affected Files:** `pi_loop/error_utils.py` (`_suggest_actionable_fix`)
+- **Affected Files:** `omp_loop/error_utils.py` (`_suggest_actionable_fix`)
 
 ---
 
@@ -1017,7 +1017,7 @@
 - **Description:** `loop.py` has `# ruff: noqa: ARG001, F841` at module level to suppress unused argument and variable warnings. The `run_loop` function unpacks 20+ `cfg.*` attributes into local variables, many of which are never used. There are dual imports — both `status.write_status` and `file_utils.write_status_file` are imported but only one is called.
 - **Reasoning:** The `noqa` suppression was added as a workaround for the monolithic function's complexity. After decomposition, many of these will naturally resolve.
 - **Suggested Approach:** After decomposing `run_loop()` (ARCH-001), clean up unused local variable assignments. Remove the module-level `noqa` comment. Audit and deduplicate imports.
-- **Affected Files:** `pi_loop/loop.py`
+- **Affected Files:** `omp_loop/loop.py`
 
 ---
 
@@ -1032,10 +1032,10 @@
 | **Dependencies** | None |
 | **Status** | Pending |
 
-- **Description:** `web_app/config_manager.py` maintains its own `CONFIG_META` dict with type, label, group, icon, and help text for each config key. This duplicates information already present in `pi_loop/config.py` (the `LoopConfig` dataclass fields). Adding a config field requires updating both files.
+- **Description:** `web_app/config_manager.py` maintains its own `CONFIG_META` dict with type, label, group, icon, and help text for each config key. This duplicates information already present in `omp_loop/config.py` (the `LoopConfig` dataclass fields). Adding a config field requires updating both files.
 - **Reasoning:** This is a maintenance burden. Every new CLI flag needs both a `LoopConfig` field and a `CONFIG_META` entry. A mismatch means the web UI shows incorrect config.
 - **Suggested Approach:** Generate `CONFIG_META` dynamically from `LoopConfig` field annotations. Use field metadata (`field(metadata={"group": "core", "label": "Goal"})`) in the dataclass itself. Remove the hardcoded dict from `config_manager.py`.
-- **Affected Files:** `web_app/config_manager.py`, `pi_loop/config.py`
+- **Affected Files:** `web_app/config_manager.py`, `omp_loop/config.py`
 
 ---
 
@@ -1055,7 +1055,7 @@
 - **Description:** All daemon logging uses bare `print()` calls and `logger.info(f"...")` with inline string formatting. No structured fields (event type, iteration number, error code, duration, correlation ID). The web UI's regex-based parsers (BUG-001) exist because there's no structured event stream to consume. Without structured logging, production debugging is manual log scraping.
 - **Reasoning:** This is a foundational improvement that unlocks multiple other items: fixing BUG-001 (regex parsing), enabling log aggregation (ELK/Datadog), and improving debuggability. Structured logging is table stakes for production services.
 - **Suggested Approach:** Define a `StructuredEvent` TypedDict or dataclass with fields: `event`, `iteration`, `duration_ms`, `error_type`, `worker_id`, `correlation_id`. Create a `log_event()` function that writes JSON lines. Console output stays human-readable (colorized). File output uses JSON format.
-- **Affected Files:** `pi_loop/file_utils.py`, `pi_loop/loop.py`, `pi_loop/error_recovery.py`, `pi_loop/git_utils.py`, `pi_loop/heartbeat.py`, `web_app/loop_manager.py`
+- **Affected Files:** `omp_loop/file_utils.py`, `omp_loop/loop.py`, `omp_loop/error_recovery.py`, `omp_loop/git_utils.py`, `omp_loop/heartbeat.py`, `web_app/loop_manager.py`
 
 ---
 
@@ -1070,10 +1070,10 @@
 | **Dependencies** | None |
 | **Status** | Pending |
 
-- **Description:** Currently there is a single `~/.config/pi-loop/config.json`. Users who run different loop configurations (e.g., "code review" vs "research" vs "bug fixing") must manually swap config files. Support for named profiles (`--profile research`) would make this seamless.
+- **Description:** Currently there is a single `~/.config/omp-loop/config.json`. Users who run different loop configurations (e.g., "code review" vs "research" vs "bug fixing") must manually swap config files. Support for named profiles (`--profile research`) would make this seamless.
 - **Reasoning:** The project already has 105+ flags — managing multiple configurations via CLI flags alone is impractical. Profile-based config switching is a natural UX evolution.
 - **Suggested Approach:** Change `config_file.py` to support a config directory instead of a single file. Add `--profile` CLI flag. Store configs as `config_{profile}.json`. The web UI can add a profile selector dropdown.
-- **Affected Files:** `pi_loop/config_file.py`, `pi_loop/cli.py`, `web_app/config_manager.py`, `web_app/static/index.html`
+- **Affected Files:** `omp_loop/config_file.py`, `omp_loop/cli.py`, `web_app/config_manager.py`, `web_app/static/index.html`
 
 ---
 
@@ -1109,7 +1109,7 @@
 - **Description:** The web server exposes iteration counts, error counts, and system resources via the dashboard, but there is no Prometheus `/metrics` endpoint for integration with monitoring stacks. Operators who use Grafana/Prometheus cannot monitor the daemon without custom scraping.
 - **Reasoning:** Services that run unattended for days need monitoring integration. Prometheus is the industry standard. This enables alerts on iteration failures, error rate spikes, and heartbeat loss.
 - **Suggested Approach:** Add optional Prometheus metrics via `prometheus_fastapi_instrumentator` or manual counter instrumentation. Export: request count/latency by endpoint, iteration rate, iteration duration, worker count, error rate by type. Disabled by default — enabled with `--metrics` flag.
-- **Affected Files:** `web_app/server.py`, `pi_loop/config.py`, `pyproject.toml`
+- **Affected Files:** `web_app/server.py`, `omp_loop/config.py`, `pyproject.toml`
 
 ---
 
@@ -1127,7 +1127,7 @@
 - **Description:** The JSON ledger file grows unboundedly with each iteration. After thousands of iterations, the ledger becomes large (>10MB), slowing down every read/write operation. There is no archiving mechanism — all iterations live in a single file forever.
 - **Reasoning:** The daemon is designed for long-running autonomous operation. After days of continuous iteration, the ledger will become slow enough to impact performance. An archiving strategy is essential for production durability.
 - **Suggested Approach:** Add configurable iteration archive limit (default: keep last 1000 iterations in the main ledger, archive older ones to timestamped archive files). The web UI can still read archived iterations by querying the archive directory. CLI flags: `--archive-limit N`, `--archive-dir PATH`.
-- **Affected Files:** `pi_loop/state.py`, `pi_loop/loop.py`, `pi_loop/config.py`, `web_app/server.py`
+- **Affected Files:** `omp_loop/state.py`, `omp_loop/loop.py`, `omp_loop/config.py`, `web_app/server.py`
 
 ---
 
@@ -1142,9 +1142,9 @@
 | **Dependencies** | None |
 | **Status** | Pending |
 
-- **Description:** The project has no Dockerfile in the main repository. Containerized deployment would make it easy to run pi-loop in CI/CD pipelines, cloud environments, or isolated environments where Python setup is not desired.
-- **Reasoning:** Containerization is standard for deployment. Currently, running pi-loop requires Python, pip, a virtual environment, and the `pi` binary on PATH. A Docker image simplifies this to `docker run`.
-- **Suggested Approach:** Create a multi-stage Dockerfile: build stage (pip install) → runtime stage (Python slim image, copy installed package). Use `uvicorn` as entry point for web UI. Create `docker-compose.yml` with volume mounts for config, ledger data, and pi binary.
+- **Description:** The project has no Dockerfile in the main repository. Containerized deployment would make it easy to run omp-loop in CI/CD pipelines, cloud environments, or isolated environments where Python setup is not desired.
+- **Reasoning:** Containerization is standard for deployment. Currently, running omp-loop requires Python, pip, a virtual environment, and the `omp` binary on PATH. A Docker image simplifies this to `docker run`.
+- **Suggested Approach:** Create a multi-stage Dockerfile: build stage (pip install) → runtime stage (Python slim image, copy installed package). Use `uvicorn` as entry point for web UI. Create `docker-compose.yml` with volume mounts for config, ledger data, and omp binary.
 - **Affected Files:** new `Dockerfile`, new `docker-compose.yml`, new `.dockerignore`
 
 ---
@@ -1221,7 +1221,7 @@
 - **Description:** The daemon has no structured event bus. All communication between the daemon and external consumers (web UI, external monitoring, log aggregation) passes through unstructured text output. This makes integration brittle and debugging painful.
 - **Reasoning:** This is the foundation for fixing BUG-001 (regex parsing) and enabling log aggregation. The web UI should consume NDJSON events, not parse colorized log strings.
 - **Suggested Approach:** Add an `EventBus` singleton that accumulates events in a ring buffer. Events are structured dicts with `type`, `timestamp`, `data` fields. The daemon emits events for: iteration started/completed, error classified, recovery action taken, worker spawned/completed, git commit made. Events are written to a structured JSON file that the web UI can poll. Console output stays human-readable.
-- **Affected Files:** new `pi_loop/event_bus.py`, `pi_loop/loop.py`, `pi_loop/error_recovery.py`, `pi_loop/git_utils.py`, `web_app/loop_manager.py`
+- **Affected Files:** new `omp_loop/event_bus.py`, `omp_loop/loop.py`, `omp_loop/error_recovery.py`, `omp_loop/git_utils.py`, `web_app/loop_manager.py`
 
 ---
 
@@ -1236,9 +1236,9 @@
 | **Dependencies** | None |
 | **Status** | Pending |
 
-- **Description:** The current `/api/health` endpoint returns a simple `{"status": "ok"}`. There's no component-level health information: is the daemon process running? Is the ledger readable? Is the pi binary available? Is there sufficient disk space?
-- **Reasoning:** For production monitoring, a health endpoint should provide component-level status for dependent services. This enables monitoring systems to distinguish between daemon-down, pi-binary-missing, and disk-full conditions.
-- **Suggested Approach:** Expand `/api/health` to return: daemon status (running/stopped), ledger readability, pi binary availability, disk space status, uptime, last successful iteration timestamp. Use HTTP status codes: 200 = healthy, 503 = degraded, with JSON detail.
+- **Description:** The current `/api/health` endpoint returns a simple `{"status": "ok"}`. There's no component-level health information: is the daemon process running? Is the ledger readable? Is the omp binary available? Is there sufficient disk space?
+- **Reasoning:** For production monitoring, a health endpoint should provide component-level status for dependent services. This enables monitoring systems to distinguish between daemon-down, omp-binary-missing, and disk-full conditions.
+- **Suggested Approach:** Expand `/api/health` to return: daemon status (running/stopped), ledger readability, omp binary availability, disk space status, uptime, last successful iteration timestamp. Use HTTP status codes: 200 = healthy, 503 = degraded, with JSON detail.
 - **Affected Files:** `web_app/server.py` (/api/health endpoint)
 
 ---
@@ -1257,7 +1257,7 @@
 - **Description:** The stats module tracks basic aggregates (total iterations, avg duration, success/error counts) but does not track latency percentiles (p50, p95, p99) or success rate over sliding windows. These are essential for understanding daemon health trends.
 - **Reasoning:** Average duration is easily skewed by outliers. Percentiles give a more accurate picture of iteration performance. Sliding-window success rate detects degradation before it becomes critical.
 - **Suggested Approach:** Add p50/p95/p99 latency tracking to the ledger stats. Use a rolling window (last 100 iterations) for success rate calculation. Expose via the web API and dashboard.
-- **Affected Files:** `pi_loop/stats.py`, `pi_loop/state.py`, `web_app/server.py`
+- **Affected Files:** `omp_loop/stats.py`, `omp_loop/state.py`, `web_app/server.py`
 
 ---
 
@@ -1277,7 +1277,7 @@
 - **Description:** `config.py` defines `TASK_PATTERNS` with 6 task types (research, code-fix, code-build, system-admin, data-processing, content) and associated toolset extensions. However, the task type is never auto-detected — the user must explicitly set `--task-type`. The keyword matching infrastructure exists but isn't wired into the loop's auto-configuration path.
 - **Reasoning:** The infrastructure (keyword matching, extra toolsets) is already built. Wiring it into the auto-config path would mean users get better tooling without manual flag setting. This makes the daemon more autonomous.
 - **Suggested Approach:** Add task type auto-detection before iteration start: compare the goal string against `TASK_PATTERNS` keywords, pick the best-matching type, and extend the toolset automatically. Allow manual override via `--task-type`. Log the detected type.
-- **Affected Files:** `pi_loop/config.py` (TASK_PATTERNS), `pi_loop/loop.py` (iteration setup), `pi_loop/functions.py`
+- **Affected Files:** `omp_loop/config.py` (TASK_PATTERNS), `omp_loop/loop.py` (iteration setup), `omp_loop/functions.py`
 
 ---
 
@@ -1292,10 +1292,10 @@
 | **Dependencies** | ARCH-001 (easier after loop decomposition) |
 | **Status** | Pending |
 
-- **Description:** The daemon has `_evolve_goal()` which detects `NEXT_GOAL:` markers in pi output, but the evolved goal is always derived from the current iteration only. There's no mechanism to build context across multiple iterations or to learn from repeated failures. The daemon can get stuck in a loop of the same failure → recovery → retry cycle.
+- **Description:** The daemon has `_evolve_goal()` which detects `NEXT_GOAL:` markers in omp output, but the evolved goal is always derived from the current iteration only. There's no mechanism to build context across multiple iterations or to learn from repeated failures. The daemon can get stuck in a loop of the same failure → recovery → retry cycle.
 - **Reasoning:** The goal evolution infrastructure exists but is stateless per-iteration. Adding cross-iteration context would enable the daemon to change approach when a strategy repeatedly fails, making it truly autonomous.
-- **Suggested Approach:** Add a "context summary" that tracks: (1) last 3 goal attempts and their outcomes, (2) error patterns that recur, (3) files modified in previous iterations. Include this in the goal context sent to pi. The goal can evolve intelligently rather than blindly retrying the same approach.
-- **Affected Files:** `pi_loop/loop.py` (`_evolve_goal`, `_build_progressive_context`), new `pi_loop/context.py`
+- **Suggested Approach:** Add a "context summary" that tracks: (1) last 3 goal attempts and their outcomes, (2) error patterns that recur, (3) files modified in previous iterations. Include this in the goal context sent to omp. The goal can evolve intelligently rather than blindly retrying the same approach.
+- **Affected Files:** `omp_loop/loop.py` (`_evolve_goal`, `_build_progressive_context`), new `omp_loop/context.py`
 
 ---
 
@@ -1312,8 +1312,8 @@
 
 - **Description:** Convergence detection uses a simple threshold on output similarity (`DEFAULT_CONVERGENCE_THRESHOLD=0.9`). It doesn't consider: (a) whether changes are meaningful (e.g., just timestamp diffs), (b) whether the goal is actually achieved, (c) diminishing returns pattern (improvements getting smaller each iteration).
 - **Reasoning:** The current approach can converge prematurely (minor output changes trigger "converged") or never converge (output changes meaningfully each time even though goal is met). Content-aware convergence would make the daemon more reliable.
-- **Suggested Approach:** Add content-aware convergence: (1) filter trivial diffs (timestamps, whitespace), (2) detect diminishing returns (improvement delta decreasing over 3+ iterations), (3) add optional goal-achievement check via pi's own assessment. Make convergence detection pluggable.
-- **Affected Files:** `pi_loop/loop.py` (convergence check), `pi_loop/config.py` (convergence defaults), new `pi_loop/convergence.py`
+- **Suggested Approach:** Add content-aware convergence: (1) filter trivial diffs (timestamps, whitespace), (2) detect diminishing returns (improvement delta decreasing over 3+ iterations), (3) add optional goal-achievement check via omp's own assessment. Make convergence detection pluggable.
+- **Affected Files:** `omp_loop/loop.py` (convergence check), `omp_loop/config.py` (convergence defaults), new `omp_loop/convergence.py`
 
 ---
 
@@ -1384,7 +1384,7 @@ Items deliverable in <2 hours with meaningful impact:
 | DEBT-001 | Unify status file writers | 30 min |
 | PERF-003 | SSE poller mtime check + skip when no clients | 30 min |
 | PERF-001 | Dashboard incremental rendering | 1-2 hr |
-| DOC-001 | README screenshot, pi version, Swagger link | 30 min |
+| DOC-001 | README screenshot, omp version, Swagger link | 30 min |
 | DOC-003 | SECURITY.md creation | 30 min |
 | DEVX-001 | Pre-commit duality resolution | 30 min |
 | DEVX-003 | Safety deprecated command update | 15 min |

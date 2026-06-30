@@ -1,4 +1,4 @@
-"""Deep integration tests for pi-loop — covering subprocess, heartbeat, web
+"""Deep integration tests for omp-loop — covering subprocess, heartbeat, web
 server, system utils, sentinel/shutdown, and atomic write surfaces.
 
 These tests validate real multi-module interactions with true filesystem
@@ -26,7 +26,7 @@ def _lock_holder(lock_path: str, acquired_flag) -> None:
 
     ``acquired_flag`` is a ``multiprocessing.Value`` (shared boolean).
     """
-    from pi_loop.file_utils import FileLock
+    from omp_loop.file_utils import FileLock
 
     with FileLock(lock_path, timeout=5.0):
         acquired_flag.value = True
@@ -48,24 +48,24 @@ def _path_restore(old: str) -> None:
 
 
 # =========================================================================
-# 1.  Subprocess Lifecycle  (loop.py → _execute_task + mock_pi.sh)
+# 1.  Subprocess Lifecycle  (loop.py → _execute_task + mock_omp.sh)
 # =========================================================================
 
 
 @pytest.fixture(scope="module")
-def mock_pi_path():
-    """Copy ``mock_pi.sh`` into a temp dir named ``pi`` so ``_execute_task``
-    finds it as the ``pi`` binary on PATH.
+def mock_omp_path():
+    """Copy ``mock_omp.sh`` into a temp dir named ``omp`` so ``_execute_task``
+    finds it as the ``omp`` binary on PATH.
 
     Yields the temp-bin directory so the test module can restore PATH later.
     """
-    mock_src = pathlib.Path(__file__).resolve().parent / "integration" / "mock_pi.sh"
-    assert mock_src.is_file(), f"mock_pi.sh not found at {mock_src}"
+    mock_src = pathlib.Path(__file__).resolve().parent / "integration" / "mock_omp.sh"
+    assert mock_src.is_file(), f"mock_omp.sh not found at {mock_src}"
 
     tmpdir = pathlib.Path(tempfile.mkdtemp())
-    pi_bin = tmpdir / "pi"
-    shutil.copy2(str(mock_src), str(pi_bin))
-    pi_bin.chmod(0o755)
+    omp_bin = tmpdir / "omp"
+    shutil.copy2(str(mock_src), str(omp_bin))
+    omp_bin.chmod(0o755)
 
     old_path = os.environ.get("PATH", "")
     _path_prepend(str(tmpdir))
@@ -75,13 +75,13 @@ def mock_pi_path():
 
 
 @pytest.fixture
-def mock_pi_env(mock_pi_path):
-    _ = mock_pi_path  # satisfy ruff: pytest fixture dependency
-    """Set env vars for mock_pi.sh and clean up after each test.
+def mock_omp_env(mock_omp_path):
+    _ = mock_omp_path  # satisfy ruff: pytest fixture dependency
+    """Set env vars for mock_omp.sh and clean up after each test.
 
     Yields a helper dict generator::
 
-        mock_pi_env({"MOCK_PI_LINE_COUNT": "3"})
+        mock_omp_env({"MOCK_PI_LINE_COUNT": "3"})
 
     The overrides are applied to ``os.environ`` immediately so
     ``_execute_task`` (which spawns a subprocess) picks them up.
@@ -108,16 +108,16 @@ def mock_pi_env(mock_pi_path):
 
 
 class TestExecuteTaskLifecycle:
-    """``_execute_task()`` with the real mock_pi.sh binary on PATH."""
+    """``_execute_task()`` with the real mock_omp.sh binary on PATH."""
 
     # ── Happy path ──────────────────────────────────────────────────────
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_successful_execution_default(self, mock_pi_env):
-        """_execute_task returns success with default mock_pi settings."""
-        from pi_loop.loop import _execute_task
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_successful_execution_default(self, mock_omp_env):
+        """_execute_task returns success with default mock_omp settings."""
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({})
+        mock_omp_env({})
         result = _execute_task(
             goal="test goal",
             context="",
@@ -130,12 +130,12 @@ class TestExecuteTaskLifecycle:
         assert "Mock run completed" in result["output"]
         assert result["duration_seconds"] >= 0.0
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_execution_with_context(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_execution_with_context(self, mock_omp_env):
         """_execute_task passes --append-system-prompt when context is given."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({})
+        mock_omp_env({})
         result = _execute_task(
             goal="g with context",
             context="Be concise",
@@ -145,13 +145,13 @@ class TestExecuteTaskLifecycle:
         assert result["error"] is None
         assert result["returncode"] == 0
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
     @pytest.mark.parametrize("line_count", [0, 1, 5])
-    def test_various_line_counts(self, mock_pi_env, line_count):
+    def test_various_line_counts(self, mock_omp_env, line_count):
         """_execute_task handles 0, 1, and 5 text_delta lines."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({"MOCK_PI_LINE_COUNT": str(line_count)})
+        mock_omp_env({"MOCK_PI_LINE_COUNT": str(line_count)})
         result = _execute_task(
             goal="lines test",
             context="",
@@ -161,12 +161,12 @@ class TestExecuteTaskLifecycle:
         assert result["error"] is None
         assert result["returncode"] == 0
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_tool_usage_events(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_tool_usage_events(self, mock_omp_env):
         """_execute_task processes tool call events when MOCK_PI_TOOL_COUNT > 0."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({"MOCK_PI_TOOL_COUNT": "2"})
+        mock_omp_env({"MOCK_PI_TOOL_COUNT": "2"})
         result = _execute_task(
             goal="tools test",
             context="",
@@ -177,13 +177,13 @@ class TestExecuteTaskLifecycle:
         assert result["returncode"] == 0
 
     # ── Error handling ──────────────────────────────────────────────────
-
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_nonzero_exit_code(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_nonzero_exit_code(self, mock_omp_env):
         """_execute_task captures non-zero exit codes as errors."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({"MOCK_PI_EXIT_CODE": "1"})
+        mock_omp_env({"MOCK_PI_EXIT_CODE": "1"})
         result = _execute_task(
             goal="fail test",
             context="",
@@ -193,12 +193,12 @@ class TestExecuteTaskLifecycle:
         assert result["error"] is not None
         assert result["returncode"] == -1 or "exit code 1" in (result.get("error") or "")
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_retry_on_failure(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_retry_on_failure(self, mock_omp_env):
         """_execute_task retries on failure when max_retries > 0."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({"MOCK_PI_EXIT_CODE": "1"})
+        mock_omp_env({"MOCK_PI_EXIT_CODE": "1"})
         result = _execute_task(
             goal="retry test",
             context="",
@@ -210,12 +210,12 @@ class TestExecuteTaskLifecycle:
         assert result["error"] is not None
         assert result["returncode"] == -1
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_missing_end_event(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_missing_end_event(self, mock_omp_env):
         """_execute_task handles missing message_end event."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({"MOCK_PI_DISABLE_END": "1"})
+        mock_omp_env({"MOCK_PI_DISABLE_END": "1"})
         result = _execute_task(
             goal="no end",
             context="",
@@ -225,12 +225,12 @@ class TestExecuteTaskLifecycle:
         assert result["error"] is None
         assert result["returncode"] == 0
 
-    @pytest.mark.skipif(not shutil.which("pi"), reason="mock pi not on PATH")
-    def test_stderr_line_is_handled(self, mock_pi_env):
+    @pytest.mark.skipif(not shutil.which("omp"), reason="mock omp not on PATH")
+    def test_stderr_line_is_handled(self, mock_omp_env):
         """_execute_task handles stderr output from the subprocess."""
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
-        mock_pi_env({"MOCK_PI_STDERR_LINE": "WARNING: something happened"})
+        mock_omp_env({"MOCK_PI_STDERR_LINE": "WARNING: something happened"})
         result = _execute_task(
             goal="stderr test",
             context="",
@@ -243,26 +243,26 @@ class TestExecuteTaskLifecycle:
     # ── Missing binary ──────────────────────────────────────────────────
 
     def test_missing_pi_binary(self, monkeypatch):
-        """_execute_task returns FileNotFound error when 'pi' is missing."""
-        # The module-scope mock_pi_path fixture prepended a dir with a `pi`
-        # symlink.  Remove any directory on PATH that has executable `pi`.
+        """_execute_task returns FileNotFound error when 'omp' is missing."""
+        # The module-scope mock_omp_path fixture prepended a dir with a `omp`
+        # symlink.  Remove any directory on PATH that has executable `omp`.
         cleaned = []
         for p in os.environ.get("PATH", "").split(":"):
-            pi_candidate = os.path.join(p, "pi")
+            omp_candidate = os.path.join(p, "omp")
             try:
-                if os.access(pi_candidate, os.X_OK):
-                    continue  # skip mock-pi dirs
+                if os.access(omp_candidate, os.X_OK):
+                    continue  # skip mock-omp dirs
             except OSError:
                 pass
             cleaned.append(p)
         monkeypatch.setenv("PATH", ":".join(cleaned))
 
-        assert not shutil.which("pi"), "pi should not be on PATH after cleanup"
+        assert not shutil.which("omp"), "omp should not be on PATH after cleanup"
 
-        from pi_loop.loop import _execute_task
+        from omp_loop.loop import _execute_task
 
         result = _execute_task(
-            goal="no pi",
+            goal="no omp",
             context="",
             workdir=None,
             session_timeout=10,
@@ -281,7 +281,7 @@ class TestHeartbeatLifecycle:
 
     def test_write_and_read_heartbeat(self, tmp_path):
         """_write_heartbeat_file creates a readable heartbeat file."""
-        from pi_loop.heartbeat import _read_heartbeat, _write_heartbeat_file
+        from omp_loop.heartbeat import _read_heartbeat, _write_heartbeat_file
 
         hb_file = str(tmp_path / "heartbeat.pid12345")
         data = {
@@ -303,7 +303,7 @@ class TestHeartbeatLifecycle:
 
     def test_heartbeat_age(self, tmp_path):
         """_heartbeat_age returns seconds since last modification."""
-        from pi_loop.heartbeat import _heartbeat_age, _write_heartbeat_file
+        from omp_loop.heartbeat import _heartbeat_age, _write_heartbeat_file
 
         hb_file = str(tmp_path / "heartbeat.age_test")
         _write_heartbeat_file(hb_file, {"ts": 0})
@@ -313,20 +313,20 @@ class TestHeartbeatLifecycle:
 
     def test_heartbeat_age_missing_file(self, tmp_path):
         """_heartbeat_age returns None for missing files."""
-        from pi_loop.heartbeat import _heartbeat_age
+        from omp_loop.heartbeat import _heartbeat_age
 
         age = _heartbeat_age(str(tmp_path / "nonexistent"))
         assert age is None
 
     def test_read_missing_heartbeat(self, tmp_path):
         """_read_heartbeat returns None for missing files."""
-        from pi_loop.heartbeat import _read_heartbeat
+        from omp_loop.heartbeat import _read_heartbeat
 
         assert _read_heartbeat(str(tmp_path / "nonexistent")) is None
 
     def test_read_corrupt_heartbeat(self, tmp_path):
         """_read_heartbeat returns None for corrupt JSON."""
-        from pi_loop.heartbeat import _read_heartbeat
+        from omp_loop.heartbeat import _read_heartbeat
 
         f = tmp_path / "corrupt.hb"
         f.write_text("not-json")
@@ -334,8 +334,8 @@ class TestHeartbeatLifecycle:
 
     def test_heartbeat_path_format(self):
         """_heartbeat_path builds correct path with prefix."""
-        from pi_loop.config import HEARTBEAT_DIR
-        from pi_loop.heartbeat import HEARTBEAT_PREFIX, _heartbeat_path
+        from omp_loop.config import HEARTBEAT_DIR
+        from omp_loop.heartbeat import HEARTBEAT_PREFIX, _heartbeat_path
 
         path = _heartbeat_path("pid-99999")
         assert HEARTBEAT_DIR in path
@@ -344,8 +344,8 @@ class TestHeartbeatLifecycle:
 
     def test_cleanup_stale_heartbeats(self, tmp_path):
         """_cleanup_stale_heartbeats removes existing heartbeat files."""
-        import pi_loop.heartbeat as hb
-        from pi_loop.heartbeat import _cleanup_stale_heartbeats, _write_heartbeat_file
+        import omp_loop.heartbeat as hb
+        from omp_loop.heartbeat import _cleanup_stale_heartbeats, _write_heartbeat_file
 
         # Point heartbeat dir to tmp_path
         old_dir = hb.HEARTBEAT_DIR
@@ -372,7 +372,7 @@ class TestHeartbeatLifecycle:
 
     def test_cleanup_heartbeat_file(self, tmp_path):
         """_cleanup_heartbeat_file removes a single heartbeat file."""
-        from pi_loop.heartbeat import _cleanup_heartbeat_file, _write_heartbeat_file
+        from omp_loop.heartbeat import _cleanup_heartbeat_file, _write_heartbeat_file
 
         hb_file = str(tmp_path / "heartbeat.cleanup_test")
         _write_heartbeat_file(hb_file, {"pid": 1})
@@ -383,13 +383,13 @@ class TestHeartbeatLifecycle:
 
     def test_cleanup_heartbeat_missing_is_noop(self, tmp_path):
         """_cleanup_heartbeat_file is a no-op for missing files."""
-        from pi_loop.heartbeat import _cleanup_heartbeat_file
+        from omp_loop.heartbeat import _cleanup_heartbeat_file
 
         _cleanup_heartbeat_file(str(tmp_path / "nonexistent"))  # should not raise
 
     def test_read_after_write_mtime_batching(self, tmp_path):
         """Reading heartbeat respects mtime-based batching (reads once per mtime)."""
-        from pi_loop.heartbeat import _read_heartbeat, _write_heartbeat_file
+        from omp_loop.heartbeat import _read_heartbeat, _write_heartbeat_file
 
         hb_file = str(tmp_path / "heartbeat.batch")
         _write_heartbeat_file(hb_file, {"pid": 100, "status": "alive"})
@@ -406,13 +406,13 @@ class TestHeartbeatLifecycle:
 
     def test_kill_session_noop_for_none(self):
         """_kill_session is a no-op when proc is None."""
-        from pi_loop.heartbeat import _kill_session
+        from omp_loop.heartbeat import _kill_session
 
         _kill_session(None, "test-session")  # should not raise
 
     def test_kill_session_noop_for_done(self):
         """_kill_session is a no-op when process already exited."""
-        from pi_loop.heartbeat import _kill_session
+        from omp_loop.heartbeat import _kill_session
 
         proc = subprocess.Popen([sys.executable, "-c", "exit(0)"])
         proc.wait(timeout=10)
@@ -443,33 +443,33 @@ class TestWebAppAuthMiddleware:
         assert resp.json()["status"] == "ok"
 
     def test_auth_rejected_without_key(self, client):
-        """GET /api/config returns 401 when PI_LOOP_API_KEY is set and no auth."""
-        with patch.dict(os.environ, {"PI_LOOP_API_KEY": "my-secret-key"}):
+        """GET /api/config returns 401 when OMP_LOOP_API_KEY is set and no auth."""
+        with patch.dict(os.environ, {"OMP_LOOP_API_KEY": "my-secret-key"}):
             resp = client.get("/api/config")
             assert resp.status_code == 401
             assert "detail" in resp.json()
 
     def test_auth_rejected_with_wrong_key(self, client):
         """GET /api/config returns 401 with wrong bearer token."""
-        with patch.dict(os.environ, {"PI_LOOP_API_KEY": "my-secret-key"}):
+        with patch.dict(os.environ, {"OMP_LOOP_API_KEY": "my-secret-key"}):
             resp = client.get("/api/config", headers={"Authorization": "Bearer wrong-key"})
             assert resp.status_code == 401
 
     def test_auth_accepted_with_correct_key(self, client):
         """GET /api/config returns 200 with correct bearer token."""
-        with patch.dict(os.environ, {"PI_LOOP_API_KEY": "my-secret-key"}):
+        with patch.dict(os.environ, {"OMP_LOOP_API_KEY": "my-secret-key"}):
             resp = client.get("/api/config", headers={"Authorization": "Bearer my-secret-key"})
             assert resp.status_code == 200
 
     def test_no_auth_no_key_allows_access(self, client):
-        """GET /api/config returns 200 when PI_LOOP_API_KEY is not set."""
+        """GET /api/config returns 200 when OMP_LOOP_API_KEY is not set."""
         with patch.dict(os.environ, {}, clear=True):
             resp = client.get("/api/config")
             assert resp.status_code == 200
 
     def test_auth_skipped_for_non_api(self, client):
         """Non-/api paths bypass auth middleware."""
-        with patch.dict(os.environ, {"PI_LOOP_API_KEY": "my-secret-key"}):
+        with patch.dict(os.environ, {"OMP_LOOP_API_KEY": "my-secret-key"}):
             resp = client.get("/")  # index page, no auth
             assert resp.status_code in {200, 404}  # 404 if no static files
 
@@ -578,7 +578,7 @@ class TestLoopControlEndpoints:
 
     def test_reset_endpoint(self, client, tmp_path):
         """POST /api/loop/reset removes ledger and lock files."""
-        import pi_loop.config as cfg
+        import omp_loop.config as cfg
 
         old_ledger = cfg.LEDGER_PATH
         old_lock = cfg.LOCK_PATH
@@ -632,7 +632,7 @@ class TestSystemUtilsIntegration:
 
     def test_get_system_usage_returns_dict(self):
         """get_system_usage returns a dict with expected keys on Linux."""
-        from pi_loop.system_utils import get_system_usage
+        from omp_loop.system_utils import get_system_usage
 
         usage = get_system_usage()
         assert isinstance(usage, dict)
@@ -647,7 +647,7 @@ class TestSystemUtilsIntegration:
 
     def test_get_system_usage_cpu(self):
         """get_system_usage returns CPU ticks on Linux."""
-        from pi_loop.system_utils import get_system_usage
+        from omp_loop.system_utils import get_system_usage
 
         usage = get_system_usage()
         if os.path.exists(f"/proc/{os.getpid()}/stat"):
@@ -656,7 +656,7 @@ class TestSystemUtilsIntegration:
 
     def test_diff_with_real_snapshots(self):
         """get_system_usage_diff works with two real snapshots."""
-        from pi_loop.system_utils import get_system_usage, get_system_usage_diff
+        from omp_loop.system_utils import get_system_usage, get_system_usage_diff
 
         before = get_system_usage()
         # Small computation to generate measureable CPU delta
@@ -678,13 +678,13 @@ class TestShutdownSequence:
 
     @pytest.fixture(autouse=True)
     def _isolate_paths(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("PI_LOOP_DATA_DIR", str(tmp_path))
-        monkeypatch.setenv("PI_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
-        monkeypatch.setenv("PI_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
+        monkeypatch.setenv("OMP_LOOP_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OMP_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
+        monkeypatch.setenv("OMP_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
         import importlib
 
-        from pi_loop import config as cfg_mod
-        from pi_loop import file_utils as fu_mod
+        from omp_loop import config as cfg_mod
+        from omp_loop import file_utils as fu_mod
 
         importlib.reload(cfg_mod)
         importlib.reload(fu_mod)
@@ -692,8 +692,8 @@ class TestShutdownSequence:
 
     def test_shutdown_sets_status_and_writes_ledger(self, tmp_path):
         """_shutdown sets status to stop_reason and persists to ledger + status file."""
-        from pi_loop.file_utils import write_ledger
-        from pi_loop.loop import _shutdown
+        from omp_loop.file_utils import write_ledger
+        from omp_loop.loop import _shutdown
 
         state = {"total_iterations": 5, "status": "running"}
         write_ledger(state)
@@ -716,7 +716,7 @@ class TestShutdownSequence:
         # Ledger persisted (write_ledger ran inside _shutdown)
         import json
 
-        from pi_loop.config import LEDGER_PATH
+        from omp_loop.config import LEDGER_PATH
 
         assert os.path.exists(LEDGER_PATH), f"Ledger not found at {LEDGER_PATH}"
         with open(LEDGER_PATH) as f:
@@ -733,7 +733,7 @@ class TestShutdownSequence:
 
     def test_shutdown_with_last_error(self, tmp_path):
         """_shutdown includes last_error in the status file."""
-        from pi_loop.loop import _shutdown
+        from omp_loop.loop import _shutdown
 
         state = {"total_iterations": 3, "status": "running"}
         status_file = str(tmp_path / "loop-status.json")
@@ -753,7 +753,7 @@ class TestShutdownSequence:
 
     def test_shutdown_with_zero_iterations(self, tmp_path):
         """_shutdown handles state with zero iterations."""
-        from pi_loop.loop import _shutdown
+        from omp_loop.loop import _shutdown
 
         state = {"total_iterations": 0, "status": "running", "iterations": []}
         status_file = str(tmp_path / "loop-status.json")
@@ -766,7 +766,7 @@ class TestShutdownSequence:
 
     def test_shutdown_print_summary(self, capsys):
         """_print_shutdown_summary prints a formatted summary block."""
-        from pi_loop.loop import _print_shutdown_summary
+        from omp_loop.loop import _print_shutdown_summary
 
         state = {
             "status": "stopped: test",
@@ -808,7 +808,7 @@ class TestSentinelFileIntegration:
 
     def test_check_sentinel_empty(self, tmp_path):
         """check_sentinel returns None for empty sentinel."""
-        from pi_loop.file_utils import check_sentinel
+        from omp_loop.file_utils import check_sentinel
 
         sentinel = tmp_path / "stop-sentinel"
         sentinel.write_text("")
@@ -818,7 +818,7 @@ class TestSentinelFileIntegration:
 
     def test_check_sentinel_stop(self, tmp_path):
         """check_sentinel returns 'stop' for stop sentinel."""
-        from pi_loop.file_utils import check_sentinel
+        from omp_loop.file_utils import check_sentinel
 
         sentinel = tmp_path / "stop-sentinel"
         sentinel.write_text("stop\n")
@@ -828,7 +828,7 @@ class TestSentinelFileIntegration:
 
     def test_check_sentinel_pause(self, tmp_path):
         """check_sentinel returns 'pause' for pause sentinel."""
-        from pi_loop.file_utils import check_sentinel
+        from omp_loop.file_utils import check_sentinel
 
         sentinel = tmp_path / "pause-sentinel"
         sentinel.write_text("pause\n")
@@ -838,13 +838,13 @@ class TestSentinelFileIntegration:
 
     def test_check_sentinel_no_file(self, tmp_path):
         """check_sentinel returns None when file doesn't exist."""
-        from pi_loop.file_utils import check_sentinel
+        from omp_loop.file_utils import check_sentinel
 
         assert check_sentinel(str(tmp_path / "nonexistent")) is None
 
     def test_check_sentinel_no_remove_keeps_file(self, tmp_path):
         """check_sentinel_no_remove reads but does not delete the sentinel."""
-        from pi_loop.file_utils import check_sentinel_no_remove
+        from omp_loop.file_utils import check_sentinel_no_remove
 
         sentinel = tmp_path / "readonly-stop"
         sentinel.write_text("stop\n")
@@ -855,7 +855,7 @@ class TestSentinelFileIntegration:
 
     def test_check_sentinel_removes_file(self, tmp_path):
         """check_sentinel reads and removes the sentinel file."""
-        from pi_loop.file_utils import check_sentinel
+        from omp_loop.file_utils import check_sentinel
 
         sentinel = tmp_path / "removable-stop"
         sentinel.write_text("stop\n")
@@ -876,13 +876,13 @@ class TestAtomicConfigWrite:
         """Config written atomically via .tmp + rename."""
         from pathlib import Path
 
-        from pi_loop.config_file import save_config
+        from omp_loop.config_file import save_config
 
         config_dir = Path(tmp_path) / "cfg"
         config_dir.mkdir(exist_ok=True)
         config_path = config_dir / "config.json"
 
-        with patch("pi_loop.config_file.CONFIG_DIR", config_dir), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", config_dir), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             save_config({"INFINITE_LOOP_GOAL": "atomically written"})
 
         assert os.path.exists(config_path)
@@ -900,14 +900,14 @@ class TestAtomicConfigWrite:
         """Corrupt config file returns defaults with corrupt flag."""
         from pathlib import Path as _Path
 
-        from pi_loop.config_file import load_config
+        from omp_loop.config_file import load_config
 
         config_dir = _Path(tmp_path) / "cfg2"
         config_dir.mkdir(exist_ok=True)
         config_path = config_dir / "config.json"
         config_path.write_text("this is not valid json")
 
-        with patch("pi_loop.config_file.CONFIG_DIR", config_dir), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", config_dir), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             loaded = load_config()
 
         # Should return defaults even with corrupt file
@@ -918,14 +918,14 @@ class TestAtomicConfigWrite:
         """Empty config file returns default values."""
         from pathlib import Path as _Path
 
-        from pi_loop.config_file import load_config
+        from omp_loop.config_file import load_config
 
         config_dir = _Path(tmp_path) / "cfg3"
         config_dir.mkdir(exist_ok=True)
         config_path = config_dir / "config.json"
         config_path.write_text("")
 
-        with patch("pi_loop.config_file.CONFIG_DIR", config_dir), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", config_dir), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             loaded = load_config()
 
         assert "INFINITE_LOOP_GOAL" in loaded
@@ -941,14 +941,14 @@ class TestJsonExtractionIntegration:
 
     def test_extract_json_from_plain_text(self):
         """extract_json_from_output returns None when no JSON found."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         result = extract_json_from_output("Just some plain text\nWith no JSON")
         assert result is None
 
     def test_extract_json_finds_json_block(self):
         """extract_json_from_output finds JSON in triple-backtick block."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         text = textwrap.dedent("""\
             Here is the result:
@@ -964,7 +964,7 @@ class TestJsonExtractionIntegration:
 
     def test_extract_json_finds_inline_json(self):
         """extract_json_from_output finds JSON object inline."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         text = 'Some text {"key": "value"} trailing'
         result = extract_json_from_output(text)
@@ -973,7 +973,7 @@ class TestJsonExtractionIntegration:
 
     def test_extract_json_with_array_not_supported(self):
         """extract_json_from_output returns None for top-level arrays (uses brace matching)."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         text = 'Here is the list: ["a", "b", "c"] done'
         result = extract_json_from_output(text)
@@ -982,13 +982,13 @@ class TestJsonExtractionIntegration:
 
     def test_extract_json_no_match(self):
         """extract_json_from_output returns None without JSON-like content."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         assert extract_json_from_output("Nothing here") is None
 
     def test_extract_json_last_block_wins(self):
         """extract_json_from_output uses the last valid JSON block (backward scan then forward)."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         text = textwrap.dedent("""\
             ```json
@@ -1017,7 +1017,7 @@ class TestStartupBannerEdge:
         """_handle_cooldown aborts early when shutdown is requested (re-verification)."""
         import time
 
-        from pi_loop.functions import _handle_cooldown
+        from omp_loop.functions import _handle_cooldown
 
         event = threading.Event()
         event.set()
@@ -1029,13 +1029,13 @@ class TestStartupBannerEdge:
 
     def test_cooldown_with_adaptive_mode(self):
         """_handle_cooldown handles 'adaptive' mode."""
-        from pi_loop.functions import _handle_cooldown
+        from omp_loop.functions import _handle_cooldown
 
         _handle_cooldown(10, "adaptive", None, "research")  # should not raise
 
     def test_cooldown_invalid_mode_falls_back(self):
         """_handle_cooldown falls back to fixed for unknown modes."""
-        from pi_loop.functions import _handle_cooldown
+        from omp_loop.functions import _handle_cooldown
 
         _handle_cooldown(5, "unknown_mode", None, "research")  # should not raise
 
@@ -1050,7 +1050,7 @@ class TestStatusFilePipeline:
 
     def test_status_roundtrip_matches_write(self, tmp_path):
         """write_status output matches what was written."""
-        from pi_loop.status import write_status
+        from omp_loop.status import write_status
 
         sp = str(tmp_path / "status.json")
         write_status(
@@ -1071,7 +1071,7 @@ class TestStatusFilePipeline:
 
     def test_status_file_default_path(self):
         """write_status uses STATUS_FILE_DEFAULT when path is not given."""
-        from pi_loop.status import STATUS_FILE_DEFAULT, write_status
+        from omp_loop.status import STATUS_FILE_DEFAULT, write_status
 
         assert STATUS_FILE_DEFAULT is not None
         # No path → should use the default
@@ -1088,7 +1088,7 @@ class TestFileLockIntegrationExtended:
 
     def test_lock_context_manager_acquires_and_releases(self, tmp_path):
         """FileLock acquires and releases the lock."""
-        from pi_loop.file_utils import FileLock
+        from omp_loop.file_utils import FileLock
 
         lock_path = str(tmp_path / "test.lock")
 
@@ -1104,7 +1104,7 @@ class TestFileLockIntegrationExtended:
         """FileLock blocks another process from acquiring the same lock."""
         import multiprocessing
 
-        from pi_loop.file_utils import FileLock
+        from omp_loop.file_utils import FileLock
 
         lock_path = str(tmp_path / "blocking_test.lock")
 

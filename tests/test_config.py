@@ -1,6 +1,6 @@
-"""Tests for pi_loop.config constants."""
+"""Tests for omp_loop.config constants."""
 
-from pi_loop import config
+from omp_loop import config
 
 
 def test_version_exists():

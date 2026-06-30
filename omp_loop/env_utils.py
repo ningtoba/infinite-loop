@@ -3,7 +3,7 @@ env_utils — Environment variable validation, discovery, and loading.
 
 Provides safe environment initialisation that does NOT require a .env file.
 Loading order (last wins):
-  1. pi_loop.config_file defaults (~/.config/pi-loop/config.json)
+  1. omp_loop.config_file defaults (~/.config/omp-loop/config.json)
   2. .env file in CWD (if it exists — optional, no crash if missing)
   3. Existing os.environ values (never overwritten)
 """
@@ -212,7 +212,7 @@ def load_env(
 
     Resolution order (last wins):
         1. IN-MEMORY os.environ — never overwritten
-        2. ``pi_loop.config_file``  — ``~/.config/pi-loop/config.json`` (optional)
+        2. ``omp_loop.config_file``  — ``~/.config/omp-loop/config.json`` (optional)
         3. ``.env`` file in CWD  — ``.env`` (optional, no crash if missing)
         4. Sensible defaults — final fallback for any unset known var
 

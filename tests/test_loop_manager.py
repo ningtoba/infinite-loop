@@ -61,7 +61,7 @@ class TestLoopManagerAddLog:
         log_file = tmp_path / "loop.log"
         mgr = LoopManager()
         mgr._log_file = str(log_file)
-        with patch("pi_loop.config.DEFAULT_LOG_FILE", str(log_file)):
+        with patch("omp_loop.config.DEFAULT_LOG_FILE", str(log_file)):
             mgr._add_log("info", "file message")
             assert log_file.exists()
             content = log_file.read_text()
@@ -261,7 +261,7 @@ class TestLoopManagerParseDaemonLine:
     def test_detects_worker_spawn(self):
         """_parse_daemon_line detects worker spawn."""
         mgr = LoopManager()
-        mgr._parse_daemon_line("[SPAWN (worker #1)] pi --mode json -- goal")
+        mgr._parse_daemon_line("[SPAWN (worker #1)] omp --mode json -- goal")
         assert "1" in mgr._worker_states
 
     def test_detects_worker_response(self):
@@ -353,7 +353,7 @@ class TestLoopManagerStructuredEvents:
     def test_fallback_to_regex_when_no_event_prefix(self):
         """Existing regex parsing still works for non-event lines."""
         mgr = LoopManager()
-        mgr._parse_daemon_line("[SPAWN (worker #1)] pi --mode json -- test goal")
+        mgr._parse_daemon_line("[SPAWN (worker #1)] omp --mode json -- test goal")
         assert "1" in mgr._worker_states
 
     def test_fallback_on_malformed_event_json(self):
@@ -377,7 +377,8 @@ class TestLoopManagerReadStream:
     async def test_reads_lines(self):
         """_read_stream reads lines from stream."""
         mgr = LoopManager()
-        mgr._process = MagicMock()  # Must have process for loop to execute
+        mock_proc = MagicMock(spec=asyncio.subprocess.Process)
+        mgr._process = mock_proc
         mock_stream = AsyncMock()
         mock_stream.readline = AsyncMock(
             side_effect=[
@@ -385,13 +386,14 @@ class TestLoopManagerReadStream:
                 b"",  # Empty → break
             ]
         )
-        await mgr._read_stream(mock_stream, "stdout")
+        await mgr._read_stream(mock_stream, "stdout", proc=mock_proc)
         assert len(mgr.logs) > 0
 
     @pytest.mark.asyncio
     async def test_handles_encoding_error(self):
         """_read_stream handles decode errors."""
         mgr = LoopManager()
+        mock_proc = MagicMock(spec=asyncio.subprocess.Process)
         mock_stream = AsyncMock()
         mock_stream.readline = AsyncMock(
             side_effect=[
@@ -399,7 +401,7 @@ class TestLoopManagerReadStream:
                 b"",
             ]
         )
-        await mgr._read_stream(mock_stream, "stdout")
+        await mgr._read_stream(mock_stream, "stderr", proc=mock_proc)
 
 
 class TestLoopManagerClose:
@@ -440,7 +442,7 @@ class TestLoopManagerHydrateFromLogFile:
         # spawn, terminal output, worker completion, and plain entries.
         log_file.write_text(
             "[2026-06-29T15:01:16] [info] [15:01:16]  Iteration  #4\n"
-            "[2026-06-29T15:01:17] [info] [SPAWN (worker #1)] pi --mode json\n"
+            "[2026-06-29T15:01:17] [info] [SPAWN (worker #1)] omp --mode json\n"
             "[2026-06-29T15:01:18] [info] [TERM (worker #1)] Building project...\n"
             "[2026-06-29T15:02:00] [info] [TERM (worker #1)] All tests pass\n"
             "[2026-06-29T15:20:25] [info] [WORKER (worker #1)] Response in 1147.8s (status=ok)\n"

@@ -1,4 +1,4 @@
-"""Integration tests for pi-loop — end-to-end workflows across modules.
+"""Integration tests for omp-loop — end-to-end workflows across modules.
 
 These tests validate multi-module interactions with minimal mocking, using
 real filesystem operations (tmp_path), real subprocess runners where safe,
@@ -21,36 +21,36 @@ class TestLedgerLifecycle:
     """Full ledger lifecycle on a real filesystem via env var overrides."""
 
     LEDGER_ENVIRON = {
-        "PI_LOOP_DATA_DIR": None,  # set per test
-        "PI_LOOP_LEDGER_PATH": None,
-        "PI_LOOP_LOCK_PATH": None,
+        "OMP_LOOP_DATA_DIR": None,  # set per test
+        "OMP_LOOP_LEDGER_PATH": None,
+        "OMP_LOOP_LOCK_PATH": None,
     }
 
     @pytest.fixture(autouse=True)
     def _isolate_paths(self, tmp_path, monkeypatch):
         """Route all ledger/lock/sentinel paths to a temp directory."""
-        monkeypatch.setenv("PI_LOOP_DATA_DIR", str(tmp_path))
-        monkeypatch.setenv("PI_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
-        monkeypatch.setenv("PI_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
+        monkeypatch.setenv("OMP_LOOP_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OMP_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
+        monkeypatch.setenv("OMP_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
         # Re-import config module so _resolve_path picks up the new env vars
         # after monkeypatch.  Inline import ensures we get the updated values.
         import importlib
 
-        from pi_loop import config as cfg_mod
+        from omp_loop import config as cfg_mod
 
         importlib.reload(cfg_mod)
         yield
         # Restore (pytest monkeypatch handles this)
 
     def _get_ledger_path(self):
-        from pi_loop.config import LEDGER_PATH
+        from omp_loop.config import LEDGER_PATH
 
         return LEDGER_PATH
 
     def test_create_and_resume_ledger(self):
         """Create a fresh ledger, then resume it with the same goal."""
-        from pi_loop.file_utils import read_ledger, write_ledger
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.file_utils import read_ledger, write_ledger
+        from omp_loop.state import load_or_create_ledger
 
         # Create fresh ledger (load_or_create_ledger does NOT write to disk
         # for fresh state — only returns the dict)
@@ -69,7 +69,7 @@ class TestLedgerLifecycle:
         assert disk_state is not None
         assert disk_state["initial_command"] == "Test goal"
 
-        from pi_loop.file_utils import write_ledger
+        from omp_loop.file_utils import write_ledger
 
         # Add an iteration manually to simulate real usage
         state["iterations"].append(
@@ -92,7 +92,7 @@ class TestLedgerLifecycle:
 
     def test_different_goal_starts_fresh(self):
         """A different goal should create a new ledger."""
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.state import load_or_create_ledger
 
         load_or_create_ledger("First goal", "")
         fresh = load_or_create_ledger("Different goal", "")
@@ -101,10 +101,10 @@ class TestLedgerLifecycle:
 
     def test_ledger_with_stale_sentinel(self):
         """Creating a ledger removes stale sentinel files."""
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.state import load_or_create_ledger
 
         sentinel_path = os.path.join(
-            os.environ.get("PI_LOOP_DATA_DIR", "/tmp"),
+            os.environ.get("OMP_LOOP_DATA_DIR", "/tmp"),
             "test-sentinel-stop",
         )
         # Create stale sentinel
@@ -117,8 +117,8 @@ class TestLedgerLifecycle:
 
     def test_reset_goals_clears_completed(self):
         """reset_goals=True clears goals_completed on resume."""
-        from pi_loop.file_utils import write_ledger
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.file_utils import write_ledger
+        from omp_loop.state import load_or_create_ledger
 
         state = load_or_create_ledger("Goal", "")
         state["goals_completed"] = {"goal1": True, "goal2": True}
@@ -129,7 +129,7 @@ class TestLedgerLifecycle:
 
     def test_fresh_ledger_has_missing_keys(self):
         """A fresh ledger has all expected keys."""
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.state import load_or_create_ledger
 
         state = load_or_create_ledger("G", "ctx")
         assert "error_type_counts" in state
@@ -148,7 +148,7 @@ class TestStatsRecalculation:
 
     def test_stats_from_iterations(self):
         """_recalc_stats computes correct stats from real iteration data."""
-        from pi_loop.stats import _recalc_stats
+        from omp_loop.stats import _recalc_stats
 
         state = {
             "iterations": [
@@ -169,7 +169,7 @@ class TestStatsRecalculation:
 
     def test_consecutive_errors(self):
         """_recalc_stats detects consecutive errors at the end."""
-        from pi_loop.stats import _recalc_stats
+        from omp_loop.stats import _recalc_stats
 
         state = {
             "iterations": [
@@ -184,7 +184,7 @@ class TestStatsRecalculation:
 
     def test_consecutive_successes(self):
         """_recalc_stats detects consecutive successes."""
-        from pi_loop.stats import _recalc_stats
+        from omp_loop.stats import _recalc_stats
 
         state = {
             "iterations": [
@@ -206,7 +206,7 @@ class TestGoalFileParsing:
 
     def test_load_simple_goals(self, tmp_path):
         """_load_goals_file parses a simple line-by-line goals file."""
-        from pi_loop.functions import _load_goals_file
+        from omp_loop.functions import _load_goals_file
 
         gf = tmp_path / "goals.txt"
         gf.write_text("Fix lint errors\nRun tests\nDeploy app\n")
@@ -218,7 +218,7 @@ class TestGoalFileParsing:
 
     def test_load_goals_with_profiles(self, tmp_path):
         """_load_goals_file parses pipe-delimited goal | profile | model | provider."""
-        from pi_loop.functions import _load_goals_file
+        from omp_loop.functions import _load_goals_file
 
         gf = tmp_path / "goals.txt"
         gf.write_text("Fix bugs | productive | gpt4 | openai\nTest | fast | claude | anthropic\n")
@@ -229,7 +229,7 @@ class TestGoalFileParsing:
 
     def test_respects_comments_and_blanks(self, tmp_path):
         """_load_goals_file skips comments and blank lines."""
-        from pi_loop.functions import _load_goals_file
+        from omp_loop.functions import _load_goals_file
 
         gf = tmp_path / "goals.txt"
         gf.write_text("# This is a comment\n\nFix bugs\n# Another comment\n\n")
@@ -239,7 +239,7 @@ class TestGoalFileParsing:
 
     def test_missing_file_returns_fallback(self):
         """_load_goals_file returns fallback when file is missing."""
-        from pi_loop.functions import _load_goals_file
+        from omp_loop.functions import _load_goals_file
 
         goals = _load_goals_file("/nonexistent/goals.txt", "fallback goal")
         assert len(goals) == 1
@@ -254,10 +254,10 @@ class TestConfigPipeline:
 
     def test_config_file_roundtrip(self, tmp_path):
         """Save then load config file — full persistence round-trip."""
-        from pi_loop.config_file import load_config, save_config
+        from omp_loop.config_file import load_config, save_config
 
         config_path = tmp_path / "config.json"
-        with patch("pi_loop.config_file.CONFIG_DIR", tmp_path), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", tmp_path), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             save_config({"INFINITE_LOOP_GOAL": "my custom goal", "INFINITE_LOOP_GIT": "true"})
             loaded = load_config()
         assert loaded["INFINITE_LOOP_GOAL"] == "my custom goal"
@@ -267,11 +267,11 @@ class TestConfigPipeline:
 
     def test_config_manager_reads_stored(self, tmp_path):
         """config_manager._read_stored reads real file values over defaults."""
-        from pi_loop.config_file import save_config as file_save
+        from omp_loop.config_file import save_config as file_save
         from web_app.config_manager import _read_stored
 
         config_path = tmp_path / "config.json"
-        with patch("pi_loop.config_file.CONFIG_DIR", tmp_path), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", tmp_path), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             file_save({"INFINITE_LOOP_GOAL": "build stuff", "INFINITE_LOOP_GIT": "true"})
             result = _read_stored()
         assert result["INFINITE_LOOP_GOAL"] == "build stuff"
@@ -281,11 +281,11 @@ class TestConfigPipeline:
 
     def test_config_manager_get_config_roundtrip(self, tmp_path):
         """get_config returns schema + current values after saving."""
-        from pi_loop.config_file import save_config as file_save
+        from omp_loop.config_file import save_config as file_save
         from web_app.config_manager import get_config
 
         config_path = tmp_path / "config.json"
-        with patch("pi_loop.config_file.CONFIG_DIR", tmp_path), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", tmp_path), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             file_save({"INFINITE_LOOP_GOAL": "my goal", "INFINITE_LOOP_QUIET": "true"})
             result = get_config()
 
@@ -303,11 +303,11 @@ class TestConfigPipeline:
 
     def test_build_cli_args_integration(self, tmp_path):
         """Build CLI args from real saved config."""
-        from pi_loop.config_file import save_config as file_save
+        from omp_loop.config_file import save_config as file_save
         from web_app.config_manager import build_cli_args, get_raw_config
 
         config_path = tmp_path / "config.json"
-        with patch("pi_loop.config_file.CONFIG_DIR", tmp_path), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", tmp_path), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             file_save(
                 {
                     "INFINITE_LOOP_GOAL": "Run tests",
@@ -329,11 +329,11 @@ class TestConfigPipeline:
 
     def test_build_cli_args_context(self, tmp_path):
         """Context value maps to --append-system-prompt flag."""
-        from pi_loop.config_file import save_config as file_save
+        from omp_loop.config_file import save_config as file_save
         from web_app.config_manager import build_cli_args, get_raw_config
 
         config_path = tmp_path / "config.json"
-        with patch("pi_loop.config_file.CONFIG_DIR", tmp_path), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", tmp_path), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             file_save({"INFINITE_LOOP_CONTEXT": "Be concise and use git"})
             raw = get_raw_config()
             args = build_cli_args(raw)
@@ -351,8 +351,8 @@ class TestLoopConfigFromArgs:
 
     def test_basic_arg_roundtrip(self):
         """LoopConfig.from_args correctly maps basic args."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.parser import _create_parser
+        from omp_loop.config import LoopConfig
+        from omp_loop.parser import _create_parser
 
         parser = _create_parser()
         ns = parser.parse_args(
@@ -379,8 +379,8 @@ class TestLoopConfigFromArgs:
 
     def test_bool_flags_map_correctly(self):
         """Boolean flags are correctly mapped to LoopConfig."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.parser import _create_parser
+        from omp_loop.config import LoopConfig
+        from omp_loop.parser import _create_parser
 
         parser = _create_parser()
         ns = parser.parse_args(["--goal", "test", "--evolve", "--quiet", "--notify-desktop"])
@@ -392,8 +392,8 @@ class TestLoopConfigFromArgs:
 
     def test_string_defaults_preserved(self):
         """Unset string args preserve their defaults."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.parser import _create_parser
+        from omp_loop.config import LoopConfig
+        from omp_loop.parser import _create_parser
 
         parser = _create_parser()
         ns = parser.parse_args(["--goal", "test"])
@@ -408,8 +408,8 @@ class TestLoopConfigFromArgs:
 
     def test_sentinel_path_preserved(self):
         """Sentinel path from CLI is preserved in LoopConfig."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.parser import _create_parser
+        from omp_loop.config import LoopConfig
+        from omp_loop.parser import _create_parser
 
         parser = _create_parser()
         custom_path = "/tmp/custom-sentinel"
@@ -423,7 +423,7 @@ class TestLoopConfigFromArgs:
 
     def test_kwargs_default_handling(self):
         """LoopConfig(some_param=val) fills unset fields with defaults."""
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         cfg = LoopConfig(goal="test", max_iterations=10)
         assert cfg.workers == 1
@@ -434,7 +434,7 @@ class TestLoopConfigFromArgs:
 
     def test_getitem_backward_compat(self):
         """LoopConfig supports dict-style access for backward compat."""
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         cfg = LoopConfig(goal="my goal", workers=3)
         assert cfg["goal"] == "my goal"
@@ -442,7 +442,7 @@ class TestLoopConfigFromArgs:
 
     def test_get_method(self):
         """LoopConfig.get() works like dict.get()."""
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         cfg = LoopConfig(goal="test")
         assert cfg.get("goal") == "test"
@@ -457,7 +457,7 @@ class TestErrorRecoveryCycle:
 
     def test_timeout_mitigation_ramp_up(self):
         """Timeout errors escalate through mitigation levels."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(session_timeout=120, cooldown=0, use_library=True, workers=2)
 
@@ -493,7 +493,7 @@ class TestErrorRecoveryCycle:
 
     def test_network_errors_exponential_backoff(self):
         """Network errors trigger exponential backoff, not stop."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(session_timeout=120, cooldown=0, use_library=True, workers=2)
 
@@ -524,13 +524,13 @@ class TestErrorRecoveryCycle:
         assert new_cooldown >= 30
         assert new_mode == "adaptive"
         # Network should never auto-stop — verify stop threshold is None
-        from pi_loop.config import _ERROR_THRESHOLDS
+        from omp_loop.config import _ERROR_THRESHOLDS
 
         assert _ERROR_THRESHOLDS["network"]["stop"] is None
 
     def test_full_success_unwind(self):
         """3+ consecutive successes fully unwind to originals."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(session_timeout=120, cooldown=10, use_library=True, workers=2)
 
@@ -579,7 +579,7 @@ class TestErrorRecoveryCycle:
 
     def test_stop_threshold_triggers_level_3(self):
         """Reaching the stop threshold sets mitigation_level to 3."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(session_timeout=120, cooldown=0, use_library=True, workers=2)
 
@@ -617,7 +617,7 @@ class TestErrorRecoveryCycle:
 
     def test_error_type_severity_sorting(self):
         """_pick_primary_error picks the most severe type."""
-        from pi_loop.error_recovery import _pick_primary_error
+        from omp_loop.error_recovery import _pick_primary_error
 
         assert _pick_primary_error(["info", "timeout", "network"]) == "timeout"
         assert _pick_primary_error(["heartbeat", "unknown"]) == "heartbeat"
@@ -632,7 +632,7 @@ class TestPreflightChecker:
 
     def test_all_checks_pass_with_defaults(self, tmp_path):
         """PreflightChecker.run_all() returns True when all checks pass."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         args = MagicMock()
         args.workdir = ""
@@ -649,7 +649,7 @@ class TestPreflightChecker:
 
     def test_fails_on_missing_workdir(self, tmp_path):
         """PreflightChecker fails when workdir doesn't exist."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         args = MagicMock()
         args.workdir = str(tmp_path / "nonexistent")
@@ -667,7 +667,7 @@ class TestPreflightChecker:
 
     def test_fail_fast_stops_early(self, tmp_path):
         """fail_fast=True stops on first failure."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         args = MagicMock()
         args.workdir = str(tmp_path / "nonexistent")
@@ -685,7 +685,7 @@ class TestPreflightChecker:
 
     def test_git_check_works_in_repo(self, tmp_path):
         """check_git_repo detects a real .git directory."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         # Create a minimal .git dir
         (tmp_path / ".git").mkdir()
@@ -694,14 +694,14 @@ class TestPreflightChecker:
 
     def test_git_check_fails_without_repo(self, tmp_path):
         """check_git_repo fails without .git."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         passed, _ = PreflightChecker.check_git_repo(str(tmp_path))
         assert not passed
 
     def test_file_readable_check(self, tmp_path):
         """check_file_readable detects existing vs missing files."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         existing = tmp_path / "context.txt"
         existing.write_text("hello")
@@ -714,7 +714,7 @@ class TestPreflightChecker:
 
     def test_port_available_check(self):
         """check_port_available returns True when port is 0."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         passed, detail = PreflightChecker.check_port_available(0)
         assert passed
@@ -722,7 +722,7 @@ class TestPreflightChecker:
 
     def test_schema_file_validation(self, tmp_path):
         """check_schema_file validates JSON schema files."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         valid = tmp_path / "schema.json"
         valid.write_text('{"type": "object", "properties": {}}')
@@ -739,7 +739,7 @@ class TestPreflightChecker:
 
     def test_format_results(self):
         """format_results produces human-readable output."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         results = [
             {"name": "python version", "passed": True, "detail": "Python 3.11"},
@@ -752,7 +752,7 @@ class TestPreflightChecker:
 
     def test_run_all_checks_returns_correct_results(self, tmp_path):
         """run_all_checks returns structured results for all checks."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         results = PreflightChecker.run_all_checks(
             workdir=str(tmp_path),
@@ -774,14 +774,14 @@ class TestFileWatcher:
 
     def test_detects_initial_scan_as_change(self, tmp_path):
         """First check_change() returns True (initial scan)."""
-        from pi_loop.file_watcher import FileWatcherTrigger
+        from omp_loop.file_watcher import FileWatcherTrigger
 
         watcher = FileWatcherTrigger(str(tmp_path), poll_interval=1.0)
         assert watcher.check_change() is True
 
     def test_detects_file_creation(self, tmp_path):
         """Creating a new file triggers change detection."""
-        from pi_loop.file_watcher import FileWatcherTrigger
+        from omp_loop.file_watcher import FileWatcherTrigger
 
         watcher = FileWatcherTrigger(str(tmp_path), poll_interval=0.5)
         watcher.check_change()  # Initial scan
@@ -791,7 +791,7 @@ class TestFileWatcher:
 
     def test_no_change_without_modification(self, tmp_path):
         """No change reported when files are stable."""
-        from pi_loop.file_watcher import FileWatcherTrigger
+        from omp_loop.file_watcher import FileWatcherTrigger
 
         # Start with a file
         (tmp_path / "stable.txt").write_text("content")
@@ -809,7 +809,7 @@ class TestFileWatcher:
         write, since write_text + stat within the same kernel tick may not
         produce a distinguishable mtime delta on some filesystems.
         """
-        from pi_loop.file_watcher import FileWatcherTrigger
+        from omp_loop.file_watcher import FileWatcherTrigger
 
         f = tmp_path / "editable.txt"
         f.write_text("v1")
@@ -825,7 +825,7 @@ class TestFileWatcher:
 
     def test_watches_single_file(self, tmp_path):
         """FileWatcherTrigger can watch a single file."""
-        from pi_loop.file_watcher import FileWatcherTrigger
+        from omp_loop.file_watcher import FileWatcherTrigger
 
         f = tmp_path / "single.txt"
         f.write_text("data")
@@ -840,7 +840,7 @@ class TestFileWatcher:
 
     def test_to_dict_returns_state(self, tmp_path):
         """to_dict returns a serializable snapshot."""
-        from pi_loop.file_watcher import FileWatcherTrigger
+        from omp_loop.file_watcher import FileWatcherTrigger
 
         watcher = FileWatcherTrigger(str(tmp_path), poll_interval=2.0)
         info = watcher.to_dict()
@@ -850,7 +850,7 @@ class TestFileWatcher:
 
     def test_format_changed(self, tmp_path):
         """format_changed returns changed file paths."""
-        from pi_loop.file_watcher import FileWatcherTrigger
+        from omp_loop.file_watcher import FileWatcherTrigger
 
         watcher = FileWatcherTrigger(str(tmp_path), poll_interval=0.5)
         watcher.check_change()  # Initial scan
@@ -868,7 +868,7 @@ class TestStatusFilePipeline:
 
     def test_write_and_read_status(self, tmp_path):
         """write_status produces a valid JSON file that can be read back."""
-        from pi_loop.status import write_status
+        from omp_loop.status import write_status
 
         status_path = str(tmp_path / "loop-status.json")
         write_status(status_path, running=True, pid=12345, iteration_count=7, version="14.39.0")
@@ -886,7 +886,7 @@ class TestStatusFilePipeline:
 
     def test_status_with_error(self, tmp_path):
         """Status file includes last_error when provided."""
-        from pi_loop.status import write_status
+        from omp_loop.status import write_status
 
         status_path = str(tmp_path / "loop-status.json")
         write_status(
@@ -905,7 +905,7 @@ class TestStatusFilePipeline:
 
     def test_no_status_path_is_noop(self):
         """write_status with no path is a no-op."""
-        from pi_loop.status import write_status
+        from omp_loop.status import write_status
 
         # Should not raise
         write_status(None)
@@ -913,7 +913,7 @@ class TestStatusFilePipeline:
 
     def test_write_and_status_file_roundtrip(self, tmp_path):
         """Status + status_file utility are consistent."""
-        from pi_loop.status import write_status
+        from omp_loop.status import write_status
 
         sp = str(tmp_path / "status.json")
         write_status(sp, running=True, pid=100, iteration_count=5)
@@ -924,7 +924,7 @@ class TestStatusFilePipeline:
 
     def test_multiple_writes_are_consistent(self, tmp_path):
         """Multiple status writes don't corrupt the file."""
-        from pi_loop.status import write_status
+        from omp_loop.status import write_status
 
         sp = str(tmp_path / "status.json")
         for i in range(5):
@@ -1032,7 +1032,7 @@ class TestLoopManagerRealPaths:
 
     def test_ledger_operations_with_real_paths(self, tmp_path):
         """LoopManager.get_ledger works with real filesystem ledger."""
-        from pi_loop.file_utils import write_ledger
+        from omp_loop.file_utils import write_ledger
         from web_app.loop_manager import LoopManager
 
         ledger_path = str(tmp_path / "ledger.json")
@@ -1040,8 +1040,8 @@ class TestLoopManagerRealPaths:
 
         # Directly overwrite runtime paths — patching via unittest.mock
         # won't work because the imported module aliases are already bound.
-        import pi_loop.config as _cfg_mod
-        import pi_loop.file_utils as _fu_mod
+        import omp_loop.config as _cfg_mod
+        import omp_loop.file_utils as _fu_mod
         import web_app.loop_manager as _lm_mod
 
         old_cfg_mod = _cfg_mod.LEDGER_PATH
@@ -1160,11 +1160,11 @@ class TestWebAppIntegration:
 
     def test_get_raw_config_integration(self, tmp_path):
         """get_raw_config returns real stored config from config_file."""
-        from pi_loop.config_file import save_config as file_save
+        from omp_loop.config_file import save_config as file_save
         from web_app.config_manager import get_raw_config
 
         config_path = tmp_path / "config.json"
-        with patch("pi_loop.config_file.CONFIG_DIR", tmp_path), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", tmp_path), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             file_save({"INFINITE_LOOP_GOAL": "integration test goal", "INFINITE_LOOP_GIT": "true"})
             raw = get_raw_config()
         assert raw["INFINITE_LOOP_GOAL"] == "integration test goal"
@@ -1225,8 +1225,8 @@ class TestCliPipeline:
 
     def test_full_arg_roundtrip(self):
         """CLI args → LoopConfig → dict access preserves values."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.parser import _create_parser
+        from omp_loop.config import LoopConfig
+        from omp_loop.parser import _create_parser
 
         parser = _create_parser()
         argv = [
@@ -1266,8 +1266,8 @@ class TestCliPipeline:
 
     def test_cli_with_goals_file(self, tmp_path):
         """CLI with --goals-file flows through correctly."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.parser import _create_parser
+        from omp_loop.config import LoopConfig
+        from omp_loop.parser import _create_parser
 
         gf = tmp_path / "goals.txt"
         gf.write_text("Goal 1\nGoal 2\n")
@@ -1280,7 +1280,7 @@ class TestCliPipeline:
 
     def test_cli_with_context_file(self, tmp_path):
         """CLI with --context-file reads context from disk."""
-        from pi_loop.parser import _create_parser
+        from omp_loop.parser import _create_parser
 
         cf = tmp_path / "context.txt"
         cf.write_text("Detailed instructions here")
@@ -1292,7 +1292,7 @@ class TestCliPipeline:
 
     def test_cli_introspection_flags(self):
         """Introspection flags parse without --goal."""
-        from pi_loop.parser import _create_parser
+        from omp_loop.parser import _create_parser
 
         parser = _create_parser()
         ns = parser.parse_args(["--version"])
@@ -1312,7 +1312,7 @@ class TestCliPipeline:
 
     def test_cli_with_all_bool_flags(self):
         """All boolean flags parse successfully."""
-        from pi_loop.parser import _create_parser
+        from omp_loop.parser import _create_parser
 
         bool_flags = [
             "--git",
@@ -1392,11 +1392,11 @@ class TestDashboardHtmlIntegration:
 
     def test_generates_valid_html(self, realistic_state):
         """_build_dashboard_html produces valid HTML with all data."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         html = _build_dashboard_html(realistic_state)
         assert "<!DOCTYPE html>" in html
-        assert "pi-loop Dashboard" in html
+        assert "omp-loop Dashboard" in html
         # Status
         assert "running" in html
         # Error indicator
@@ -1410,7 +1410,7 @@ class TestDashboardHtmlIntegration:
 
     def test_empty_iterations(self):
         """Dashboard handles empty iterations list."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         html = _build_dashboard_html({"status": "stopped", "iterations": [], "stats": {}})
         assert "stopped" in html
@@ -1418,7 +1418,7 @@ class TestDashboardHtmlIntegration:
 
     def test_html_escapes_user_content(self):
         """Dashboard HTML-escapes iteration summaries to prevent XSS."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         state = {
             "status": "running",
@@ -1445,7 +1445,7 @@ class TestValidationSchemaIntegration:
 
     def test_load_valid_schema(self, tmp_path):
         """load_json_schema reads valid JSON schema files."""
-        from pi_loop.validation import load_json_schema
+        from omp_loop.validation import load_json_schema
 
         schema_path = tmp_path / "schema.json"
         schema_path.write_text('{"type": "object", "properties": {"name": {"type": "string"}}}')
@@ -1456,13 +1456,13 @@ class TestValidationSchemaIntegration:
 
     def test_load_missing_schema_returns_none(self):
         """load_json_schema returns None for missing file."""
-        from pi_loop.validation import load_json_schema
+        from omp_loop.validation import load_json_schema
 
         assert load_json_schema("/nonexistent/schema.json") is None
 
     def test_load_invalid_schema_returns_none(self, tmp_path):
         """load_json_schema returns None for invalid JSON."""
-        from pi_loop.validation import load_json_schema
+        from omp_loop.validation import load_json_schema
 
         bad = tmp_path / "bad.json"
         bad.write_text("not json")
@@ -1477,7 +1477,7 @@ class TestEnvUtilsIntegration:
 
     def test_check_env_file(self, tmp_path):
         """check_env_file validates a real .env file."""
-        from pi_loop.env_utils import check_env_file
+        from omp_loop.env_utils import check_env_file
 
         env_file = tmp_path / ".env"
         env_file.write_text(
@@ -1496,7 +1496,7 @@ class TestEnvUtilsIntegration:
 
     def test_known_env_vars_exist(self):
         """KNOWN_ENV_VARS returns recognized env var names."""
-        from pi_loop.env_utils import KNOWN_ENV_VARS
+        from omp_loop.env_utils import KNOWN_ENV_VARS
 
         assert isinstance(KNOWN_ENV_VARS, (set, list)) or True
         assert len(KNOWN_ENV_VARS) > 0
@@ -1512,14 +1512,14 @@ class TestGitUtilsIntegration:
 
     def test_capture_git_state_in_non_repo(self, tmp_path):
         """_capture_git_state returns empty dict in non-repo dir."""
-        from pi_loop.git_utils import _capture_git_state
+        from omp_loop.git_utils import _capture_git_state
 
         result = _capture_git_state(str(tmp_path))
         assert result == {}
 
     def test_git_auto_commit_in_non_repo(self, tmp_path):
         """_git_auto_commit returns None in non-repo dir."""
-        from pi_loop.git_utils import _git_auto_commit
+        from omp_loop.git_utils import _git_auto_commit
 
         result = _git_auto_commit(str(tmp_path), 1, "test")
         assert result is None
@@ -1533,7 +1533,7 @@ class TestGoalCycling:
 
     def test_single_goal_no_cycle(self):
         """_cycle_goal returns no-op for single goal."""
-        from pi_loop.functions import _cycle_goal
+        from omp_loop.functions import _cycle_goal
 
         goal_text, should_stop = _cycle_goal([("Only goal", "", "", "")], 0, stop_at_goals_end=False)
         assert goal_text == ""
@@ -1541,7 +1541,7 @@ class TestGoalCycling:
 
     def test_cycles_through_multi_goals(self):
         """_cycle_goal cycles through multiple goals."""
-        from pi_loop.functions import _cycle_goal
+        from omp_loop.functions import _cycle_goal
 
         goals = [("Goal A", "", "", ""), ("Goal B", "", "", "")]
         goal_text, _ = _cycle_goal(goals, 0, stop_at_goals_end=False)
@@ -1561,7 +1561,7 @@ class TestGoalCycling:
         len(goals_list) <= 1, so we test with 2 goals where index
         reaches len(goals_list) (wraps, but stop-at-end check runs first).
         """
-        from pi_loop.functions import _cycle_goal
+        from omp_loop.functions import _cycle_goal
 
         goals = [("Goal A", "", "", ""), ("Goal B", "", "", "")]
         # Index 2 is length of list — stop check fires before cycle
@@ -1571,7 +1571,7 @@ class TestGoalCycling:
 
     def test_progressive_context_building(self):
         """_build_progressive_context appends recent summaries."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         context = _build_progressive_context("Base context", ["Summary 1", "Summary 2", "Summary 3"])
         assert "Base context" in context
@@ -1587,7 +1587,7 @@ class TestColorUtils:
 
     def test_colorizer_singleton(self):
         """colorizer is a singleton-like object."""
-        from pi_loop.color_utils import colorizer
+        from omp_loop.color_utils import colorizer
 
         assert hasattr(colorizer, "ok")
         assert hasattr(colorizer, "fail")
@@ -1597,7 +1597,7 @@ class TestColorUtils:
 
     def test_configurable_color_mode(self):
         """configure_color_mode sets color mode 'never'."""
-        import pi_loop.color_utils as _cu
+        import omp_loop.color_utils as _cu
 
         _cu.configure_color_mode("never")
         assert not _cu.colorizer._enabled()
@@ -1614,7 +1614,7 @@ class TestCooldown:
 
     def test_no_cooldown_when_zero(self):
         """_handle_cooldown returns immediately when cooldown is 0."""
-        from pi_loop.functions import _handle_cooldown
+        from omp_loop.functions import _handle_cooldown
 
         # Should not block
         _handle_cooldown(0, "fixed", None, "research")
@@ -1629,13 +1629,13 @@ class TestFileLockIntegration:
 
     def test_read_ledger_through_lock(self, tmp_path):
         """write_ledger + read_ledger through FileLock round-trips data."""
-        from pi_loop.file_utils import read_ledger, write_ledger
+        from omp_loop.file_utils import read_ledger, write_ledger
 
         ledger_path = str(tmp_path / "ledger.json")
         lock_path = str(tmp_path / "ledger.lock")
 
-        import pi_loop.config as _cfg
-        import pi_loop.file_utils as _fu
+        import omp_loop.config as _cfg
+        import omp_loop.file_utils as _fu
 
         old_ledger = _fu.LEDGER_PATH
         old_lock = _fu.LOCK_PATH
@@ -1665,13 +1665,13 @@ class TestFileLockIntegration:
         """Multiple threads can safely write+read ledger through FileLock."""
         import threading
 
-        from pi_loop.file_utils import read_ledger, write_ledger
+        from omp_loop.file_utils import read_ledger, write_ledger
 
         ledger_path = str(tmp_path / "ledger_concurrent.json")
         lock_path = str(tmp_path / "ledger_concurrent.lock")
 
-        import pi_loop.config as _cfg
-        import pi_loop.file_utils as _fu
+        import omp_loop.config as _cfg
+        import omp_loop.file_utils as _fu
 
         old_ledger = _fu.LEDGER_PATH
         old_lock = _fu.LOCK_PATH
@@ -1683,7 +1683,7 @@ class TestFileLockIntegration:
         _cfg.LEDGER_PATH = ledger_path
         _cfg.LOCK_PATH = lock_path
 
-        from pi_loop.file_utils import FileLock
+        from omp_loop.file_utils import FileLock
 
         # Pre-write initial state so threads only need to append
         write_ledger({"status": "running", "iterations": [], "total_iterations": 0})
@@ -1735,7 +1735,7 @@ class TestFileLockIntegration:
         fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
-            from pi_loop.file_utils import FileLock
+            from omp_loop.file_utils import FileLock
 
             with pytest.raises(TimeoutError), FileLock(lock_path, timeout=0.1):
                 pass
@@ -1752,7 +1752,7 @@ class TestDaemonLogIntegration:
 
     def test_init_daemon_log_creates_file(self, tmp_path):
         """_init_daemon_log creates a log file with a header message."""
-        from pi_loop.file_utils import _init_daemon_log
+        from omp_loop.file_utils import _init_daemon_log
 
         log_file = str(tmp_path / "daemon.log")
         logger = _init_daemon_log(log_file, max_mb=5)
@@ -1764,7 +1764,7 @@ class TestDaemonLogIntegration:
 
     def test_logs_across_callers_go_to_file(self, tmp_path):
         """Multiple _log calls write through the daemon logger."""
-        from pi_loop.file_utils import _init_daemon_log, _log
+        from omp_loop.file_utils import _init_daemon_log, _log
 
         log_file = str(tmp_path / "multi.log")
         _init_daemon_log(log_file, max_mb=10)
@@ -1777,8 +1777,8 @@ class TestDaemonLogIntegration:
 
     def test_no_daemon_logger_does_not_crash(self, tmp_path):
         """_log works when _daemon_logger is None (no crash)."""
-        import pi_loop.file_utils as _fu
-        from pi_loop.file_utils import _log
+        import omp_loop.file_utils as _fu
+        from omp_loop.file_utils import _log
 
         saved = _fu._daemon_logger
         _fu._daemon_logger = None
@@ -1797,8 +1797,8 @@ class TestErrorRecoveryCooldownStats:
 
     def test_timeout_ramp_up_and_stats(self):
         """Timeout error ramps up mitigation and stats reflect the error."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
-        from pi_loop.stats import _recalc_stats
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.stats import _recalc_stats
 
         _set_originals(session_timeout=60, cooldown=0, use_library=True, workers=2)
 
@@ -1840,7 +1840,7 @@ class TestErrorRecoveryCooldownStats:
 
     def test_network_backoff_then_full_recovery(self):
         """Network errors backoff, then 3+ successes fully recover."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(session_timeout=120, cooldown=10, use_library=True, workers=2)
 
@@ -1872,7 +1872,7 @@ class TestErrorRecoveryCooldownStats:
 
     def test_mixed_errors_across_iterations(self):
         """Stats recalculated after mixed success/error iterations."""
-        from pi_loop.stats import _recalc_stats
+        from omp_loop.stats import _recalc_stats
 
         state = {
             "iterations": [
@@ -1892,7 +1892,7 @@ class TestErrorRecoveryCooldownStats:
 
     def test_unknown_error_does_not_change_cooldown(self):
         """Unknown error type triggers a mild mitigation but no cooldown change."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(session_timeout=120, cooldown=0, use_library=True, workers=2)
 
@@ -1932,18 +1932,18 @@ class TestLedgerCrashRecovery:
 
     @pytest.fixture(autouse=True)
     def _isolate_paths(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("PI_LOOP_DATA_DIR", str(tmp_path))
-        monkeypatch.setenv("PI_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
-        monkeypatch.setenv("PI_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
+        monkeypatch.setenv("OMP_LOOP_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OMP_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
+        monkeypatch.setenv("OMP_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
         import importlib
 
-        from pi_loop import config as cfg_mod
+        from omp_loop import config as cfg_mod
 
         importlib.reload(cfg_mod)
         yield
 
     def _get_ledger_path(self):
-        from pi_loop.config import LEDGER_PATH
+        from omp_loop.config import LEDGER_PATH
 
         return LEDGER_PATH
 
@@ -1951,8 +1951,8 @@ class TestLedgerCrashRecovery:
         """Pending iteration older than 300s is recovered on resume."""
         import time
 
-        from pi_loop.file_utils import write_ledger
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.file_utils import write_ledger
+        from omp_loop.state import load_or_create_ledger
 
         past_ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - 600)) + "+00:00"
 
@@ -1975,8 +1975,8 @@ class TestLedgerCrashRecovery:
         """Recent pending iteration (< 300s) is NOT recovered."""
         import time
 
-        from pi_loop.file_utils import write_ledger
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.file_utils import write_ledger
+        from omp_loop.state import load_or_create_ledger
 
         recent_ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - 60)) + "+00:00"
 
@@ -1998,8 +1998,8 @@ class TestLedgerCrashRecovery:
 
     def test_resume_foreign_goal_starts_fresh(self):
         """Different goal on resume creates fresh ledger."""
-        from pi_loop.file_utils import write_ledger
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.file_utils import write_ledger
+        from omp_loop.state import load_or_create_ledger
 
         state = load_or_create_ledger("Original goal", "ctx")
         state["iterations"].append({"n": 1, "summary": "Did work", "error": None, "duration_seconds": 10.0})
@@ -2020,7 +2020,7 @@ class TestSystemUsageDiffIntegration:
 
     def test_diff_between_snapshots(self):
         """get_system_usage_diff computes diff correctly."""
-        from pi_loop.system_utils import get_system_usage_diff
+        from omp_loop.system_utils import get_system_usage_diff
 
         before = {
             "cpu_seconds": 10.0,
@@ -2044,21 +2044,21 @@ class TestSystemUsageDiffIntegration:
 
     def test_diff_with_empty_before(self):
         """get_system_usage_diff handles empty before dict."""
-        from pi_loop.system_utils import get_system_usage_diff
+        from omp_loop.system_utils import get_system_usage_diff
 
         diff = get_system_usage_diff({}, {"cpu_seconds": 10.0})
         assert diff == {}
 
     def test_diff_with_empty_before2(self):
         """get_system_usage_diff handles empty before dict (delegated to None check)."""
-        from pi_loop.system_utils import get_system_usage_diff
+        from omp_loop.system_utils import get_system_usage_diff
 
         diff = get_system_usage_diff({}, {"cpu_seconds": 10.0})
         assert diff == {}
 
     def test_diff_returns_after_values(self):
         """get_system_usage_diff returns after values (not delta) for memory."""
-        from pi_loop.system_utils import get_system_usage_diff
+        from omp_loop.system_utils import get_system_usage_diff
 
         before = {"cpu_seconds": 5.0}
         after = {
@@ -2079,7 +2079,7 @@ class TestDashboardEdgeCases:
 
     def test_empty_state(self):
         """Dashboard handles completely empty state dict."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         html = _build_dashboard_html({})
         assert isinstance(html, str)
@@ -2087,7 +2087,7 @@ class TestDashboardEdgeCases:
 
     def test_error_only_iterations(self):
         """Dashboard shows all-error iterations."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         state = {
             "status": "running",
@@ -2127,7 +2127,7 @@ class TestDashboardEdgeCases:
 
     def test_many_iterations_truncation(self):
         """Dashboard still renders with 100+ iterations."""
-        from pi_loop.loop import _build_dashboard_html
+        from omp_loop.loop import _build_dashboard_html
 
         iterations = [
             {
@@ -2163,13 +2163,13 @@ class TestFullConfigOrchestration:
 
     def test_full_config_roundtrip(self, tmp_path):
         """Config round-trips through the entire pipeline."""
-        from pi_loop.config import LoopConfig
-        from pi_loop.config_file import load_config, save_config
-        from pi_loop.parser import _create_parser
+        from omp_loop.config import LoopConfig
+        from omp_loop.config_file import load_config, save_config
+        from omp_loop.parser import _create_parser
         from web_app.config_manager import build_cli_args, get_raw_config, validate_config
 
         config_path = tmp_path / "config.json"
-        with patch("pi_loop.config_file.CONFIG_DIR", tmp_path), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", tmp_path), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             # 1. Save
             save_config(
                 {
@@ -2246,12 +2246,12 @@ class TestSentinelForceResetOrchestration:
 
     @pytest.fixture(autouse=True)
     def _isolate_paths(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("PI_LOOP_DATA_DIR", str(tmp_path))
-        monkeypatch.setenv("PI_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
-        monkeypatch.setenv("PI_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
+        monkeypatch.setenv("OMP_LOOP_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("OMP_LOOP_LEDGER_PATH", str(tmp_path / "infinite-loop-state.json"))
+        monkeypatch.setenv("OMP_LOOP_LOCK_PATH", str(tmp_path / "infinite-loop-state.lock"))
         import importlib
 
-        from pi_loop import config as cfg_mod
+        from omp_loop import config as cfg_mod
 
         importlib.reload(cfg_mod)
         yield
@@ -2261,9 +2261,9 @@ class TestSentinelForceResetOrchestration:
         import os
         import pathlib
 
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.state import load_or_create_ledger
 
-        sentinel = os.path.join(os.environ.get("PI_LOOP_DATA_DIR", "/tmp"), "stop-sentinel")
+        sentinel = os.path.join(os.environ.get("OMP_LOOP_DATA_DIR", "/tmp"), "stop-sentinel")
         pathlib.Path(sentinel).write_text("stop\n")
 
         state = load_or_create_ledger("Sentinel goal", "", sentinel_path=sentinel)
@@ -2277,17 +2277,17 @@ class TestSentinelForceResetOrchestration:
         import pathlib
 
         # Resolve the real ledger path — same env vars the fixture set
-        data_dir = os.environ.get("PI_LOOP_DATA_DIR", "/tmp")
+        data_dir = os.environ.get("OMP_LOOP_DATA_DIR", "/tmp")
         ledger_path = os.environ.get(
-            "PI_LOOP_LEDGER_PATH",
+            "OMP_LOOP_LEDGER_PATH",
             os.path.join(data_dir, "infinite-loop-state.json"),
         )
         lock_path = os.environ.get(
-            "PI_LOOP_LOCK_PATH",
+            "OMP_LOOP_LOCK_PATH",
             os.path.join(data_dir, "infinite-loop-state.lock"),
         )
 
-        from pi_loop.file_utils import FileLock
+        from omp_loop.file_utils import FileLock
 
         # Write a fake ledger directly to the tmp path
         state = {
@@ -2314,7 +2314,7 @@ class TestSentinelForceResetOrchestration:
         with contextlib.suppress(OSError):
             os.remove(ledger_path)
 
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.state import load_or_create_ledger
 
         fresh = load_or_create_ledger("fresh start", "")
         assert fresh["total_iterations"] == 0
@@ -2322,8 +2322,8 @@ class TestSentinelForceResetOrchestration:
 
     def test_reset_goals_with_resume(self):
         """Resume with reset_goals=True clears previous completions."""
-        from pi_loop.file_utils import write_ledger
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.file_utils import write_ledger
+        from omp_loop.state import load_or_create_ledger
 
         state = load_or_create_ledger("Goal with history", "")
         state["goals_completed"] = {"goal_1": True, "goal_2": True}
@@ -2344,7 +2344,7 @@ class TestGoalCombinedFlow:
 
     def test_goals_file_to_cycle_to_context(self, tmp_path):
         """Goals file loading cycles through goals and builds progressive context."""
-        from pi_loop.functions import _build_progressive_context, _cycle_goal, _load_goals_file
+        from omp_loop.functions import _build_progressive_context, _cycle_goal, _load_goals_file
 
         gf = tmp_path / "goals.txt"
         gf.write_text("Fix lint errors\nRun tests\nDeploy app\n")
@@ -2369,7 +2369,7 @@ class TestGoalCombinedFlow:
 
     def test_goals_with_profiles_through_cycle(self, tmp_path):
         """Goals with profile/model/provider tuples cycle correctly."""
-        from pi_loop.functions import _cycle_goal, _load_goals_file
+        from omp_loop.functions import _cycle_goal, _load_goals_file
 
         gf = tmp_path / "goals_profile.txt"
         gf.write_text("Fix bugs | productive | gpt4 | openai\nTest | fast | claude | anthropic\n")
@@ -2389,7 +2389,7 @@ class TestGoalCombinedFlow:
 
     def test_goal_file_empty_line_handling(self, tmp_path):
         """Empty lines and comments are stripped from goals file."""
-        from pi_loop.functions import _load_goals_file
+        from omp_loop.functions import _load_goals_file
 
         gf = tmp_path / "messy_goals.txt"
         gf.write_text("# Header comment\n\n  First goal with spaces  \n\n# Another comment\n\n  Second goal  \n")
@@ -2401,7 +2401,7 @@ class TestGoalCombinedFlow:
 
     def test_goal_stop_at_exhaustion(self, tmp_path):
         """stop_at_goals_end stops when all goals exhausted."""
-        from pi_loop.functions import _cycle_goal, _load_goals_file
+        from omp_loop.functions import _cycle_goal, _load_goals_file
 
         gf = tmp_path / "exhaust_goals.txt"
         gf.write_text("Goal A\nGoal B\n")
@@ -2414,7 +2414,7 @@ class TestGoalCombinedFlow:
 
     def test_context_building_preserves_order(self):
         """_build_progressive_context preserves summary order."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         context = _build_progressive_context(
             "Base context",
@@ -2439,7 +2439,7 @@ class TestStartupBanner:
 
     def test_quiet_mode_shows_compact(self, capsys):
         """_log_startup_banner with quiet=True emits a compact banner."""
-        from pi_loop.functions import _log_startup_banner
+        from omp_loop.functions import _log_startup_banner
 
         _log_startup_banner(
             task_type="research",
@@ -2480,7 +2480,7 @@ class TestStartupBanner:
 
     def test_verbose_banner_includes_sections(self, capsys):
         """_log_startup_banner with quiet=False shows all sections."""
-        from pi_loop.functions import _log_startup_banner
+        from omp_loop.functions import _log_startup_banner
 
         _log_startup_banner(
             task_type="code",
@@ -2529,7 +2529,7 @@ class TestStartupBanner:
         """_handle_cooldown aborts early when shutdown is requested."""
         import threading
 
-        from pi_loop.functions import _handle_cooldown
+        from omp_loop.functions import _handle_cooldown
 
         event = threading.Event()
         event.set()  # Simulate shutdown

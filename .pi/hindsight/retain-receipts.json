@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "receipts": [
+    {
+      "createdAt": "2026-06-30T02:44:10.544Z",
+      "bankId": "omp",
+      "documentId": "pi-explicit:e57dff116f5f4411:300fc5a2b0b56042",
+      "queueJobId": "1c3c90e9-9f2c-473b-967b-c3932e49e4f1",
+      "updateMode": "replace",
+      "source": "tool",
+      "context": "User asked to store OMP Hindsight configuration details.",
+      "tags": [
+        "source:pi",
+        "repo:hermes-loop-dfd5e5e6d9d0",
+        "session:e57dff116f5f4411"
+      ]
+    }
+  ]
+}

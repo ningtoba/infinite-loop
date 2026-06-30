@@ -1,6 +1,6 @@
-# Contributing to pi-loop
+# Contributing to omp-loop
 
-Thank you for your interest in contributing to pi-loop! This document provides guidelines and workflows for contributing effectively.
+Thank you for your interest in contributing to omp-loop! This document provides guidelines and workflows for contributing effectively.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ Thank you for your interest in contributing to pi-loop! This document provides g
 
 ```bash
 git clone <repo-url>
-cd pi-loop
+cd omp-loop
 
 # Install with dev and test dependencies
 make install-dev
@@ -53,8 +53,8 @@ make mypy
 ## Project Structure
 
 ```
-pi-loop/
-├── pi_loop/              # Core daemon package
+omp-loop/
+├── omp_loop/              # Core daemon package
 │   ├── cli.py            # CLI entry point and argparse setup
 │   ├── loop.py           # Main loop engine (~820 lines)
 │   ├── config.py         # Constants, paths, defaults, and LoopConfig
@@ -150,18 +150,18 @@ make test
 # Run specific test files
 python -m pytest tests/test_loop.py -v
 
-# Run smoke tests only (needs external tools like `pi`)
+# Run smoke tests only (needs external tools like `omp`)
 python -m pytest tests/ -m smoke -v
 
 # Run with coverage
-python -m pytest tests/ --cov=pi_loop --cov=web_app --cov-report=term-missing
+python -m pytest tests/ --cov=omp_loop --cov=web_app --cov-report=term-missing
 ```
 
 ### Test Structure
 
-- Tests live in `tests/` and mirror the `pi_loop/` and `web_app/` structure
+- Tests live in `tests/` and mirror the `omp_loop/` and `web_app/` structure
 - Shared fixtures are in `tests/conftest.py`
-- Smoke tests (marked `@pytest.mark.smoke`) require external tools like the `pi` binary
+- Smoke tests (marked `@pytest.mark.smoke`) require external tools like the `omp` binary
 - All other tests should be self-contained and not require external dependencies
 
 ### Writing Tests
@@ -176,7 +176,7 @@ python -m pytest tests/ --cov=pi_loop --cov=web_app --cov-report=term-missing
 
 - Tests should not depend on `/tmp/infinite-loop-state.json` or other runtime files
 - Use `tmp_path` fixture for temporary file I/O tests
-- Set `PI_LOOP_NO_HYDRATE=1` for tests that interact with `LoopManager` to avoid log file reads
+- Set `OMP_LOOP_NO_HYDRATE=1` for tests that interact with `LoopManager` to avoid log file reads
 
 ---
 

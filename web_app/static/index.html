@@ -3,9 +3,9 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="description" content="Web UI for the pi-loop autonomous task daemon" />
+        <meta name="description" content="Web UI for the omp-loop autonomous task daemon" />
         <meta name="theme-color" content="#09090b" />
-        <title>pi-loop — Web UI</title>
+        <title>omp-loop — Web UI</title>
         <link
             rel="icon"
             type="image/svg+xml"
@@ -21,7 +21,7 @@
             <!-- Sidebar -->
             <nav id="sidebar">
                 <div class="sidebar-header">
-                    <h1>&#x3C0; pi-loop</h1>
+                    <h1>&#x3C0; omp-loop</h1>
                     <span class="version">Web UI v2.0</span>
                 </div>
                 <div class="sidebar-nav" role="tablist">
@@ -377,12 +377,14 @@
                             <h2 id="worker-log-title">Worker #—</h2>
                             <span class="subtitle" id="worker-log-meta"></span>
                         </div>
-                        <div
-                            id="worker-terminal-container"
-                            style="height: calc(100vh - 160px); padding: 4px; background: #0d1117; border-radius: 8px"
-                        ></div>
+                        <div class="worker-detail-layout">
+                            <div id="worker-log-list" class="worker-log-list"></div>
+                            <div
+                                id="worker-terminal-container"
+                                style="height: calc(100vh - 160px); padding: 4px; background: #0d1117; border-radius: 8px"
+                            ></div>
+                        </div>
                     </div>
-                </section>
                 <section id="tab-system" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-system">
                     <div class="top-bar"><h2>System Resources</h2></div>
                     <div class="system-grid" id="system-grid">

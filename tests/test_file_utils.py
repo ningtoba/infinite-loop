@@ -1,4 +1,4 @@
-"""Tests for pi_loop.file_utils — file locking, logging, ledger I/O, and sentinel checks."""
+"""Tests for omp_loop.file_utils — file locking, logging, ledger I/O, and sentinel checks."""
 
 import json
 import logging
@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from pi_loop.file_utils import (
+from omp_loop.file_utils import (
     FileLock,
     _colorize_log_tags,
     _init_daemon_log,
@@ -48,13 +48,13 @@ class TestFileLock:
 class TestColorizeLogTags:
     def test_no_color_returns_original(self):
         """_colorize_log_tags returns original when color disabled."""
-        with patch("pi_loop.file_utils._cu._enabled", return_value=False):
+        with patch("omp_loop.file_utils._cu._enabled", return_value=False):
             result = _colorize_log_tags("[ERROR] something failed")
         assert result == "[ERROR] something failed"
 
     def test_color_on_returns_colored(self):
         """_colorize_log_tags returns modified when color enabled."""
-        with patch("pi_loop.file_utils._cu._enabled", return_value=True):
+        with patch("omp_loop.file_utils._cu._enabled", return_value=True):
             for tag in ("[ERROR]", "[WARN]", "[OK]", "[BEAT]", "[DAEMON]"):
                 # Just verify it doesn't crash and returns a string
                 result = _colorize_log_tags(f"{tag} something")
@@ -99,10 +99,10 @@ class TestInitDaemonLog:
     def test_initializes_global(self, tmp_path):
         """_init_daemon_log initializes the module-level logger."""
         log_file = str(tmp_path / "daemon.log")
-        import pi_loop.file_utils
+        import omp_loop.file_utils
 
         _init_daemon_log(log_file, max_mb=5)
-        assert pi_loop.file_utils._daemon_logger is not None
+        assert omp_loop.file_utils._daemon_logger is not None
 
 
 class TestWriteLedger:
@@ -110,8 +110,8 @@ class TestWriteLedger:
         """write_ledger writes state to LEDGER_PATH."""
         state = {"iterations": [], "status": "running"}
         with (
-            patch("pi_loop.file_utils.LEDGER_PATH", str(tmp_path / "ledger.json")),
-            patch("pi_loop.file_utils.FileLock"),
+            patch("omp_loop.file_utils.LEDGER_PATH", str(tmp_path / "ledger.json")),
+            patch("omp_loop.file_utils.FileLock"),
         ):
             write_ledger(state)
             ledger_file = tmp_path / "ledger.json"
@@ -125,14 +125,14 @@ class TestReadLedger:
         """read_ledger reads an existing ledger file."""
         ledger_path = tmp_path / "ledger.json"
         ledger_path.write_text(json.dumps({"status": "running"}))
-        with patch("pi_loop.file_utils.LEDGER_PATH", str(ledger_path)), patch("pi_loop.file_utils.FileLock"):
+        with patch("omp_loop.file_utils.LEDGER_PATH", str(ledger_path)), patch("omp_loop.file_utils.FileLock"):
             data = read_ledger()
         assert data is not None
         assert data["status"] == "running"
 
     def test_nonexistent(self, tmp_path):
         """read_ledger returns None when file doesn't exist."""
-        with patch("pi_loop.file_utils.LEDGER_PATH", str(tmp_path / "nonexistent.json")):
+        with patch("omp_loop.file_utils.LEDGER_PATH", str(tmp_path / "nonexistent.json")):
             result = read_ledger()
         assert result is None
 
@@ -140,7 +140,7 @@ class TestReadLedger:
         """read_ledger returns None for invalid JSON."""
         ledger_path = tmp_path / "ledger.json"
         ledger_path.write_text("invalid json")
-        with patch("pi_loop.file_utils.LEDGER_PATH", str(ledger_path)), patch("pi_loop.file_utils.FileLock"):
+        with patch("omp_loop.file_utils.LEDGER_PATH", str(ledger_path)), patch("omp_loop.file_utils.FileLock"):
             data = read_ledger()
         assert data is None
 
@@ -150,7 +150,7 @@ class TestWriteStatusFile:
         """write_status_file writes a JSON status line."""
         status_path = str(tmp_path / "status.json")
         state = {"total_iterations": 5, "stats": {"total_duration_seconds": 30.0}}
-        with patch("pi_loop.file_utils.os.getpid", return_value=12345):
+        with patch("omp_loop.file_utils.os.getpid", return_value=12345):
             write_status_file(status_path, state, iteration=3, status="running")
         data = json.loads((tmp_path / "status.json").read_text())
         assert data["pid"] == 12345
@@ -167,7 +167,7 @@ class TestWriteStatusFile:
     def test_error_logged(self):
         """write_status_file logs on OSError."""
         with (
-            patch("pi_loop.file_utils._log") as mock_log,
+            patch("omp_loop.file_utils._log") as mock_log,
             patch("builtins.open", side_effect=OSError("permission denied")),
         ):
             write_status_file("/nonexistent/status.json", {}, iteration=0)

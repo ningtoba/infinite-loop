@@ -1,20 +1,20 @@
 """Configuration manager — reads/writes JSON config and provides config schema.
 
 The web UI is the sole source of truth. Config is persisted via
-pi_loop.config_file (no .env file needed).
+omp_loop.config_file (no .env file needed).
 """
 
 import logging
 from typing import Any
 
-from pi_loop.config import SENTINEL_PATH_DEFAULT
-from pi_loop.config_file import load_config
-from pi_loop.config_file import save_config as _save_config
+from omp_loop.config import SENTINEL_PATH_DEFAULT
+from omp_loop.config_file import load_config
+from omp_loop.config_file import save_config as _save_config
 
 logger = logging.getLogger(__name__)
 
-# Working configuration flags for pi-loop.
-# Only flags that pi actually uses are kept.
+# Working configuration flags for omp-loop.
+# Only flags that omp actually uses are kept.
 CONFIG_DEFAULTS: dict[str, dict[str, Any]] = {
     # ── Core Task ──────────────────────────────────────────────────────
     "INFINITE_LOOP_GOAL": {
@@ -22,7 +22,7 @@ CONFIG_DEFAULTS: dict[str, dict[str, Any]] = {
         "type": "string",
         "group": "core",
         "label": "Goal",
-        "description": "Task description passed to pi",
+        "description": "Task description passed to omp",
         "required": True,
         "multiline": True,
     },
@@ -31,7 +31,7 @@ CONFIG_DEFAULTS: dict[str, dict[str, Any]] = {
         "type": "string",
         "group": "core",
         "label": "Context",
-        "description": "Initial context appended to pi's system prompt",
+        "description": "Initial context appended to omp's system prompt",
         "multiline": True,
     },
     "INFINITE_LOOP_WORKDIR": {
@@ -54,7 +54,7 @@ CONFIG_DEFAULTS: dict[str, dict[str, Any]] = {
         "type": "int",
         "group": "iteration",
         "label": "Session Timeout",
-        "description": "Max seconds per spawned pi session.",
+        "description": "Max seconds per spawned omp session.",
     },
     "INFINITE_LOOP_COOLDOWN": {
         "default": "0",
@@ -68,7 +68,7 @@ CONFIG_DEFAULTS: dict[str, dict[str, Any]] = {
         "type": "int",
         "group": "iteration",
         "label": "Max Output Chars",
-        "description": "Max chars of pi output to store in ledger.",
+        "description": "Max chars of omp output to store in ledger.",
     },
     "INFINITE_LOOP_SHUTDOWN_SENTINEL": {
         "default": SENTINEL_PATH_DEFAULT,
@@ -249,7 +249,7 @@ CONFIG_GROUPS = [
 
 
 def _read_stored() -> dict[str, str]:
-    """Read stored config via pi_loop.config_file.load_config()."""
+    """Read stored config via omp_loop.config_file.load_config()."""
     try:
         stored = load_config()
     except Exception as exc:
@@ -281,7 +281,7 @@ def _read_stored() -> dict[str, str]:
 
 
 def save_config(config: dict[str, str]) -> None:
-    """Persist config dict via pi_loop.config_file.save_config().
+    """Persist config dict via omp_loop.config_file.save_config().
 
     Casts string values to their declared Python types so the downstream
     config reader gets bool/int/float, not strings.
@@ -336,7 +336,7 @@ def get_raw_config() -> dict[str, str]:
 
 
 def build_cli_args(config: dict[str, str]) -> list[str]:
-    """Build CLI argument list from config dict for pi-loop."""
+    """Build CLI argument list from config dict for omp-loop."""
     args: list[str] = []
 
     str_flags: dict[str, str] = {
@@ -365,7 +365,7 @@ def build_cli_args(config: dict[str, str]) -> list[str]:
         if val and val != CONFIG_DEFAULTS.get(env_key, {}).get("default", ""):
             args.extend([flag, val])
 
-    # Context uses --append-system-prompt (pi's flag name)
+    # Context uses --append-system-prompt (omp's flag name)
     ctx = config.get("INFINITE_LOOP_CONTEXT", "")
     if ctx:
         args.extend(["--append-system-prompt", ctx])

@@ -3,17 +3,17 @@
 PYTHON := python3
 
 help:
-	@echo "━━━ pi-loop — Makefile ━━━"
+	@echo "━━━ omp-loop — Makefile ━━━"
 	@echo ""
 	@echo "USAGE:  make <target>"
 	@echo ""
 	@echo "TARGETS:"
-	@echo "  install       Install pi-loop as a system command via pip install -e ."
+	@echo "  install       Install omp-loop as a system command via pip install -e ."
 	@echo "  install-dev   Install with dev/test dependencies"
 	@echo "  update-lock   Re-generate requirements.txt + requirements-dev.txt"
 	@echo "  verify-lock   Verify lock files are up to date with pyproject.toml"
-	@echo "  lint          Run ruff check on pi_loop/ and web_app/"
-	@echo "  format        Run ruff format (in-place) on pi_loop/ and web_app/"
+	@echo "  lint          Run ruff check on omp_loop/ and web_app/"
+	@echo "  format        Run ruff format (in-place) on omp_loop/ and web_app/"
 	@echo "  lint-all      Full CI check: lint + format check (no write)"
 	@echo "  security      Run security scanning (bandit + safety)"
 	@echo "  test          Run tests with pytest (verbose + coverage)"
@@ -38,38 +38,38 @@ update-lock:
 
 verify-lock:
 	$(PYTHON) -m pip install pip-tools 2>/dev/null || $(PYTHON) -m pip install pip-tools --break-system-packages
-	pip-compile pyproject.toml --output-file /tmp/pi-loop-reqs.txt --quiet --strip-extras
-	pip-compile pyproject.toml --output-file /tmp/pi-loop-reqs-dev.txt --extra test --extra dev --quiet --strip-extras
-	cmp requirements.txt /tmp/pi-loop-reqs.txt || { echo "LOCK OUTDATED: re-run 'make update-lock'"; exit 1; }
-	cmp requirements-dev.txt /tmp/pi-loop-reqs-dev.txt || { echo "LOCK OUTDATED: re-run 'make update-lock'"; exit 1; }
-	rm -f /tmp/pi-loop-reqs.txt /tmp/pi-loop-reqs-dev.txt
+	pip-compile pyproject.toml --output-file /tmp/omp-loop-reqs.txt --quiet --strip-extras
+	pip-compile pyproject.toml --output-file /tmp/omp-loop-reqs-dev.txt --extra test --extra dev --quiet --strip-extras
+	cmp requirements.txt /tmp/omp-loop-reqs.txt || { echo "LOCK OUTDATED: re-run 'make update-lock'"; exit 1; }
+	cmp requirements-dev.txt /tmp/omp-loop-reqs-dev.txt || { echo "LOCK OUTDATED: re-run 'make update-lock'"; exit 1; }
+	rm -f /tmp/omp-loop-reqs.txt /tmp/omp-loop-reqs-dev.txt
 
 lint:
-	ruff check pi_loop/ web_app/
+	ruff check omp_loop/ web_app/
 
 format:
-	ruff format pi_loop/ web_app/
+	ruff format omp_loop/ web_app/
 
 lint-all:
-	ruff check pi_loop/ web_app/
-	ruff format --check pi_loop/ web_app/
-	$(PYTHON) -m mypy pi_loop/ web_app/ --ignore-missing-imports --warn-unused-configs
+	ruff check omp_loop/ web_app/
+	ruff format --check omp_loop/ web_app/
+	$(PYTHON) -m mypy omp_loop/ web_app/ --ignore-missing-imports --warn-unused-configs
 
 security:
-	bandit -r pi_loop/ web_app/ -f json -o bandit-report.json
+	bandit -r omp_loop/ web_app/ -f json -o bandit-report.json
 	safety check -r requirements.txt -r requirements-dev.txt --continue-on-error
 
 test:
-	$(PYTHON) -m pytest tests/ -v --cov=pi_loop --cov=web_app --cov-report=term-missing
+	$(PYTHON) -m pytest tests/ -v --cov=omp_loop --cov=web_app --cov-report=term-missing
 
 test-ci:
-	$(PYTHON) -m pytest tests/ -v --cov=pi_loop --cov=web_app --cov-report=term-missing --cov-report=xml:coverage.xml
+	$(PYTHON) -m pytest tests/ -v --cov=omp_loop --cov=web_app --cov-report=term-missing --cov-report=xml:coverage.xml
 
 test-simple:
 	$(PYTHON) -m pytest tests/ -v
 
 mypy:
-	$(PYTHON) -m mypy pi_loop/ web_app/ --ignore-missing-imports --warn-unused-configs
+	$(PYTHON) -m mypy omp_loop/ web_app/ --ignore-missing-imports --warn-unused-configs
 
 pre-commit:
 	$(PYTHON) -m pip install pre-commit
@@ -81,11 +81,11 @@ pre-commit-run:
 
 web:
 	$(PYTHON) -m pip install -e .
-	pi-loop-web
+	omp-loop-web
 
 web-dev:
 	$(PYTHON) -m pip install -e .
-	pi-loop-web --reload
+	omp-loop-web --reload
 
 clean:
 	rm -rf build/ dist/ *.egg-info .ruff_cache/ .pytest_cache/ .mypy_cache/

@@ -1,10 +1,10 @@
-"""Tests for pi_loop.system_utils — /proc-based CPU/memory tracking."""
+"""Tests for omp_loop.system_utils — /proc-based CPU/memory tracking."""
 
 from unittest.mock import mock_open, patch
 
 import pytest
 
-from pi_loop.system_utils import get_system_usage, get_system_usage_diff
+from omp_loop.system_utils import get_system_usage, get_system_usage_diff
 
 
 class TestGetSystemUsage:

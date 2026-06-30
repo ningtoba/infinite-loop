@@ -1,9 +1,9 @@
-# pi-loop Web App — Architecture & Developer Guide
+# omp-loop Web App — Architecture & Developer Guide
 
 ## Overview
 
 The web app (`web_app/`) provides a REST API and browser-based UI for managing
-the pi-loop autonomous task daemon. It lives alongside `pi_loop/` and depends
+the omp-loop autonomous task daemon. It lives alongside `omp_loop/` and depends
 on it for configuration schemas but does **not** import the daemon's runtime
 modules — the daemon is launched as a **subprocess** whose stdout/stderr are
 parsed for live worker progress.
@@ -22,7 +22,7 @@ parsed for live worker progress.
 | `static/app.js` | SPA — REST fetches, SSE listener, DOM rendering |
 
 **Note:** The `web_app/` package is the **current, actively maintained** web interface.
-It was preserved and enhanced after a prior `hermes_loop` → `pi_loop` rename;
+It was preserved and enhanced after a prior `hermes_loop` → `omp_loop` rename;
 see the integration notes at the bottom of this document.
 
 ## Data Flow
@@ -30,7 +30,7 @@ see the integration notes at the bottom of this document.
 ```
 Browser (SPA)
   │
-  ├── REST (fetch) ──► server.py ──► loop_manager.py ──► subprocess: pi_loop
+  ├── REST (fetch) ──► server.py ──► loop_manager.py ──► subprocess: omp_loop
   │                                    │
   │                                    └── stdout parser (regex)
   │                                    │
@@ -79,13 +79,13 @@ changes (plus a periodic keepalive every ~10s).
 
 The config layer uses **two storage mechanisms**:
 
-1. **JSON file** (`/tmp/pi-loop/config.json` by default, overridable via
-   `PI_LOOP_DATA_DIR` or `CONFIG_PATH` env vars):
+1. **JSON file** (`/tmp/omp-loop/config.json` by default, overridable via
+   `OMP_LOOP_DATA_DIR` or `CONFIG_PATH` env vars):
    - Flat `dict[str, str]` (all values serialised as strings).
    - Read by `read_json_config()` -> `get_config_with_defaults()`.
    - Written by `write_json_config()` (from Save Config button).
 
-2. **`.env` file** (optional, pointed at via `--env` or `PI_LOOP_ENV_PATH`):
+2. **`.env` file** (optional, pointed at via `--env` or `OMP_LOOP_ENV_PATH`):
    - Not currently read by the web app; the daemon subprocess inherits
      the web server's environment (supplemented by `os.environ.copy()`).
 
@@ -105,7 +105,7 @@ This ensures round-trip consistency between `read`→`display`→`save` cycles.
 ```
 start()
   ├── read config → build_cli_args()
-  ├── create_subprocess_exec(pi_loop, ...)  (with 30s timeout)
+  ├── create_subprocess_exec(omp_loop, ...)  (with 30s timeout)
   ├── verify process alive (sleep 0.1, check returncode)
   ├── status = "running"
   ├── spawn: _read_stream(stdout), _read_stream(stderr)
@@ -141,7 +141,7 @@ The app has a two-way theme toggle (toggle button in sidebar footer):
 2. **`[data-theme="light"]`** — overrides to light when user toggles.
 3. **`[data-theme="dark"]`** — overrides to dark when user toggles back.
 
-The toggle saves preference to `localStorage` under `pi-loop-theme`.
+The toggle saves preference to `localStorage` under `omp-loop-theme`.
 
 ## SSE Client Cleanup
 
@@ -153,19 +153,18 @@ The toggle saves preference to `localStorage` under `pi-loop-theme`.
 
 ## Log File Handle
 
-`LoopManager` writes logs to `_log_file` (configurable via `PI_LOOP_WEB_LOG`
+`LoopManager` writes logs to `_log_file` (configurable via `OMP_LOOP_WEB_LOG`
 env var, default `/tmp/infinite-loop-web.log`). The file handle is closed by
 `close()` which is called from `stop()` and `__del__()`.
 
 ## Paths (all configurable)
 
 | Path | Env Var | Default |
-|------|---------|---------|
-| Ledger state | `PI_LOOP_LEDGER_PATH` | `/tmp/infinite-loop-state.json` |
-| Sentinel | `PI_LOOP_SENTINEL_PATH` | `/tmp/infinite-loop-stop` |
-| Status file | `PI_LOOP_STATUS_FILE` | `/tmp/loop-status.json` |
-| Web log | `PI_LOOP_WEB_LOG` | `/tmp/infinite-loop-web.log` |
-| Config JSON | `PI_LOOP_DATA_DIR` + `/pi-loop/config.json` | `/tmp/pi-loop/config.json` |
+| Ledger state | `OMP_LOOP_LEDGER_PATH` | `/tmp/infinite-loop-state.json` |
+| Sentinel | `OMP_LOOP_SENTINEL_PATH` | `/tmp/infinite-loop-stop` |
+| Status file | `OMP_LOOP_STATUS_FILE` | `/tmp/loop-status.json` |
+| Web log | `OMP_LOOP_WEB_LOG` | `/tmp/infinite-loop-web.log` |
+| Config JSON | `OMP_LOOP_DATA_DIR` + `/omp-loop/config.json` | `/tmp/omp-loop/config.json` |
 
 ## Skeleton Loading
 
@@ -178,11 +177,11 @@ inactive, usable via the `data-loaded="false"` attribute on `.status-card`).
 
 ## Status File Protocol
 
-The daemon (`pi_loop/`) writes a lightweight JSON status file to
-`/tmp/loop-status.json` (configurable via `PI_LOOP_STATUS_FILE` env var)
+The daemon (`omp_loop/`) writes a lightweight JSON status file to
+`/tmp/loop-status.json` (configurable via `OMP_LOOP_STATUS_FILE` env var)
 after every iteration and on shutdown. This file is written by
-`pi_loop/status.py` on top of the existing `write_status_file()` in
-`pi_loop/file_utils.py`.
+`omp_loop/status.py` on top of the existing `write_status_file()` in
+`omp_loop/file_utils.py`.
 
 **Status file fields:** `running`, `pid`, `start_time`, `iteration_count`,
 `last_error`, `version`, `uptime`, `last_updated`.
@@ -192,6 +191,5 @@ the status file provides a minimal fallback for external monitoring.
 
 ---
 
-*This document was originally the `hermes_loop` → `pi_loop` refactor plan
-and was converted into the web-app architecture guide when the UI was
+*This document was originally the `hermes_loop` → `omp_loop` refactor plan
 preserved and enhanced.*

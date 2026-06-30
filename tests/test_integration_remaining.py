@@ -20,7 +20,7 @@ import pytest
 # Module-level helper for multiprocessing lock test (must be pickleable)
 def _lock_holder(lock_path: str, acquired_flag):
     """Acquire a FileLock and hold it for 1 second."""
-    from pi_loop.file_utils import FileLock
+    from omp_loop.file_utils import FileLock
 
     with FileLock(lock_path, timeout=5.0):
         acquired_flag.value = True
@@ -35,48 +35,48 @@ class TestConfigPathResolution:
 
     def test_get_data_dir_default(self):
         """_get_data_dir returns /tmp when no env var is set."""
-        from pi_loop.config import _get_data_dir
+        from omp_loop.config import _get_data_dir
 
         with patch.dict(os.environ, {}, clear=True):
             assert _get_data_dir() == "/tmp"
 
     def test_get_data_dir_respects_env(self):
-        """_get_data_dir returns the value of PI_LOOP_DATA_DIR when set."""
-        from pi_loop.config import _get_data_dir
+        """_get_data_dir returns the value of OMP_LOOP_DATA_DIR when set."""
+        from omp_loop.config import _get_data_dir
 
-        with patch.dict(os.environ, {"PI_LOOP_DATA_DIR": "/custom/data"}, clear=True):
+        with patch.dict(os.environ, {"OMP_LOOP_DATA_DIR": "/custom/data"}, clear=True):
             assert _get_data_dir() == "/custom/data"
 
     def test_resolve_path_no_explicit(self):
         """_resolve_path falls back to data_dir + default_name."""
-        from pi_loop.config import _resolve_path
+        from omp_loop.config import _resolve_path
 
         with patch.dict(os.environ, {}, clear=True):
-            path = _resolve_path("PI_LOOP_LEDGER_PATH", "test-ledger.json")
+            path = _resolve_path("OMP_LOOP_LEDGER_PATH", "test-ledger.json")
             assert path == "/tmp/test-ledger.json"
 
     def test_resolve_path_with_explicit(self):
         """_resolve_path uses explicit env var when set."""
-        from pi_loop.config import _resolve_path
+        from omp_loop.config import _resolve_path
 
-        with patch.dict(os.environ, {"PI_LOOP_LEDGER_PATH": "/explicit/ledger.json"}, clear=True):
-            path = _resolve_path("PI_LOOP_LEDGER_PATH", "fallback.json")
+        with patch.dict(os.environ, {"OMP_LOOP_LEDGER_PATH": "/explicit/ledger.json"}, clear=True):
+            path = _resolve_path("OMP_LOOP_LEDGER_PATH", "fallback.json")
             assert path == "/explicit/ledger.json"
 
     def test_resolve_path_empty_explicit_falls_back(self):
         """_resolve_path falls back when explicit env var is set to empty string."""
-        from pi_loop.config import _resolve_path
+        from omp_loop.config import _resolve_path
 
-        with patch.dict(os.environ, {"PI_LOOP_LEDGER_PATH": ""}, clear=True):
-            path = _resolve_path("PI_LOOP_LEDGER_PATH", "default.json")
+        with patch.dict(os.environ, {"OMP_LOOP_LEDGER_PATH": ""}, clear=True):
+            path = _resolve_path("OMP_LOOP_LEDGER_PATH", "default.json")
             assert path == "/tmp/default.json"
 
     def test_resolve_path_custom_data_dir(self):
-        """_resolve_path respects PI_LOOP_DATA_DIR when no explicit path is set."""
-        from pi_loop.config import _resolve_path
+        """_resolve_path respects OMP_LOOP_DATA_DIR when no explicit path is set."""
+        from omp_loop.config import _resolve_path
 
-        with patch.dict(os.environ, {"PI_LOOP_DATA_DIR": "/data/dir"}, clear=True):
-            path = _resolve_path("PI_LOOP_SENTINEL_PATH", "sentinel-stop")
+        with patch.dict(os.environ, {"OMP_LOOP_DATA_DIR": "/data/dir"}, clear=True):
+            path = _resolve_path("OMP_LOOP_SENTINEL_PATH", "sentinel-stop")
             assert path == "/data/dir/sentinel-stop"
 
 
@@ -85,7 +85,7 @@ class TestLoopConfigAccessors:
 
     def test_getitem_returns_attr(self):
         """__getitem__ returns the attribute value."""
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         cfg = LoopConfig(goal="test", workers=3)
         assert cfg["goal"] == "test"
@@ -93,21 +93,21 @@ class TestLoopConfigAccessors:
 
     def test_get_returns_attr(self):
         """.get() returns the attribute value."""
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         cfg = LoopConfig(goal="find bugs")
         assert cfg.get("goal") == "find bugs"
 
     def test_get_returns_default_for_missing(self):
         """.get() returns the default for non-existent keys."""
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         cfg = LoopConfig()
         assert cfg.get("nonexistent", "fallback") == "fallback"
 
     def test_get_returns_none_for_unset(self):
         """.get() returns None when no attribute and no default."""
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         cfg = LoopConfig()
         assert cfg.get("nonexistent") is None
@@ -116,7 +116,7 @@ class TestLoopConfigAccessors:
         """from_args silently ignores unknown attributes on the source object."""
         from argparse import Namespace
 
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         args = Namespace(goal="test", workers=2, unknown_flag=True, bogus=42)
         cfg = LoopConfig.from_args(args)
@@ -129,7 +129,7 @@ class TestLoopConfigAccessors:
         """from_args fills in defaults for missing attributes."""
         from argparse import Namespace
 
-        from pi_loop.config import LoopConfig
+        from omp_loop.config import LoopConfig
 
         args = Namespace(goal="defaults_test", workers=None)
         cfg = LoopConfig.from_args(args)
@@ -145,7 +145,7 @@ class TestLoadJsonSchema:
 
     def test_loads_valid_schema(self, tmp_path):
         """load_json_schema loads a valid JSON schema file."""
-        from pi_loop.validation import load_json_schema
+        from omp_loop.validation import load_json_schema
 
         schema_path = tmp_path / "schema.json"
         schema_content = {
@@ -162,14 +162,14 @@ class TestLoadJsonSchema:
 
     def test_returns_none_for_missing_file(self, tmp_path):
         """load_json_schema returns None for a non-existent file."""
-        from pi_loop.validation import load_json_schema
+        from omp_loop.validation import load_json_schema
 
         result = load_json_schema(str(tmp_path / "nonexistent.json"))
         assert result is None
 
     def test_returns_none_for_corrupt_json(self, tmp_path):
         """load_json_schema returns None for corrupt/malformed JSON."""
-        from pi_loop.validation import load_json_schema
+        from omp_loop.validation import load_json_schema
 
         schema_path = tmp_path / "corrupt.json"
         schema_path.write_text("not valid json {")
@@ -179,7 +179,7 @@ class TestLoadJsonSchema:
 
     def test_returns_none_for_non_dict_json(self, tmp_path):
         """load_json_schema returns None when JSON root is not a dict."""
-        from pi_loop.validation import load_json_schema
+        from omp_loop.validation import load_json_schema
 
         schema_path = tmp_path / "array.json"
         schema_path.write_text('["a", "b"]')
@@ -189,7 +189,7 @@ class TestLoadJsonSchema:
 
     def test_returns_none_for_primitive_json(self, tmp_path):
         """load_json_schema returns None when JSON is a primitive."""
-        from pi_loop.validation import load_json_schema
+        from omp_loop.validation import load_json_schema
 
         schema_path = tmp_path / "string.json"
         schema_path.write_text('"justastring"')
@@ -206,8 +206,8 @@ class TestStatusWriterDeeperEdges:
 
     def test_writes_to_default_path(self, tmp_path):
         """write_status writes to STATUS_FILE_DEFAULT when path is None."""
-        import pi_loop.status as status_mod
-        from pi_loop.status import write_status
+        import omp_loop.status as status_mod
+        from omp_loop.status import write_status
 
         default = str(tmp_path / "default-loop-status.json")
         old_default = status_mod.STATUS_FILE_DEFAULT
@@ -225,7 +225,7 @@ class TestStatusWriterDeeperEdges:
 
     def test_stores_uptime_seconds(self, tmp_path):
         """write_status stores the provided uptime_seconds (rounded to 1dp)."""
-        from pi_loop.status import write_status
+        from omp_loop.status import write_status
 
         sp = str(tmp_path / "uptime.json")
         write_status(sp, running=True, pid=os.getpid(), iteration_count=0, uptime_seconds=123.45)
@@ -236,14 +236,14 @@ class TestStatusWriterDeeperEdges:
 
     def test_empty_path_is_noop(self):
         """write_status is a no-op when path is empty string."""
-        from pi_loop.status import write_status
+        from omp_loop.status import write_status
 
         # Should not raise
         write_status("", running=True, pid=1, iteration_count=0)
 
     def test_nonwritable_path_logs_warning(self, tmp_path):
         """write_status logs a warning when it cannot write to the path."""
-        from pi_loop.status import write_status
+        from omp_loop.status import write_status
 
         # Path in a non-existent deep directory without parents created
         deep_path = str(tmp_path / "nonexistent" / "subdir" / "status.json")
@@ -260,14 +260,14 @@ class TestGitUtilsIntegration:
 
     def test_capture_git_state_no_repo(self, tmp_path):
         """_capture_git_state returns empty dict when not in a git repo."""
-        from pi_loop.git_utils import _capture_git_state
+        from omp_loop.git_utils import _capture_git_state
 
         result = _capture_git_state(str(tmp_path))
         assert result == {}
 
     def test_capture_git_state_in_repo(self, tmp_path):
         """_capture_git_state captures diff stat and head hash in a real repo."""
-        from pi_loop.git_utils import _capture_git_state
+        from omp_loop.git_utils import _capture_git_state
 
         _init_git_repo(tmp_path)
 
@@ -280,7 +280,7 @@ class TestGitUtilsIntegration:
         """_capture_git_state detects staged changes."""
         import subprocess
 
-        from pi_loop.git_utils import _capture_git_state
+        from omp_loop.git_utils import _capture_git_state
 
         _init_git_repo(tmp_path)
         # Create a file, then modify it after staging
@@ -303,7 +303,7 @@ class TestGitUtilsIntegration:
         """_capture_git_state with store_diff=True includes the unified diff."""
         import subprocess
 
-        from pi_loop.git_utils import _capture_git_state
+        from omp_loop.git_utils import _capture_git_state
 
         _init_git_repo(tmp_path)
         (tmp_path / "test.txt").write_text("original")
@@ -322,14 +322,14 @@ class TestGitUtilsIntegration:
 
     def test_git_auto_commit_no_repo(self, tmp_path):
         """_git_auto_commit returns None when not in a git repo."""
-        from pi_loop.git_utils import _git_auto_commit
+        from omp_loop.git_utils import _git_auto_commit
 
         result = _git_auto_commit(str(tmp_path), 1, "test iteration")
         assert result is None
 
     def test_git_auto_commit_creates_commit(self, tmp_path):
         """_git_auto_commit creates a commit with iteration message."""
-        from pi_loop.git_utils import _git_auto_commit
+        from omp_loop.git_utils import _git_auto_commit
 
         _init_git_repo(tmp_path)
 
@@ -355,7 +355,7 @@ class TestGitUtilsIntegration:
 
     def test_git_auto_commit_noop_when_clean(self, tmp_path):
         """_git_auto_commit returns None when there are no changes."""
-        from pi_loop.git_utils import _git_auto_commit
+        from omp_loop.git_utils import _git_auto_commit
 
         _init_git_repo(tmp_path)
 
@@ -364,7 +364,7 @@ class TestGitUtilsIntegration:
 
     def test_git_auto_commit_with_subdir(self, tmp_path):
         """_git_auto_commit works with a subdirectory as workdir."""
-        from pi_loop.git_utils import _git_auto_commit
+        from omp_loop.git_utils import _git_auto_commit
 
         _init_git_repo(tmp_path)
 
@@ -402,7 +402,7 @@ class TestErrorRecoveryFullTypeCoverage:
 
     def test_heartbeat_error_mild_threshold(self):
         """Heartbeat errors at mild threshold reach level 1 (one level per call)."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(7200, 10, True, 2)
         mitigations = {
@@ -434,7 +434,7 @@ class TestErrorRecoveryFullTypeCoverage:
 
     def test_heartbeat_error_stop_threshold_escalates_one_level(self):
         """Heartbeat errors at stop threshold reach level 1 (single-call)."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(7200, 10, True, 2)
         mitigations = {
@@ -466,7 +466,7 @@ class TestErrorRecoveryFullTypeCoverage:
 
     def test_schema_errors_level1(self):
         """Schema errors at mild threshold trigger level 1 (monitoring)."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(7200, 10, True, 2)
         mitigations = {
@@ -497,7 +497,7 @@ class TestErrorRecoveryFullTypeCoverage:
 
     def test_schema_errors_level3_stop_multi_call(self):
         """Schema errors reach level 3 STOP after multiple calls."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(7200, 10, True, 2)
         mitigations = {
@@ -558,7 +558,7 @@ class TestErrorRecoveryFullTypeCoverage:
 
     def test_unknown_error_level2_escalation_multi_call(self):
         """Unknown errors escalate to level 2 after multiple calls."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(7200, 10, True, 3)
         mitigations = {
@@ -603,7 +603,7 @@ class TestErrorRecoveryFullTypeCoverage:
 
     def test_error_recovery_incremental_success(self):
         """Each incremental success gradually unwinds mitigations."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(7200, 10, True, 2)
         mitigations = {
@@ -652,7 +652,7 @@ class TestErrorRecoveryFullTypeCoverage:
 
     def test_no_change_when_below_mild_threshold(self):
         """No mitigation actions when error count is below mild threshold."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(7200, 10, True, 2)
         mitigations = {
@@ -684,7 +684,7 @@ class TestErrorRecoveryFullTypeCoverage:
 
     def test_mitigation_actions_rolling_capped(self):
         """Mitigation actions list is capped at 20 entries."""
-        from pi_loop.error_recovery import _adapt_to_error, _set_originals
+        from omp_loop.error_recovery import _adapt_to_error, _set_originals
 
         _set_originals(7200, 10, True, 2)
         mitigations = {
@@ -720,7 +720,7 @@ class TestPendingIterationEdgeCases:
 
     def test_stale_pending_recovered(self, tmp_path):
         """Stale pending iteration (>300s old) is recovered as error."""
-        from pi_loop.file_utils import write_ledger
+        from omp_loop.file_utils import write_ledger
 
         # Write a state with a stale pending iteration
         state = {
@@ -753,14 +753,14 @@ class TestPendingIterationEdgeCases:
         import importlib
 
         # Override path resolution via env
-        os.environ["PI_LOOP_LEDGER_PATH"] = str(tmp_path / "ledger_stale_pending.json")
-        os.environ["PI_LOOP_DATA_DIR"] = str(tmp_path)
+        os.environ["OMP_LOOP_LEDGER_PATH"] = str(tmp_path / "ledger_stale_pending.json")
+        os.environ["OMP_LOOP_DATA_DIR"] = str(tmp_path)
 
-        importlib.reload(__import__("pi_loop.config", fromlist=[""]))
+        importlib.reload(__import__("omp_loop.config", fromlist=[""]))
 
         write_ledger(state)
 
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.state import load_or_create_ledger
 
         loaded = load_or_create_ledger("test goal", "")
         assert len(loaded.get("iterations", [])) == 1
@@ -773,7 +773,7 @@ class TestPendingIterationEdgeCases:
         """Recent pending iteration (<300s old) is NOT recovered."""
         from datetime import datetime, timezone
 
-        from pi_loop.file_utils import write_ledger
+        from omp_loop.file_utils import write_ledger
 
         now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -806,14 +806,14 @@ class TestPendingIterationEdgeCases:
 
         import importlib
 
-        os.environ["PI_LOOP_LEDGER_PATH"] = str(tmp_path / "ledger_recent_pending.json")
-        os.environ["PI_LOOP_DATA_DIR"] = str(tmp_path)
+        os.environ["OMP_LOOP_LEDGER_PATH"] = str(tmp_path / "ledger_recent_pending.json")
+        os.environ["OMP_LOOP_DATA_DIR"] = str(tmp_path)
 
-        importlib.reload(__import__("pi_loop.config", fromlist=[""]))
+        importlib.reload(__import__("omp_loop.config", fromlist=[""]))
 
         write_ledger(state)
 
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.state import load_or_create_ledger
 
         loaded = load_or_create_ledger("recent pending", "")
         # Pending iteration should NOT be recovered (recent)
@@ -821,7 +821,7 @@ class TestPendingIterationEdgeCases:
 
     def test_pending_iteration_adds_missing_keys(self, tmp_path):
         """load_or_create_ledger adds missing error_type_counts and mitigations to resumed ledger."""
-        from pi_loop.file_utils import write_ledger
+        from omp_loop.file_utils import write_ledger
 
         now_iso = "2025-01-01T00:00:00+00:00"
 
@@ -838,14 +838,14 @@ class TestPendingIterationEdgeCases:
 
         import importlib
 
-        os.environ["PI_LOOP_LEDGER_PATH"] = str(tmp_path / "ledger_missing_keys.json")
-        os.environ["PI_LOOP_DATA_DIR"] = str(tmp_path)
+        os.environ["OMP_LOOP_LEDGER_PATH"] = str(tmp_path / "ledger_missing_keys.json")
+        os.environ["OMP_LOOP_DATA_DIR"] = str(tmp_path)
 
-        importlib.reload(__import__("pi_loop.config", fromlist=[""]))
+        importlib.reload(__import__("omp_loop.config", fromlist=[""]))
 
         write_ledger(state)
 
-        from pi_loop.state import load_or_create_ledger
+        from omp_loop.state import load_or_create_ledger
 
         loaded = load_or_create_ledger("migration test", "")
         assert "error_type_counts" in loaded
@@ -861,43 +861,43 @@ class TestColorizeLogTags:
 
     def test_colorize_returns_original_when_disabled(self):
         """_colorize_log_tags returns original msg when color is disabled."""
-        from pi_loop.file_utils import _colorize_log_tags
+        from omp_loop.file_utils import _colorize_log_tags
 
         # Mock colorizer._enabled() to return False
-        with patch("pi_loop.file_utils._cu._enabled", return_value=False):
+        with patch("omp_loop.file_utils._cu._enabled", return_value=False):
             result = _colorize_log_tags("[ERROR] Something failed")
             assert result == "[ERROR] Something failed"
 
     def test_colorize_all_known_tags(self):
         """_colorize_log_tags transforms all known log tags."""
-        from pi_loop.file_utils import _colorize_log_tags
+        from omp_loop.file_utils import _colorize_log_tags
 
         with (
-            patch("pi_loop.file_utils._cu._enabled", return_value=True),
-            patch("pi_loop.file_utils._cu.fail", return_value="[ERROR]"),
-            patch("pi_loop.file_utils._cu.warn", return_value="[WARN]"),
-            patch("pi_loop.file_utils._cu.ok", return_value="[OK]"),
-            patch("pi_loop.file_utils._cu.dim", return_value="[BEAT]"),
-            patch("pi_loop.file_utils._cu.subheader", return_value="[DAEMON]"),
-            patch("pi_loop.file_utils._cu.header", return_value="[GOALS]"),
-            patch("pi_loop.file_utils._cu.group_title", return_value="[SUGGEST]"),
+            patch("omp_loop.file_utils._cu._enabled", return_value=True),
+            patch("omp_loop.file_utils._cu.fail", return_value="[ERROR]"),
+            patch("omp_loop.file_utils._cu.warn", return_value="[WARN]"),
+            patch("omp_loop.file_utils._cu.ok", return_value="[OK]"),
+            patch("omp_loop.file_utils._cu.dim", return_value="[BEAT]"),
+            patch("omp_loop.file_utils._cu.subheader", return_value="[DAEMON]"),
+            patch("omp_loop.file_utils._cu.header", return_value="[GOALS]"),
+            patch("omp_loop.file_utils._cu.group_title", return_value="[SUGGEST]"),
         ):
             result = _colorize_log_tags("[ERROR] err [WARN] warn [OK] ok")
             assert len(result) > 0
 
     def test_colorize_unknown_tag_preserved(self):
         """_colorize_log_tags preserves unknown tags unchanged."""
-        from pi_loop.file_utils import _colorize_log_tags
+        from omp_loop.file_utils import _colorize_log_tags
 
         with (
-            patch("pi_loop.file_utils._cu._enabled", return_value=True),
-            patch("pi_loop.file_utils._cu.fail", side_effect=lambda x: f"**{x}**"),
-            patch("pi_loop.file_utils._cu.warn", side_effect=lambda x: f"*{x}*"),
-            patch("pi_loop.file_utils._cu.ok", side_effect=lambda x: f"+{x}+"),
-            patch("pi_loop.file_utils._cu.dim", side_effect=lambda x: f"-{x}-"),
-            patch("pi_loop.file_utils._cu.subheader", side_effect=lambda x: f"={x}="),
-            patch("pi_loop.file_utils._cu.header", side_effect=lambda x: f"#{x}#"),
-            patch("pi_loop.file_utils._cu.group_title", return_value="[SUGGEST]"),
+            patch("omp_loop.file_utils._cu._enabled", return_value=True),
+            patch("omp_loop.file_utils._cu.fail", side_effect=lambda x: f"**{x}**"),
+            patch("omp_loop.file_utils._cu.warn", side_effect=lambda x: f"*{x}*"),
+            patch("omp_loop.file_utils._cu.ok", side_effect=lambda x: f"+{x}+"),
+            patch("omp_loop.file_utils._cu.dim", side_effect=lambda x: f"-{x}-"),
+            patch("omp_loop.file_utils._cu.subheader", side_effect=lambda x: f"={x}="),
+            patch("omp_loop.file_utils._cu.header", side_effect=lambda x: f"#{x}#"),
+            patch("omp_loop.file_utils._cu.group_title", return_value="[SUGGEST]"),
         ):
             result = _colorize_log_tags("[ERROR] real [UNKNOWN_TAG] keep")
             assert "[UNKNOWN_TAG]" in result
@@ -909,7 +909,7 @@ class TestInitDaemonLog:
 
     def test_creates_log_file(self, tmp_path):
         """_init_daemon_log creates the log file on disk."""
-        from pi_loop.file_utils import _init_daemon_log
+        from omp_loop.file_utils import _init_daemon_log
 
         log_path = str(tmp_path / "daemon.log")
         logger = _init_daemon_log(log_path, max_mb=5)
@@ -918,7 +918,7 @@ class TestInitDaemonLog:
 
     def test_creates_parent_directories(self, tmp_path):
         """_init_daemon_log creates parent directories if needed."""
-        from pi_loop.file_utils import _init_daemon_log
+        from omp_loop.file_utils import _init_daemon_log
 
         log_path = str(tmp_path / "logs" / "subdir" / "daemon.log")
         logger = _init_daemon_log(log_path)
@@ -927,7 +927,7 @@ class TestInitDaemonLog:
 
     def test_logs_go_to_file(self, tmp_path):
         """Messages logged through _log go to the file logger."""
-        from pi_loop.file_utils import _init_daemon_log, _log
+        from omp_loop.file_utils import _init_daemon_log, _log
 
         log_path = str(tmp_path / "daemon-messages.log")
         _init_daemon_log(log_path)
@@ -946,7 +946,7 @@ class TestWriteStatusFile:
 
     def test_writes_status_file(self, tmp_path):
         """write_status_file writes a one-line JSON status file."""
-        from pi_loop.file_utils import write_status_file
+        from omp_loop.file_utils import write_status_file
 
         sp = str(tmp_path / "status.json")
         state = {"total_iterations": 10, "stats": {"total_duration_seconds": 123.4}}
@@ -963,13 +963,13 @@ class TestWriteStatusFile:
 
     def test_empty_path_is_noop(self):
         """write_status_file is a no-op with empty path."""
-        from pi_loop.file_utils import write_status_file
+        from omp_loop.file_utils import write_status_file
 
         write_status_file("", {}, iteration=0, status="running")  # should not raise
 
     def test_creates_parent_dirs(self, tmp_path):
         """write_status_file creates parent directories."""
-        from pi_loop.file_utils import write_status_file
+        from omp_loop.file_utils import write_status_file
 
         sp = str(tmp_path / "deep" / "nested" / "status.json")
         state = {"total_iterations": 1, "stats": {}}
@@ -978,7 +978,7 @@ class TestWriteStatusFile:
 
     def test_nonwritable_path_logs_gracefully(self):
         """write_status_file logs but does not crash on write failure."""
-        from pi_loop.file_utils import write_status_file
+        from omp_loop.file_utils import write_status_file
 
         # Use a path that should fail in a read-only scenario
         state = {"total_iterations": 0, "stats": {}}
@@ -993,7 +993,7 @@ class TestFileLockTimeout:
         """FileLock raises TimeoutError with very short timeout when locked."""
         import multiprocessing
 
-        from pi_loop.file_utils import FileLock
+        from omp_loop.file_utils import FileLock
 
         lock_path = str(tmp_path / "short_timeout.lock")
         acquired = multiprocessing.Value("b", False, lock=True)
@@ -1017,7 +1017,7 @@ class TestSystemUtilsDeeperEdges:
 
     def test_get_system_usage_has_expected_keys(self):
         """get_system_usage returns expected keys on this Linux system."""
-        from pi_loop.system_utils import get_system_usage
+        from omp_loop.system_utils import get_system_usage
 
         usage = get_system_usage()
         assert isinstance(usage, dict)
@@ -1028,14 +1028,14 @@ class TestSystemUtilsDeeperEdges:
 
     def test_diff_returns_empty_for_empty_snapshots(self):
         """get_system_usage_diff returns empty dict when both snapshots are empty."""
-        from pi_loop.system_utils import get_system_usage_diff
+        from omp_loop.system_utils import get_system_usage_diff
 
         result = get_system_usage_diff({}, {})
         assert result == {}
 
     def test_diff_with_partial_data(self):
         """get_system_usage_diff handles partial data gracefully."""
-        from pi_loop.system_utils import get_system_usage_diff
+        from omp_loop.system_utils import get_system_usage_diff
 
         before = {"cpu_seconds": 10.0}
         after = {"cpu_seconds": 15.5, "memory_rss_mb": 100.0}
@@ -1045,14 +1045,14 @@ class TestSystemUtilsDeeperEdges:
 
     def test_diff_with_empty_before(self):
         """get_system_usage_diff returns after values when before is empty."""
-        from pi_loop.system_utils import get_system_usage_diff
+        from omp_loop.system_utils import get_system_usage_diff
 
         result = get_system_usage_diff({}, {"cpu_seconds": 5.0, "memory_rss_mb": 50.0})
         assert result == {}
 
     def test_diff_with_empty_after(self):
         """get_system_usage_diff returns empty values when after is empty."""
-        from pi_loop.system_utils import get_system_usage_diff
+        from omp_loop.system_utils import get_system_usage_diff
 
         result = get_system_usage_diff({"cpu_seconds": 5.0}, {})
         assert result == {}
@@ -1065,11 +1065,11 @@ class TestEnvUtilsEdgeCases:
     """Edge cases for env_utils functions."""
 
     def test_known_env_vars_have_correct_prefix(self):
-        """All known env vars start with INFINITE_LOOP_ or PI_LOOP_."""
-        from pi_loop.env_utils import KNOWN_ENV_VARS
+        """All known env vars start with INFINITE_LOOP_ or OMP_LOOP_."""
+        from omp_loop.env_utils import KNOWN_ENV_VARS
 
         for var in KNOWN_ENV_VARS:
-            assert var.startswith("INFINITE_LOOP_") or var.startswith("PI_LOOP_"), (
+            assert var.startswith("INFINITE_LOOP_") or var.startswith("OMP_LOOP_"), (
                 f"Env var {var} does not start with expected prefix"
             )
 
@@ -1082,7 +1082,7 @@ class TestSentinelDeeperEdges:
 
     def test_check_sentinel_returns_content(self, tmp_path):
         """check_sentinel returns the content of the sentinel file."""
-        from pi_loop.file_utils import check_sentinel
+        from omp_loop.file_utils import check_sentinel
 
         sentinel = tmp_path / "sentinel"
         sentinel.write_text("stop\n")
@@ -1092,14 +1092,14 @@ class TestSentinelDeeperEdges:
 
     def test_check_sentinel_none_path(self):
         """check_sentinel returns None when path is empty."""
-        from pi_loop.file_utils import check_sentinel
+        from omp_loop.file_utils import check_sentinel
 
         result = check_sentinel("")
         assert result is None
 
     def test_check_sentinel_no_remove_preserves_file(self, tmp_path):
         """check_sentinel_no_remove reads without deleting."""
-        from pi_loop.file_utils import check_sentinel_no_remove
+        from omp_loop.file_utils import check_sentinel_no_remove
 
         sentinel = tmp_path / "pause_sentinel"
         sentinel.write_text("pause")
@@ -1110,7 +1110,7 @@ class TestSentinelDeeperEdges:
 
     def test_check_sentinel_no_remove_missing_file(self, tmp_path):
         """check_sentinel_no_remove returns None for missing file."""
-        from pi_loop.file_utils import check_sentinel_no_remove
+        from omp_loop.file_utils import check_sentinel_no_remove
 
         result = check_sentinel_no_remove(str(tmp_path / "nonexistent"))
         assert result is None
@@ -1124,7 +1124,7 @@ class TestGoalCyclingEdgeCases:
 
     def test_cycle_single_goal_returns_empty(self):
         """_cycle_goal returns ('', False) for single goal list."""
-        from pi_loop.functions import _cycle_goal
+        from omp_loop.functions import _cycle_goal
 
         goal_text, should_stop = _cycle_goal(["single goal"], 0, stop_at_goals_end=False)
         assert goal_text == ""
@@ -1132,7 +1132,7 @@ class TestGoalCyclingEdgeCases:
 
     def test_cycle_wraps_around(self):
         """_cycle_goal wraps around the goals list with modulo."""
-        from pi_loop.functions import _cycle_goal
+        from omp_loop.functions import _cycle_goal
 
         goals = [("goal1", "", "", ""), ("goal2", "", "", "")]
         goal_text, should_stop = _cycle_goal(goals, 2, stop_at_goals_end=False)
@@ -1141,7 +1141,7 @@ class TestGoalCyclingEdgeCases:
 
     def test_cycle_with_index(self):
         """_cycle_goal returns correct goal at index."""
-        from pi_loop.functions import _cycle_goal
+        from omp_loop.functions import _cycle_goal
 
         goals = [("first", "", "", ""), ("second", "", "", "")]
         goal_text, should_stop = _cycle_goal(goals, 1, stop_at_goals_end=False)
@@ -1150,7 +1150,7 @@ class TestGoalCyclingEdgeCases:
 
     def test_cycle_stops_at_goals_end(self):
         """_cycle_goal signals stop when indices exhausted and stop_at_goals_end."""
-        from pi_loop.functions import _cycle_goal
+        from omp_loop.functions import _cycle_goal
 
         # With stop_at_goals_end and index >= len(goals), should stop
         # But with len <= 1, it short-circuits to ('', False)
@@ -1162,7 +1162,7 @@ class TestGoalCyclingEdgeCases:
 
     def test_cycle_with_string_goals(self):
         """_cycle_goal handles plain string goals (not tuples)."""
-        from pi_loop.functions import _cycle_goal
+        from omp_loop.functions import _cycle_goal
 
         goals = ["plain1", "plain2"]
         goal_text, should_stop = _cycle_goal(goals, 1, stop_at_goals_end=False)
@@ -1175,7 +1175,7 @@ class TestBuildProgressiveContext:
 
     def test_empty_context_with_summaries(self):
         """_build_progressive_context works with empty base context."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         result = _build_progressive_context("", ["summary1"])
         assert "summary1" in result
@@ -1183,7 +1183,7 @@ class TestBuildProgressiveContext:
 
     def test_multiline_summaries(self):
         """_build_progressive_context handles multi-line summary strings."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         summaries = [
             "line1\nline2\nline3",
@@ -1195,7 +1195,7 @@ class TestBuildProgressiveContext:
 
     def test_exactly_three_summaries(self):
         """_build_progressive_context includes only 3 most recent summaries."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         summaries = ["a", "b", "c", "d", "e"]
         context = _build_progressive_context("X", summaries)
@@ -1208,7 +1208,7 @@ class TestBuildProgressiveContext:
 
     def test_no_change_without_summaries(self):
         """_build_progressive_context returns just the context when no summaries."""
-        from pi_loop.functions import _build_progressive_context
+        from omp_loop.functions import _build_progressive_context
 
         result = _build_progressive_context("base only", [])
         assert result == "base only"
@@ -1219,7 +1219,7 @@ class TestSetMaxOutputChars:
 
     def test_default_value(self):
         """get_max_output_chars returns default 2000."""
-        from pi_loop.functions import get_max_output_chars, set_max_output_chars
+        from omp_loop.functions import get_max_output_chars, set_max_output_chars
 
         # Reset to default
         set_max_output_chars(2000)
@@ -1227,7 +1227,7 @@ class TestSetMaxOutputChars:
 
     def test_set_and_get(self):
         """set_max_output_chars changes the value returned by get."""
-        from pi_loop.functions import get_max_output_chars, set_max_output_chars
+        from omp_loop.functions import get_max_output_chars, set_max_output_chars
 
         set_max_output_chars(5000)
         assert get_max_output_chars() == 5000
@@ -1244,7 +1244,7 @@ class TestPreflightDeeperEdges:
 
     def test_missing_schema_file_does_not_fail_preflight(self, tmp_path):
         """Preflight handles missing schema file gracefully."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         results = PreflightChecker.run_all_checks(
             workdir=str(tmp_path),
@@ -1259,7 +1259,7 @@ class TestPreflightDeeperEdges:
 
     def test_run_all_checks_returns_list_of_dicts(self, tmp_path):
         """PreflightChecker.run_all_checks returns a list of result dicts."""
-        from pi_loop.preflight import PreflightChecker
+        from omp_loop.preflight import PreflightChecker
 
         results = PreflightChecker.run_all_checks(workdir=str(tmp_path))
         assert isinstance(results, list)
@@ -1278,7 +1278,7 @@ class TestLogFunctionEdges:
 
     def test_log_handles_various_levels(self, capsys):
         """_log handles different log levels without error."""
-        from pi_loop.file_utils import _log
+        from omp_loop.file_utils import _log
 
         _log("Debug message", level="DEBUG")
         _log("Info message", level="INFO")
@@ -1293,7 +1293,7 @@ class TestLogFunctionEdges:
 
     def test_log_unknown_level_falls_back_to_info(self, capsys):
         """_log falls back to INFO for unknown level strings."""
-        from pi_loop.file_utils import _log
+        from omp_loop.file_utils import _log
 
         _log("Unknown level message", level="BOGUS")
         captured = capsys.readouterr()
@@ -1301,7 +1301,7 @@ class TestLogFunctionEdges:
 
     def test_log_unicode_handling(self, capsys):
         """_log handles unicode characters."""
-        from pi_loop.file_utils import _log
+        from omp_loop.file_utils import _log
 
         _log("Unicode message: ✓ ✗ 🚀")
         captured = capsys.readouterr()
@@ -1316,7 +1316,7 @@ class TestJsonExtractionDeeperEdges:
 
     def test_extract_with_session_id_noise(self):
         """extract_json_from_output strips session_id: lines."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         output = 'session_id: abc123\nHere is the result: {"status": "ok", "value": 42}\nsession_id: def456\n'
         result = extract_json_from_output(output)
@@ -1326,7 +1326,7 @@ class TestJsonExtractionDeeperEdges:
 
     def test_extract_with_session_id_before_json(self):
         """extract_json_from_output handles session_id on same line as JSON."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         output = 'Thinking... session_id: xyz\n{"answer": 7}\n'
         result = extract_json_from_output(output)
@@ -1335,21 +1335,21 @@ class TestJsonExtractionDeeperEdges:
 
     def test_extract_empty_string(self):
         """extract_json_from_output returns None for empty string."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         result = extract_json_from_output("")
         assert result is None
 
     def test_extract_none_input(self):
         """extract_json_from_output returns None for None input."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         result = extract_json_from_output("")
         assert result is None
 
     def test_extract_nested_json_object(self):
         """extract_json_from_output handles nested JSON objects."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         output = 'The result: {"outer": {"inner": 42, "list": [1,2,3]}}'
         result = extract_json_from_output(output)
@@ -1359,7 +1359,7 @@ class TestJsonExtractionDeeperEdges:
 
     def test_extract_multiple_json_objects(self):
         """extract_json_from_output returns the LAST JSON object."""
-        from pi_loop.file_utils import extract_json_from_output
+        from omp_loop.file_utils import extract_json_from_output
 
         output = 'First: {"step": 1}\nSecond: {"step": 2}'
         result = extract_json_from_output(output)
@@ -1375,7 +1375,7 @@ class TestLoadGoalsFileDeeperEdges:
 
     def test_goals_file_with_mixed_content(self, tmp_path):
         """_load_goals_file parses mixed content with blank lines."""
-        from pi_loop.functions import _load_goals_file
+        from omp_loop.functions import _load_goals_file
 
         gf = tmp_path / "goals.txt"
         gf.write_text("goal1\n\ngoal2\n# comment\ngoal3|profile3|model3|provider3\n")
@@ -1391,7 +1391,7 @@ class TestLoadGoalsFileDeeperEdges:
 
     def test_goals_file_with_trailing_pipe(self, tmp_path):
         """_load_goals_file handles trailing pipes (empty extra field)."""
-        from pi_loop.functions import _load_goals_file
+        from omp_loop.functions import _load_goals_file
 
         gf = tmp_path / "trailing.txt"
         gf.write_text("goal|profile||")

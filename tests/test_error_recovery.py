@@ -1,8 +1,8 @@
-"""Tests for pi_loop.error_recovery — automatic error adaptation engine."""
+"""Tests for omp_loop.error_recovery — automatic error adaptation engine."""
 
 from unittest.mock import patch
 
-from pi_loop.error_recovery import _adapt_to_error, _pick_primary_error, _set_originals
+from omp_loop.error_recovery import _adapt_to_error, _pick_primary_error, _set_originals
 
 
 class TestSetOriginals:
@@ -12,10 +12,10 @@ class TestSetOriginals:
         # After set, mitigation calculations use these as baseline
         # Call with no prior mitigations and a timeout error to verify baselines are used
         with (
-            patch("pi_loop.error_recovery._ORIGINAL_SESSION_TIMEOUT", 300),
-            patch("pi_loop.error_recovery._ORIGINAL_COOLDOWN", 10),
-            patch("pi_loop.error_recovery._ORIGINAL_USE_LIBRARY", True),
-            patch("pi_loop.error_recovery._ORIGINAL_WORKERS", 3),
+            patch("omp_loop.error_recovery._ORIGINAL_SESSION_TIMEOUT", 300),
+            patch("omp_loop.error_recovery._ORIGINAL_COOLDOWN", 10),
+            patch("omp_loop.error_recovery._ORIGINAL_USE_LIBRARY", True),
+            patch("omp_loop.error_recovery._ORIGINAL_WORKERS", 3),
         ):
             result = _adapt_to_error(
                 error_type="timeout",
@@ -97,8 +97,8 @@ class TestAdaptToErrorNoError:
     def test_first_success_ramps_down(self):
         """_adapt_to_error with 1st success ramps down slightly."""
         with (
-            patch("pi_loop.error_recovery._ORIGINAL_SESSION_TIMEOUT", 300),
-            patch("pi_loop.error_recovery._ORIGINAL_COOLDOWN", 10),
+            patch("omp_loop.error_recovery._ORIGINAL_SESSION_TIMEOUT", 300),
+            patch("omp_loop.error_recovery._ORIGINAL_COOLDOWN", 10),
         ):
             result = _adapt_to_error(
                 error_type=None,
@@ -126,10 +126,10 @@ class TestAdaptToErrorNoError:
     def test_third_success_full_reset(self):
         """_adapt_to_error with 3+ successes fully resets to original values."""
         with (
-            patch("pi_loop.error_recovery._ORIGINAL_SESSION_TIMEOUT", 300),
-            patch("pi_loop.error_recovery._ORIGINAL_COOLDOWN", 10),
-            patch("pi_loop.error_recovery._ORIGINAL_USE_LIBRARY", True),
-            patch("pi_loop.error_recovery._ORIGINAL_WORKERS", 2),
+            patch("omp_loop.error_recovery._ORIGINAL_SESSION_TIMEOUT", 300),
+            patch("omp_loop.error_recovery._ORIGINAL_COOLDOWN", 10),
+            patch("omp_loop.error_recovery._ORIGINAL_USE_LIBRARY", True),
+            patch("omp_loop.error_recovery._ORIGINAL_WORKERS", 2),
         ):
             result = _adapt_to_error(
                 error_type=None,
@@ -238,7 +238,7 @@ class TestAdaptToErrorTimeout:
 class TestAdaptToErrorNetwork:
     def test_mild_threshold_escalates_cooldown(self):
         """_adapt_to_error with network error at mild threshold escalates cooldown."""
-        with patch("pi_loop.error_recovery._ORIGINAL_COOLDOWN", 10):
+        with patch("omp_loop.error_recovery._ORIGINAL_COOLDOWN", 10):
             result = _adapt_to_error(
                 error_type="network",
                 mitigations={
@@ -329,7 +329,7 @@ class TestAdaptToErrorNetwork:
 class TestAdaptToErrorUnknown:
     def test_mild_threshold(self):
         """_adapt_to_error with unknown error at mild threshold escalates cooldown."""
-        with patch("pi_loop.error_recovery._ORIGINAL_COOLDOWN", 10):
+        with patch("omp_loop.error_recovery._ORIGINAL_COOLDOWN", 10):
             result = _adapt_to_error(
                 error_type="unknown",
                 mitigations={

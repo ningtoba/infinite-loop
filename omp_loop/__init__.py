@@ -1,8 +1,8 @@
 """
-pi-loop — A lightweight, self-contained task automation daemon.
+omp-loop — A lightweight, self-contained task automation daemon.
 
 Watches files, runs tasks in a loop, tracks progress in a JSON ledger,
-and integrates with the pi coding agent as a background worker.
+and integrates with the omp coding agent as a background worker.
 """
 
 from .cli import main

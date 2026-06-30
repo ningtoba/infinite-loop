@@ -70,7 +70,7 @@ def main() -> None:
         return
 
     if args.version:
-        print(f"pi-loop v{VERSION}")
+        print(f"omp-loop v{VERSION}")
         return
 
     if args.dump_env:
@@ -273,22 +273,22 @@ def _generate_completion(shell: str) -> None:
             flag_names.extend(action.option_strings)
 
     if shell == "bash":
-        print(f"""# pi-loop bash completion
-_pi_loop_completions() {{
+        print(f"""# omp-loop bash completion
+_omp_loop_completions() {{
     local cur="${{COMP_WORDS[COMP_CWORD]}}"
     COMPREPLY=( $(compgen -W "{" ".join(sorted(flag_names))}" -- "$cur") )
     return 0
 }}
-complete -F _pi_loop_completions pi-loop
+complete -F _omp_loop_completions omp-loop
 """)
     elif shell == "zsh":
         # Compute separator outside the f-string to avoid SyntaxError
         # on Python <3.12 (backslash \ in f-string expression parts).
         _zsh_sep = chr(92) + chr(10) + "        "
         _zsh_flags = _zsh_sep.join(f"--{f}" for f in sorted(flag_names) if not f.startswith("--") and f != "--help")
-        print(f"""#compdef pi-loop
-compdef _pi_loop pi-loop
-function _pi_loop() {{
+        print(f"""#compdef omp-loop
+compdef _omp_loop omp-loop
+function _omp_loop() {{
     _arguments -s -S \\
         {{'--goal','-g'}}[Task goal] \\
         {{'--help','-h'}}[Show help] \\

@@ -1,4 +1,4 @@
-"""Tests for web_app.server — FastAPI web server for pi-loop Web UI."""
+"""Tests for web_app.server — FastAPI web server for omp-loop Web UI."""
 
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -19,7 +19,7 @@ def client():
 class TestIndex:
     def test_returns_html_when_static_exists(self, client):
         """GET / returns HTML when static/index.html exists."""
-        mock_html = "<h1>pi-loop Web UI</h1>"
+        mock_html = "<h1>omp-loop Web UI</h1>"
         with (
             patch("os.path.exists", return_value=True),
             patch(
@@ -228,17 +228,17 @@ class TestApiKeyAuth:
     """Tests for API-key authentication middleware."""
 
     def test_no_key_configured_allows_all(self, client):
-        """When PI_LOOP_API_KEY is unset, all requests pass through."""
+        """When OMP_LOOP_API_KEY is unset, all requests pass through."""
         with patch.dict(os.environ, {}, clear=True), patch("web_app.server.get_config") as mock_get_config:
             mock_get_config.return_value = {"INFINITE_LOOP_GOAL": {"value": "test", "group": "core"}}
             resp = client.get("/api/config")
         assert resp.status_code == 200
 
     def test_empty_key_disables_auth(self, client):
-        """When PI_LOOP_API_KEY is empty, all requests pass through."""
+        """When OMP_LOOP_API_KEY is empty, all requests pass through."""
         # This tests the case where the env var is set but empty — should behave the same as unset
         with (
-            patch.dict(os.environ, {"PI_LOOP_API_KEY": ""}, clear=True),
+            patch.dict(os.environ, {"OMP_LOOP_API_KEY": ""}, clear=True),
             patch("web_app.server.get_config") as mock_get_config,
         ):
             mock_get_config.return_value = {"INFINITE_LOOP_GOAL": {"value": "test", "group": "core"}}
@@ -248,7 +248,7 @@ class TestApiKeyAuth:
     def test_valid_key_allows_access(self, client):
         """A request with valid Bearer token gets through."""
         with (
-            patch.dict(os.environ, {"PI_LOOP_API_KEY": "my-secret-key"}, clear=True),
+            patch.dict(os.environ, {"OMP_LOOP_API_KEY": "my-secret-key"}, clear=True),
             patch("web_app.server.get_config") as mock_get_config,
         ):
             mock_get_config.return_value = {"INFINITE_LOOP_GOAL": {"value": "test", "group": "core"}}
@@ -258,7 +258,7 @@ class TestApiKeyAuth:
     def test_missing_key_returns_401(self, client):
         """A request with no Authorization header gets 401."""
         with (
-            patch.dict(os.environ, {"PI_LOOP_API_KEY": "my-secret-key"}, clear=True),
+            patch.dict(os.environ, {"OMP_LOOP_API_KEY": "my-secret-key"}, clear=True),
             patch("web_app.server.get_config") as mock_get_config,
         ):
             mock_get_config.return_value = {"INFINITE_LOOP_GOAL": {"value": "test", "group": "core"}}
@@ -270,7 +270,7 @@ class TestApiKeyAuth:
     def test_wrong_key_returns_401(self, client):
         """A request with the wrong bearer token gets 401."""
         with (
-            patch.dict(os.environ, {"PI_LOOP_API_KEY": "correct-key"}, clear=True),
+            patch.dict(os.environ, {"OMP_LOOP_API_KEY": "correct-key"}, clear=True),
             patch("web_app.server.get_config") as mock_get_config,
         ):
             mock_get_config.return_value = {"INFINITE_LOOP_GOAL": {"value": "test", "group": "core"}}
@@ -279,13 +279,13 @@ class TestApiKeyAuth:
 
     def test_health_endpoint_always_allowed(self, client):
         """The /api/health endpoint bypasses auth."""
-        with patch.dict(os.environ, {"PI_LOOP_API_KEY": "my-secret-key"}, clear=True):
+        with patch.dict(os.environ, {"OMP_LOOP_API_KEY": "my-secret-key"}, clear=True):
             resp = client.get("/api/health")
         assert resp.status_code == 200
 
     def test_non_api_paths_bypass_auth(self, client):
         """Non-/api paths bypass auth, returning 404 for unknown paths."""
-        with patch.dict(os.environ, {"PI_LOOP_API_KEY": "my-secret-key"}, clear=True):
+        with patch.dict(os.environ, {"OMP_LOOP_API_KEY": "my-secret-key"}, clear=True):
             resp = client.get("/nonexistent")
         # Non-/api paths bypass auth; unknown path getting a 404 confirms the
         # request reached the router without being blocked by auth middleware.
@@ -422,7 +422,7 @@ class TestRateLimit:
         original = srv._read_limiter
         srv._read_limiter = SlidingWindowRateLimiter(max_requests=0, window_seconds=60.0)
         try:
-            with patch.dict(os.environ, {"PI_LOOP_API_KEY": "my-key"}, clear=True):
+            with patch.dict(os.environ, {"OMP_LOOP_API_KEY": "my-key"}, clear=True):
                 resp = client.get("/api/config", headers={"Authorization": "Bearer my-key"})
             assert resp.status_code == 429
         finally:

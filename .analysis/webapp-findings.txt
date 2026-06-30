@@ -45,12 +45,12 @@ The memory info function constructs a path using `os.path.join(DATA_DIR, "..", "
 - config_file.py DEFAULTS: SESSION_TIMEOUT=120, WEB_PORT=8000
 - config_manager.py CONFIG_DEFAULTS: SESSION_TIMEOUT=600, no port default
 These overlapping sets of defaults diverge and can cause confusion on first run.
-- Files: pi_loop/config_file.py, web_app/config_manager.py
+- Files: omp_loop/config_file.py, web_app/config_manager.py
 - Fix: Consolidate defaults into a single source of truth
 
 ### 4. Default port mismatch (low)
 config_file.py says WEB_PORT=8000; server.py uses 8090 as the fallback.
-- Files: pi_loop/config_file.py (8000), web_app/server.py (8090)
+- Files: omp_loop/config_file.py (8000), web_app/server.py (8090)
 - Fix: Harmonize default port to 8090
 
 ### 5. SSE poller runs with zero clients (BL-034 already tracks)

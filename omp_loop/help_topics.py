@@ -1,4 +1,4 @@
-"""Help topics, examples, and introspection for the pi-loop CLI.
+"""Help topics, examples, and introspection for the omp-loop CLI.
 
 Extracted from cli.py to keep the CLI module focused on argparse setup
 and the main() entry point.
@@ -57,10 +57,9 @@ def _list_flags(show_help: bool = True, parser=None) -> None:
                 entries.append((flag, help_short))
         if entries:
             group_map[title] = entries
-
     iflags = _introspection_flags()
     total_flags = sum(len(v) for v in group_map.values()) + len(iflags)
-    header = f"pi-loop v{VERSION} — CLI Flags Reference"
+    header = f"omp-loop v{VERSION} — CLI Flags Reference"
     print()
     print(f"  {colorizer.colorize(header, 'bold', 'white')}")
     print(f"  {colorizer.dim(f'Total: {total_flags} flags')}")
@@ -83,9 +82,9 @@ def _list_flags(show_help: bool = True, parser=None) -> None:
 
 
 def _list_examples() -> None:
-    """Print categorized usage examples. Used by --examples flag."""
     data_dir = _get_data_dir()
-    header = f"pi-loop v{VERSION} — Usage Examples"
+    """Print categorized usage examples. Used by --examples flag."""
+    header = f"omp-loop v{VERSION} — Usage Examples"
     print()
     print(f"  {colorizer.colorize(header, 'bold', 'white')}")
     print(f"  {colorizer.dim('=' * 48)}")
@@ -103,40 +102,40 @@ def _list_examples() -> None:
 
     _section("Basic Single-Goal Loop")
     _comment("Run with a single goal — simplest invocation")
-    _cmd('pi-loop --goal "Fix all ESLint errors" --run')
+    _cmd('omp-loop --goal "Fix all ESLint errors" --run')
     print()
     _comment("One-shot preview (no loop started)")
-    _cmd('pi-loop --goal "Fix tests" --dry-run')
+    _cmd('omp-loop --goal "Fix tests" --dry-run')
     print()
     _comment("Run to completion (10 iterations then stop)")
-    _cmd('pi-loop --goal "Refactor auth" --max-iterations 10 --run')
+    _cmd('omp-loop --goal "Refactor auth" --max-iterations 10 --run')
     print()
 
     _section("Git-Integrated Evolution")
     _comment("Auto-detect, fix, and commit — ideal for linting/formatting")
-    _cmd('pi-loop --goal "Fix lint errors" --git --git-commit --run')
+    _cmd('omp-loop --goal "Fix lint errors" --git --git-commit --run')
     print()
     _comment("Stop once all changes are made")
-    _cmd('pi-loop --goal "Clean up warnings" --git --git-commit --convergence-stop --run')
+    _cmd('omp-loop --goal "Clean up warnings" --git --git-commit --convergence-stop --run')
     print()
 
     _section("Batch / Goals-File Processing")
     _comment("Process a list of goals, one per line")
-    _cmd("pi-loop --goals-file goals.txt --run")
+    _cmd("omp-loop --goals-file goals.txt --run")
     print()
     _comment("Batch with 5 parallel workers, stop when done")
-    _cmd("pi-loop --goals-file todos.txt --workers 5 --stop-at-goals-end --run")
+    _cmd("omp-loop --goals-file todos.txt --workers 5 --stop-at-goals-end --run")
     print()
 
     _section("Notifications & Monitoring")
     _comment("Get desktop notifications after each iteration (Linux)")
-    _cmd('pi-loop --goal "Fix bugs" --notify-desktop --run')
+    _cmd('omp-loop --goal "Fix bugs" --notify-desktop --run')
     print()
     _comment("Push to phone via ntfy.sh")
-    _cmd('pi-loop --goal "Run tests" --notify-ntfy my-alerts --run')
+    _cmd('omp-loop --goal "Run tests" --notify-ntfy my-alerts --run')
     print()
     _comment("Real-time HTML dashboard + JSON status file")
-    _cmd(f'pi-loop --goal "Refactor" --status-html {data_dir}/dash.html --status-file {data_dir}/status.json --run')
+    _cmd(f'omp-loop --goal "Refactor" --status-html {data_dir}/dash.html --status-file {data_dir}/status.json --run')
     print()
 
     _section("Monitoring & Control")
@@ -154,50 +153,50 @@ def _list_examples() -> None:
 
     _section("Advanced Patterns")
     _comment("Multi-worker parallel analysis")
-    _cmd('pi-loop --goal "Review all modules" --workers 4 --git --run')
+    _cmd('omp-loop --goal "Review all modules" --workers 4 --git --run')
     print()
     _comment("Structured JSON logs for programmatic consumption")
-    _cmd("pi-loop --goal \"Fix tests\" --json-logs --run 2>&1 | jq '.summary'")
+    _cmd("omp-loop --goal \"Fix tests\" --json-logs --run 2>&1 | jq '.summary'")
     print()
     _comment("File watcher — auto-trigger when files change")
-    _cmd('pi-loop --goal "Run on change" --watch-dir src/ --run')
+    _cmd('omp-loop --goal "Run on change" --watch-dir src/ --run')
     print()
     _comment("Webhook-triggered iteration server")
-    _cmd('pi-loop --goal "Trigger me" --webhook-port 9090 --run')
+    _cmd('omp-loop --goal "Trigger me" --webhook-port 9090 --run')
     _comment("Then POST /webhook to trigger an iteration")
     print()
 
     _section("Help & Diagnostics")
     _comment("Quick overview of all flags by category")
-    _cmd("pi-loop --list-flags")
+    _cmd("omp-loop --list-flags")
     _comment("Full detailed flag reference")
-    _cmd("pi-loop --help")
+    _cmd("omp-loop --help")
     _comment("Detailed help on any single flag")
-    _cmd("pi-loop --explain workers")
-    _cmd("pi-loop --explain cooldown")
+    _cmd("omp-loop --explain workers")
+    _cmd("omp-loop --explain cooldown")
     _comment("Run environment checks before starting")
-    _cmd("pi-loop --preflight")
+    _cmd("omp-loop --preflight")
     _comment("Full self-diagnosis")
-    _cmd("pi-loop --doctor")
+    _cmd("omp-loop --doctor")
     _comment("Quick status of running daemon")
-    _cmd("pi-loop --status")
+    _cmd("omp-loop --status")
     _comment("View all env vars with defaults")
-    _cmd("pi-loop --dump-env")
+    _cmd("omp-loop --dump-env")
     _comment("Pipeline health check")
-    _cmd("pi-loop --healthcheck")
+    _cmd("omp-loop --healthcheck")
     print()
 
     _section("Flag Reference")
     _comment("Detailed help on any single CLI flag")
-    _cmd("pi-loop --explain git")
-    _cmd("pi-loop --explain converge")
-    _cmd("pi-loop --explain workers")
+    _cmd("omp-loop --explain git")
+    _cmd("omp-loop --explain converge")
+    _cmd("omp-loop --explain workers")
     _comment("Help for a specific argument group")
-    _cmd("pi-loop --help-topic notifications")
-    _cmd("pi-loop --help-topic git")
+    _cmd("omp-loop --help-topic notifications")
+    _cmd("omp-loop --help-topic git")
     _comment("List all flags")
-    _cmd("pi-loop --list-flags")
-    _cmd("pi-loop --list-groups")
+    _cmd("omp-loop --list-flags")
+    _cmd("omp-loop --list-groups")
     print()
 
 
@@ -217,24 +216,24 @@ def _run_healthcheck() -> None:
         }
     )
 
-    # 2. pi binary
-    pi_bin = shutil.which("pi")
-    if pi_bin:
+    # 2. omp binary
+    omp_bin = shutil.which("omp")
+    if omp_bin:
         checks.append(
             {
-                "name": "pi_binary",
+                "name": "omp_binary",
                 "status": "healthy",
-                "detail": f"Found at {pi_bin}",
+                "detail": f"Found at {omp_bin}",
                 "suggestion": "",
             }
         )
     else:
         checks.append(
             {
-                "name": "pi_binary",
+                "name": "omp_binary",
                 "status": "critical",
-                "detail": "'pi' not found on PATH",
-                "suggestion": "Install the pi coding agent",
+                "detail": "'omp' not found on PATH",
+                "suggestion": "Install the omp coding agent",
             }
         )
 
@@ -307,7 +306,7 @@ def _run_doctor() -> None:
 
     c = colorizer
 
-    print(f"\n  {c.header('═══════════════ pi-loop Doctor ═══════════════')}\n")
+    print(f"\n  {c.header('═══════════════ omp-loop Doctor ═══════════════')}\n")
 
     # Python
     v = sys.version_info
@@ -316,17 +315,17 @@ def _run_doctor() -> None:
     if not py_ok:
         print(f"    {c.dim('Need Python >= 3.10')}")
 
-    # pi binary
-    pi_bin = shutil.which("pi")
-    if pi_bin:
+    # omp binary
+    omp_bin = shutil.which("omp")
+    if omp_bin:
         try:
-            r = subprocess.run([pi_bin, "--version"], capture_output=True, text=True, timeout=10)
-            pi_ver = (r.stdout or "").strip()[:80]
+            r = subprocess.run([omp_bin, "--version"], capture_output=True, text=True, timeout=10)
+            omp_ver = (r.stdout or "").strip()[:80]
         except Exception:
-            pi_ver = pi_bin
-        print(f"  {c.value('pi binary:'):10s} {c.tag_ok()} {pi_ver}")
+            omp_ver = omp_bin
+        print(f"  {c.value('omp binary:'):10s} {c.tag_ok()} {omp_ver}")
     else:
-        print(f"  {c.value('pi binary:'):10s} {c.tag_fail()} Not found on PATH")
+        print(f"  {c.value('omp binary:'):10s} {c.tag_fail()} Not found on PATH")
 
     # PATH
     path_dirs = os.environ.get("PATH", "").split(":")
@@ -357,7 +356,7 @@ def _run_doctor() -> None:
         print(f"  {c.value('Ledger:'):10s} {c.dim('Not found (daemon not running)')}")
 
     # Environment
-    dotted_envars = sorted(k for k in os.environ if k.startswith("INFINITE_LOOP_") or k.startswith("PI_LOOP_"))
+    dotted_envars = sorted(k for k in os.environ if k.startswith("INFINITE_LOOP_") or k.startswith("OMP_LOOP_"))
     if dotted_envars:
         print(f"  {c.value('Env vars:'):10s} {c.dim(str(len(dotted_envars)))} set")
         for ev in dotted_envars:
@@ -459,7 +458,8 @@ def _render_status(state: dict) -> None:
         dur_str += f" ({total_dur / 60:.1f}m)"
 
     print()
-    print(f"  {c.colorize(f'pi-loop v{VERSION} — Status', 'bold', 'white')}")
+    status_header = f"omp-loop v{VERSION} \u2014 Status"
+    print(f"  {c.colorize(status_header, 'bold', 'white')}")
     print(f"  {c.dim('=' * 44)}")
     print(f"  {c.value('Status:')}      {c.flag(status)}")
     print(f"  {c.value('Iterations:')}   {c.flag(str(total))}")

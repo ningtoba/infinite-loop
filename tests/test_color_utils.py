@@ -3,7 +3,7 @@
 import os
 import sys
 
-from pi_loop.color_utils import Colorizer, configure_color_mode, strip_ansi
+from omp_loop.color_utils import Colorizer, configure_color_mode, strip_ansi
 
 
 class TestModeNever:
@@ -227,7 +227,7 @@ class TestConfigureColorMode:
     def test_configure_mode_never(self):
         """configure_color_mode('never') disables the global colorizer."""
         configure_color_mode("never")
-        from pi_loop.color_utils import colorizer
+        from omp_loop.color_utils import colorizer
 
         result = colorizer.colorize("test", "red")
         assert result == "test"
@@ -235,7 +235,7 @@ class TestConfigureColorMode:
     def test_configure_mode_always(self):
         """configure_color_mode('always') enables the global colorizer."""
         configure_color_mode("always")
-        from pi_loop.color_utils import colorizer
+        from omp_loop.color_utils import colorizer
 
         result = colorizer.colorize("test", "red")
         assert "\033" in result
@@ -243,7 +243,7 @@ class TestConfigureColorMode:
     def test_configure_mode_invalid(self):
         """Invalid mode falls back to auto."""
         configure_color_mode("invalid")
-        from pi_loop.color_utils import colorizer
+        from omp_loop.color_utils import colorizer
 
         assert colorizer._mode == "auto"
 

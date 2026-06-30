@@ -1,9 +1,9 @@
-"""Tests for pi_loop.preflight — preflight health checks."""
+"""Tests for omp_loop.preflight — preflight health checks."""
 
 import json
 from unittest.mock import Mock, patch
 
-from pi_loop.preflight import PreflightChecker
+from omp_loop.preflight import PreflightChecker
 
 
 class TestCheckPythonVersion:
@@ -149,12 +149,12 @@ class TestRunAllChecks:
     def test_runs_all_checks(self):
         """run_all_checks runs all standard checks."""
         with (
-            patch("pi_loop.preflight.PreflightChecker.check_python_version", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_workdir", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_sentinel_writable", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_port_available", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_file_readable", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_schema_file", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_python_version", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_workdir", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_sentinel_writable", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_port_available", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_file_readable", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_schema_file", return_value=(True, "OK")),
         ):
             results = PreflightChecker.run_all_checks()
         assert len(results) == 7
@@ -162,7 +162,7 @@ class TestRunAllChecks:
 
     def test_fail_fast_stops(self):
         """run_all_checks with fail_fast=True stops after first failure."""
-        with patch("pi_loop.preflight.PreflightChecker.check_python_version", return_value=(False, "FAIL")):
+        with patch("omp_loop.preflight.PreflightChecker.check_python_version", return_value=(False, "FAIL")):
             results = PreflightChecker.run_all_checks(fail_fast=True)
         assert len(results) == 1
         assert not results[0]["passed"]
@@ -170,13 +170,13 @@ class TestRunAllChecks:
     def test_includes_git_check(self):
         """run_all_checks includes git check when requested."""
         with (
-            patch("pi_loop.preflight.PreflightChecker.check_python_version", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_workdir", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_sentinel_writable", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_port_available", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_file_readable", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_git_repo", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_schema_file", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_python_version", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_workdir", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_sentinel_writable", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_port_available", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_file_readable", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_git_repo", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_schema_file", return_value=(True, "OK")),
         ):
             results = PreflightChecker.run_all_checks(check_git=True)
         assert len(results) == 8
@@ -184,13 +184,13 @@ class TestRunAllChecks:
     def test_includes_disk_check(self):
         """run_all_checks includes disk space check when requested."""
         with (
-            patch("pi_loop.preflight.PreflightChecker.check_python_version", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_workdir", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_sentinel_writable", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_port_available", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_file_readable", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_disk_space", return_value=(True, "OK")),
-            patch("pi_loop.preflight.PreflightChecker.check_schema_file", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_python_version", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_workdir", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_sentinel_writable", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_port_available", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_file_readable", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_disk_space", return_value=(True, "OK")),
+            patch("omp_loop.preflight.PreflightChecker.check_schema_file", return_value=(True, "OK")),
         ):
             results = PreflightChecker.run_all_checks(check_disk="/tmp")
         assert len(results) == 8

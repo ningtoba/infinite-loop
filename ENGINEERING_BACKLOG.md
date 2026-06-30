@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**pi-loop** is a Python daemon that wraps the `pi` coding agent to automate goal-driven iteration loops for coding sessions. The tech stack is Python 3.10+ with argparse for CLI entry, FastAPI/uvicorn for the web management UI, pytest for testing, and ruff/mypy/bandit for quality tooling.
+**omp-loop** is a Python daemon that wraps the `omp` coding agent to automate goal-driven iteration loops for coding sessions. The tech stack is Python 3.10+ with argparse for CLI entry, FastAPI/uvicorn for the web management UI, pytest for testing, and ruff/mypy/bandit for quality tooling.
 
 The architecture follows a **dual-process pattern**: a single-threaded synchronous daemon process manages the iteration loop (subprocess spawning, state persistence as JSON ledger, error recovery, heartbeat monitoring), while a separate async FastAPI process provides a REST API and SPA frontend for daemon control. State is shared via disk (JSON ledger and sentinel files), and the daemon supports ~70 CLI flags across 14 groups with multi-layer config precedence (CLI flags → JSON config file → env vars → .env file → defaults).
 
@@ -24,7 +24,7 @@ The codebase has **26 test files (~861 tests)** but suffers from significant tec
 | BACKLOG-3 | Add synchronization between heartbeat killer thread and main loop | bug | high | high | small | pending |
 | BACKLOG-4 | Complete LoopConfig migration and remove 71-parameter `run_loop` signature | tech-debt | critical | high | large | pending |
 | BACKLOG-5 | Add TypedDict for ledger state across 15 consuming modules | architecture | high | high | large | pending |
-| BACKLOG-6 | Decouple `web_app` from `pi_loop` internal path constants | architecture | high | high | medium | pending |
+| BACKLOG-6 | Decouple `web_app` from `omp_loop` internal path constants | architecture | high | high | medium | pending |
 | BACKLOG-7 | Consolidate multi-layer config precedence into a single resolver | architecture | high | high | xlarge | pending |
 | BACKLOG-8 | Decompose `main()` in `cli.py` (~200 lines) | tech-debt | high | medium | medium | pending |
 | BACKLOG-9 | Block shell redirection characters in `on_error_cmd` validation | security | high | medium | small | pending |
@@ -62,13 +62,13 @@ The codebase has **26 test files (~861 tests)** but suffers from significant tec
 - **Effort:** small
 - **Status:** completed
 
-**Problem:** `_execute_task` reads stdout in a for-loop without concurrently reading stderr. If the pi subprocess writes ~64KB to stderr (common with error diagnostics or model choice messages), the OS pipe buffer fills, the child blocks writing to stderr, stdout stalls, and the parent's `for raw_line in proc.stdout` loop hangs indefinitely.
+**Problem:** `_execute_task` reads stdout in a for-loop without concurrently reading stderr. If the omp subprocess writes ~64KB to stderr (common with error diagnostics or model choice messages), the OS pipe buffer fills, the child blocks writing to stderr, stdout stalls, and the parent's `for raw_line in proc.stdout` loop hangs indefinitely.
 
 **Fix:** Added a daemon thread (`_drain_pipe`) that drains stderr concurrently via `proc.stderr` while the main thread reads stdout. A `_stderr_buf` list collects lines, and the main thread joins the drain thread (with 10s timeout) after stdout is fully consumed. The drain thread is also joined in exception handlers (`TimeoutExpired`, `FileNotFoundError`, generic `Exception`) before retry to prevent stale pipe references.
 
-**Files changed:** `pi_loop/loop.py` — added `_drain_pipe()` module-level function, stderr drain thread instantiation in `_execute_task()`, and `_stderr_thread.join()` in normal completion and all exception paths.
+**Files changed:** `omp_loop/loop.py` — added `_drain_pipe()` module-level function, stderr drain thread instantiation in `_execute_task()`, and `_stderr_thread.join()` in normal completion and all exception paths.
 
-**Validation:** All 28 `test_loop.py` tests pass, all 71 tests across `test_loop.py`, `test_file_utils.py`, `test_error_recovery.py` pass. `ruff check pi_loop/loop.py` clean (B023 false positive eliminated with explicit `args` parameter on `threading.Thread`).
+**Validation:** All 28 `test_loop.py` tests pass, all 71 tests across `test_loop.py`, `test_file_utils.py`, `test_error_recovery.py` pass. `ruff check omp_loop/loop.py` clean (B023 false positive eliminated with explicit `args` parameter on `threading.Thread`).
 
 ---
 
@@ -116,14 +116,14 @@ Ledger state is a plain dict shared across ~15 modules with no type contract. Ke
 
 ---
 
-### BACKLOG-6 — Decouple `web_app` from `pi_loop` internal path constants
+### BACKLOG-6 — Decouple `web_app` from `omp_loop` internal path constants
 
 - **Category:** architecture
 - **Priority:** high
 - **Impact:** high
 - **Effort:** medium
 
-`web_app.loop_manager` imports `LEDGER_PATH`, `SENTINEL_PATH_DEFAULT`, and other `pi_loop` internals directly. This tight coupling means any daemon path refactor breaks the web UI. Introduce a stable inter-process API contract — either environment variables, a config file section, or a dedicated IPC channel.
+`web_app.loop_manager` imports `LEDGER_PATH`, `SENTINEL_PATH_DEFAULT`, and other `omp_loop` internals directly. This tight coupling means any daemon path refactor breaks the web UI. Introduce a stable inter-process API contract — either environment variables, a config file section, or a dedicated IPC channel.
 
 ---
 
@@ -354,7 +354,7 @@ The ~150 hardcoded keywords in `TASK_PATTERNS` cannot be extended or overridden 
 - **Impact:** low
 - **Effort:** small
 
-`extract_json_from_output` runs two full scans (reverse and forward) on the entire output text — O(n²) worst case for large pi outputs. Change to a single-pass brace-depth counting algorithm that finds JSON in one forward scan.
+`extract_json_from_output` runs two full scans (reverse and forward) on the entire output text — O(n²) worst case for large omp outputs. Change to a single-pass brace-depth counting algorithm that finds JSON in one forward scan.
 
 ---
 

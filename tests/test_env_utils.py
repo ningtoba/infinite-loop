@@ -1,8 +1,8 @@
-"""Tests for pi_loop.env_utils — environment variable validation."""
+"""Tests for omp_loop.env_utils — environment variable validation."""
 
 from unittest.mock import patch
 
-from pi_loop.env_utils import (
+from omp_loop.env_utils import (
     KNOWN_ENV_VARS,
     _find_closest_match,
     check_env_file,
@@ -134,7 +134,7 @@ class TestCheckEnvFile:
         """check_env_file with no INFINITE_LOOP_* vars returns 0."""
         with (
             patch("os.path.isfile", return_value=True),
-            patch("pi_loop.env_utils.parse_env_vars_from_file", return_value=({}, [])),
+            patch("omp_loop.env_utils.parse_env_vars_from_file", return_value=({}, [])),
         ):
             result = check_env_file("/tmp/.env")
         assert result == 0
@@ -144,7 +144,7 @@ class TestCheckEnvFile:
         vars_found = {"UNKNOWN_VAR": "test"}
         with (
             patch("os.path.isfile", return_value=True),
-            patch("pi_loop.env_utils.parse_env_vars_from_file", return_value=(vars_found, [])),
+            patch("omp_loop.env_utils.parse_env_vars_from_file", return_value=(vars_found, [])),
         ):
             result = check_env_file("/tmp/.env")
         assert result == 1
@@ -154,8 +154,8 @@ class TestCheckEnvFile:
         vars_found = {"INFINITE_LOOP_GOAL": "test"}
         with (
             patch("os.path.isfile", return_value=True),
-            patch("pi_loop.env_utils.parse_env_vars_from_file", return_value=(vars_found, ["line 1: bad format"])),
-            patch("pi_loop.env_utils._log") as mock_log,
+            patch("omp_loop.env_utils.parse_env_vars_from_file", return_value=(vars_found, ["line 1: bad format"])),
+            patch("omp_loop.env_utils._log") as mock_log,
         ):
             check_env_file("/tmp/.env")
         assert mock_log.call_count > 0

@@ -19,19 +19,19 @@ from .config import (
 def _create_parser(for_introspection: bool = False) -> argparse.ArgumentParser:
     """Create and return the argument parser."""
     parser = argparse.ArgumentParser(
-        prog="pi-loop",
-        description="pi-loop — Autonomous task automation daemon that watches files, runs tasks, and tracks progress in a JSON ledger.",
+        prog="omp-loop",
+        description="omp-loop — Autonomous task automation daemon that watches files, runs tasks, and tracks progress in a JSON ledger.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=not for_introspection,
         epilog="""
 Examples:
-  pi-loop --goal "Fix all lint errors" --run
-  pi-loop --goal "Refactor auth module" --git --git-commit --run
-  pi-loop --goals-file goals.txt --workers 3 --run
-  pi-loop --preflight
-  pi-loop --status
+  omp-loop --goal "Fix all lint errors" --run
+  omp-loop --goal "Refactor auth module" --git --git-commit --run
+  omp-loop --goals-file goals.txt --workers 3 --run
+  omp-loop --preflight
+  omp-loop --status
 
-See 'pi-loop --examples' for more usage patterns.
+See 'omp-loop --examples' for more usage patterns.
         """,
     )
 

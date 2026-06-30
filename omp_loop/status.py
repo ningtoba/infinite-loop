@@ -1,7 +1,7 @@
 """Status file writer — emits a JSON status snapshot for web UI consumption.
 
 The web_app server reads this file to get live loop status without
-importing pi_loop runtime modules directly.
+importing omp_loop runtime modules directly.
 """
 
 import json
@@ -15,8 +15,8 @@ from .config import _get_data_dir
 
 logger = logging.getLogger(__name__)
 
-# Default status file path (overridable via PI_LOOP_STATUS_FILE)
-STATUS_FILE_DEFAULT = os.environ.get("PI_LOOP_STATUS_FILE", os.path.join(_get_data_dir(), "loop-status.json"))
+# Default status file path (overridable via OMP_LOOP_STATUS_FILE)
+STATUS_FILE_DEFAULT = os.environ.get("OMP_LOOP_STATUS_FILE", os.path.join(_get_data_dir(), "loop-status.json"))
 
 # Process start time (monotonic clock) — used for accurate uptime calculation.
 # Set once at import time, which is effectively when the process starts.

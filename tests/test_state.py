@@ -1,8 +1,8 @@
-"""Tests for pi_loop.state — ledger loading and creation."""
+"""Tests for omp_loop.state — ledger loading and creation."""
 
 from unittest.mock import patch
 
-from pi_loop.state import _version_detail, load_or_create_ledger
+from omp_loop.state import _version_detail, load_or_create_ledger
 
 
 class TestVersionDetail:
@@ -46,7 +46,7 @@ class TestLoadOrCreateLedger:
 
     def test_creates_fresh_ledger(self):
         """load_or_create_ledger creates a fresh ledger when none exists."""
-        with patch("pi_loop.state.read_ledger", return_value=None):
+        with patch("omp_loop.state.read_ledger", return_value=None):
             result = load_or_create_ledger("my goal", "some context")
         assert result["initial_command"] == "my goal"
         assert result["initial_context"] == "some context"
@@ -58,7 +58,7 @@ class TestLoadOrCreateLedger:
     def test_removes_stale_sentinel(self):
         """load_or_create_ledger removes stale sentinel file."""
         with (
-            patch("pi_loop.state.read_ledger", return_value=None),
+            patch("omp_loop.state.read_ledger", return_value=None),
             patch("os.path.exists", return_value=True),
             patch("os.remove") as mock_remove,
         ):
@@ -69,8 +69,8 @@ class TestLoadOrCreateLedger:
         """load_or_create_ledger resumes existing ledger with same goal."""
         existing = self._mock_state(initial_command="same goal", total_iterations=5)
         with (
-            patch("pi_loop.state.read_ledger", return_value=existing),
-            patch("pi_loop.state.write_ledger") as mock_write,
+            patch("omp_loop.state.read_ledger", return_value=existing),
+            patch("omp_loop.state.write_ledger") as mock_write,
         ):
             result = load_or_create_ledger("same goal", "")
         assert result["total_iterations"] == 5
@@ -80,7 +80,7 @@ class TestLoadOrCreateLedger:
     def test_starts_fresh_with_different_goal(self):
         """load_or_create_ledger starts fresh when goal differs."""
         existing = self._mock_state(initial_command="old goal")
-        with patch("pi_loop.state.read_ledger", return_value=existing):
+        with patch("omp_loop.state.read_ledger", return_value=existing):
             result = load_or_create_ledger("new goal", "ctx")
         assert result["initial_command"] == "new goal"
         assert result["total_iterations"] == 0
@@ -88,7 +88,7 @@ class TestLoadOrCreateLedger:
     def test_adds_missing_error_type_counts_on_resume(self):
         """load_or_create_ledger adds missing error_type_counts on resume."""
         existing = {"initial_command": "goal", "total_iterations": 0, "status": "running"}
-        with patch("pi_loop.state.read_ledger", return_value=existing), patch("pi_loop.state.write_ledger"):
+        with patch("omp_loop.state.read_ledger", return_value=existing), patch("omp_loop.state.write_ledger"):
             result = load_or_create_ledger("goal", "")
         assert "error_type_counts" in result
         assert result["error_type_counts"]["timeout"] == 0
@@ -96,7 +96,7 @@ class TestLoadOrCreateLedger:
     def test_adds_missing_mitigations_on_resume(self):
         """load_or_create_ledger adds missing mitigations on resume."""
         existing = {"initial_command": "goal", "total_iterations": 0, "status": "running"}
-        with patch("pi_loop.state.read_ledger", return_value=existing), patch("pi_loop.state.write_ledger"):
+        with patch("omp_loop.state.read_ledger", return_value=existing), patch("omp_loop.state.write_ledger"):
             result = load_or_create_ledger("goal", "")
         assert "mitigations" in result
         assert result["mitigations"]["mitigation_level"] == 0
@@ -105,7 +105,7 @@ class TestLoadOrCreateLedger:
         """load_or_create_ledger with reset_goals=True clears goals_completed."""
         existing = self._mock_state(goals_completed={"goal1": True, "goal2": True})
         existing["initial_command"] = "goal"
-        with patch("pi_loop.state.read_ledger", return_value=existing), patch("pi_loop.state.write_ledger"):
+        with patch("omp_loop.state.read_ledger", return_value=existing), patch("omp_loop.state.write_ledger"):
             result = load_or_create_ledger("goal", "", reset_goals=True)
         assert result["goals_completed"] == {}
 
@@ -116,7 +116,7 @@ class TestLoadOrCreateLedger:
             initial_command="goal",
             pending_iteration={"n": 3, "started_at": old_ts},
         )
-        with patch("pi_loop.state.read_ledger", return_value=existing), patch("pi_loop.state.write_ledger"):
+        with patch("omp_loop.state.read_ledger", return_value=existing), patch("omp_loop.state.write_ledger"):
             result = load_or_create_ledger("goal", "")
         assert len(result["iterations"]) == 1
         assert result["iterations"][0]["n"] == 3
@@ -126,20 +126,20 @@ class TestLoadOrCreateLedger:
 
     def test_fresh_ledger_has_error_type_counts(self):
         """A fresh ledger has all error type counters initialized."""
-        with patch("pi_loop.state.read_ledger", return_value=None):
+        with patch("omp_loop.state.read_ledger", return_value=None):
             result = load_or_create_ledger("goal", "ctx")
         expected_keys = {"timeout", "network", "schema", "unknown", "heartbeat"}
         assert set(result["error_type_counts"].keys()) == expected_keys
 
     def test_fresh_ledger_has_mitigations_block(self):
         """A fresh ledger has the mitigations block initialized."""
-        with patch("pi_loop.state.read_ledger", return_value=None):
+        with patch("omp_loop.state.read_ledger", return_value=None):
             result = load_or_create_ledger("goal", "ctx")
         assert result["mitigations"]["mitigation_level"] == 0
         assert result["mitigations"]["actions"] == []
 
     def test_fresh_ledger_has_goals_completed(self):
         """A fresh ledger has an empty goals_completed dict."""
-        with patch("pi_loop.state.read_ledger", return_value=None):
+        with patch("omp_loop.state.read_ledger", return_value=None):
             result = load_or_create_ledger("goal", "ctx")
         assert result["goals_completed"] == {}

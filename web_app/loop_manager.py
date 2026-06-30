@@ -10,8 +10,8 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-from pi_loop.config import DEFAULT_LOG_FILE, LEDGER_PATH
-from pi_loop.config import SENTINEL_PATH_DEFAULT as SENTINEL_PATH
+from omp_loop.config import DEFAULT_LOG_FILE, LEDGER_PATH
+from omp_loop.config import SENTINEL_PATH_DEFAULT as SENTINEL_PATH
 
 from .config_manager import build_cli_args, get_raw_config
 
@@ -42,9 +42,9 @@ class LoopManager:
         # Track reader tasks so they can be cancelled on restart (RACE-2)
         self._reader_tasks: list[asyncio.Task] = []
         # Hydrate in-memory logs from the persisted log file so worker output
-        # survives web UI restarts.  Skipped when PI_LOOP_NO_HYDRATE is set
+        # survives web UI restarts.  Skipped when OMP_LOOP_NO_HYDRATE is set
         # (tests) so that test assertions are not polluted by real log data.
-        if not os.environ.get("PI_LOOP_NO_HYDRATE"):
+        if not os.environ.get("OMP_LOOP_NO_HYDRATE"):
             self._hydrate_from_log_file()
 
     @property
@@ -104,8 +104,15 @@ class LoopManager:
             tail_bytes = min(file_size, 64 * 1024)
             with open(self._log_file, "rb") as f:
                 if file_size > tail_bytes:
+                    # Seek back and find start of a complete line (L-5)
                     f.seek(file_size - tail_bytes)
-                    f.readline()  # discard partial first line
+                    # Read forward to find the first newline — stop before it
+                    remaining = f.read()
+                    first_nl = remaining.find(b"\n")
+                    if first_nl >= 0:
+                        f.seek(file_size - tail_bytes + first_nl + 1)
+                    else:
+                        f.seek(file_size - tail_bytes)
                 for line in f:
                     text = line.decode("utf-8", errors="replace").rstrip()
                     if not text:
@@ -153,7 +160,7 @@ class LoopManager:
         if in_docker and "--workdir" not in cli_args:
             cli_args.extend(["--workdir", "/workdir"])
 
-        # pi-loop uses direct subprocess mode (no worker-url concept).
+        # omp-loop uses direct subprocess mode (no worker-url concept).
 
         # Always pass --run — clicking Start implies the user wants to run
         if "--run" not in cli_args:
@@ -169,7 +176,7 @@ class LoopManager:
             with contextlib.suppress(OSError):
                 os.remove(SENTINEL_PATH)
 
-        cmd = [sys.executable, "-m", "pi_loop"] + cli_args
+        cmd = [sys.executable, "-m", "omp_loop"] + cli_args
 
         self._add_log("info", f"Starting daemon: {' '.join(cmd)}")
 
@@ -235,7 +242,7 @@ class LoopManager:
 
     async def stop(self) -> dict[str, Any]:
         """Stop the loop daemon — writes sentinel + immediately kills the
-        process group (including any running pi chat session)."""
+        # process group (including any running omp chat session)."""
         # Hold the lock for the ENTIRE kill+cleanup+nullify sequence
         # to prevent concurrent start() from inserting a new process (RACE-1).
         async with self._lock:
@@ -255,7 +262,7 @@ class LoopManager:
 
         # Immediately kill the process group — the daemon only checks the
         # sentinel between iterations, so we need SIGTERM to stop a running
-        # pi chat session mid-iteration.
+        # omp chat session mid-iteration.
         # Capture PID locally to avoid TOCTOU race (BUG-003).
         if proc is not None:
             try:
@@ -345,9 +352,11 @@ class LoopManager:
         try:
             exists = await asyncio.to_thread(os.path.exists, self._ledger_path)
             if exists:
+
                 def _read_json():
                     with open(self._ledger_path) as f:
                         return json.load(f)
+
                 return await asyncio.to_thread(_read_json)
         except (json.JSONDecodeError, OSError):
             pass

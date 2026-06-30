@@ -1,10 +1,10 @@
-"""Tests for pi_loop.config_file — JSON config persistence."""
+"""Tests for omp_loop.config_file — JSON config persistence."""
 
 import json
 import os
 from unittest.mock import patch
 
-from pi_loop.config_file import (
+from omp_loop.config_file import (
     DEFAULTS,
     apply_to_environ,
     ensure_config_dir,
@@ -17,10 +17,10 @@ from pi_loop.config_file import (
 
 class TestEnsureConfigDir:
     def test_creates_directory(self, tmp_path):
-        """ensure_config_dir creates ~/.config/pi-loop."""
+        """ensure_config_dir creates ~/.config/omp-loop."""
         with (
-            patch("pi_loop.config_file.CONFIG_DIR", tmp_path),
-            patch("pi_loop.config_file.CONFIG_PATH", tmp_path / "config.json"),
+            patch("omp_loop.config_file.CONFIG_DIR", tmp_path),
+            patch("omp_loop.config_file.CONFIG_PATH", tmp_path / "config.json"),
         ):
             ensure_config_dir()
         assert tmp_path.exists()
@@ -29,8 +29,8 @@ class TestEnsureConfigDir:
         """ensure_config_dir is idempotent — no error if dir exists."""
         tmp_path.mkdir(parents=True, exist_ok=True)
         with (
-            patch("pi_loop.config_file.CONFIG_DIR", tmp_path),
-            patch("pi_loop.config_file.CONFIG_PATH", tmp_path / "config.json"),
+            patch("omp_loop.config_file.CONFIG_DIR", tmp_path),
+            patch("omp_loop.config_file.CONFIG_PATH", tmp_path / "config.json"),
         ):
             ensure_config_dir()
         assert tmp_path.exists()
@@ -40,7 +40,7 @@ class TestLoadConfig:
     def test_returns_defaults_when_no_file(self, tmp_path):
         """load_config returns DEFAULTS when config file does not exist."""
         config_path = tmp_path / "config.json"
-        with patch("pi_loop.config_file.CONFIG_DIR", tmp_path), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", tmp_path), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             result = load_config()
         for k, v in DEFAULTS.items():
             assert result[k] == v, f"Mismatch for {k}"
@@ -52,7 +52,7 @@ class TestLoadConfig:
         stored = {"INFINITE_LOOP_GOAL": "custom goal", "INFINITE_LOOP_RUN": "true"}
         with open(config_path, "w") as f:
             json.dump(stored, f)
-        with patch("pi_loop.config_file.CONFIG_DIR", config_dir), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", config_dir), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             result = load_config()
         assert result["INFINITE_LOOP_GOAL"] == "custom goal"
         assert result["INFINITE_LOOP_RUN"] == "true"
@@ -62,7 +62,7 @@ class TestLoadConfig:
         """load_config returns defaults when config file is corrupted."""
         config_path = tmp_path / "config.json"
         config_path.write_text("invalid json{{{")
-        with patch("pi_loop.config_file.CONFIG_DIR", tmp_path), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", tmp_path), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             result = load_config()
         for k, v in DEFAULTS.items():
             assert result[k] == v, f"Mismatch for {k}"
@@ -72,8 +72,8 @@ class TestLoadConfig:
         config_path = tmp_path / "config.json"
         config_path.write_text("{}")
         with (
-            patch("pi_loop.config_file.CONFIG_DIR", tmp_path),
-            patch("pi_loop.config_file.CONFIG_PATH", config_path),
+            patch("omp_loop.config_file.CONFIG_DIR", tmp_path),
+            patch("omp_loop.config_file.CONFIG_PATH", config_path),
             patch("builtins.open", side_effect=OSError("permission denied")),
         ):
             result = load_config()
@@ -85,7 +85,7 @@ class TestSaveConfig:
     def test_persists_values(self, tmp_path):
         """save_config writes merged values to disk."""
         config_path = tmp_path / "config.json"
-        with patch("pi_loop.config_file.CONFIG_DIR", tmp_path), patch("pi_loop.config_file.CONFIG_PATH", config_path):
+        with patch("omp_loop.config_file.CONFIG_DIR", tmp_path), patch("omp_loop.config_file.CONFIG_PATH", config_path):
             save_config(
                 {"INFINITE_LOOP_GOAL": "test goal", "INFINITE_LOOP_RUN": "true", "INFINITE_LOOP_NEW_KEY": "custom"}
             )
@@ -101,8 +101,8 @@ class TestSaveConfig:
         """save_config does not raise on OSError."""
         config_path = tmp_path / "config.json"
         with (
-            patch("pi_loop.config_file.CONFIG_DIR", tmp_path),
-            patch("pi_loop.config_file.CONFIG_PATH", config_path),
+            patch("omp_loop.config_file.CONFIG_DIR", tmp_path),
+            patch("omp_loop.config_file.CONFIG_PATH", config_path),
             patch("builtins.open", side_effect=OSError("read-only")),
         ):
             result = save_config({"INFINITE_LOOP_GOAL": "test"})
@@ -112,19 +112,19 @@ class TestSaveConfig:
 class TestGet:
     def test_returns_value(self):
         """get returns the value for a known key."""
-        with patch("pi_loop.config_file.load_config", return_value=dict(DEFAULTS)):
+        with patch("omp_loop.config_file.load_config", return_value=dict(DEFAULTS)):
             assert get("INFINITE_LOOP_TIMEOUT") == "600"
 
     def test_returns_default_for_missing(self):
         """get returns default for unknown keys."""
-        with patch("pi_loop.config_file.load_config", return_value=dict(DEFAULTS)):
+        with patch("omp_loop.config_file.load_config", return_value=dict(DEFAULTS)):
             assert get("NONEXISTENT_KEY") == ""
 
     def test_custom_value_returned(self):
         """get returns custom stored value."""
         custom = dict(DEFAULTS)
         custom["INFINITE_LOOP_GOAL"] = "my goal"
-        with patch("pi_loop.config_file.load_config", return_value=custom):
+        with patch("omp_loop.config_file.load_config", return_value=custom):
             assert get("INFINITE_LOOP_GOAL") == "my goal"
 
 
@@ -134,7 +134,7 @@ class TestGetBool:
         for val in ("true", "True", "1", "yes", "YES"):
             cfg = dict(DEFAULTS)
             cfg["INFINITE_LOOP_RUN"] = val
-            with patch("pi_loop.config_file.load_config", return_value=cfg):
+            with patch("omp_loop.config_file.load_config", return_value=cfg):
                 assert get_bool("INFINITE_LOOP_RUN") is True
 
     def test_false_values(self):
@@ -142,7 +142,7 @@ class TestGetBool:
         for val in ("false", "0", "no", "", "maybe"):
             cfg = dict(DEFAULTS)
             cfg["INFINITE_LOOP_RUN"] = val
-            with patch("pi_loop.config_file.load_config", return_value=cfg):
+            with patch("omp_loop.config_file.load_config", return_value=cfg):
                 assert get_bool("INFINITE_LOOP_RUN") is False
 
 
@@ -166,6 +166,6 @@ class TestApplyToEnviron:
         """apply_to_environ calls load_config() when config arg is None."""
         custom_cfg = dict(DEFAULTS)
         custom_cfg["INFINITE_LOOP_RUN"] = "true"
-        with patch("pi_loop.config_file.load_config", return_value=custom_cfg), patch.dict(os.environ, {}, clear=True):
+        with patch("omp_loop.config_file.load_config", return_value=custom_cfg), patch.dict(os.environ, {}, clear=True):
             apply_to_environ()
             assert os.environ.get("INFINITE_LOOP_RUN") == "true"

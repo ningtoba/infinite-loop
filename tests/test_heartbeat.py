@@ -1,10 +1,10 @@
-"""Tests for pi_loop.heartbeat — heartbeat helpers for session self-healing."""
+"""Tests for omp_loop.heartbeat — heartbeat helpers for session self-healing."""
 
 import json
 import time
 from unittest.mock import MagicMock, patch
 
-from pi_loop.heartbeat import (
+from omp_loop.heartbeat import (
     _cleanup_heartbeat_file,
     _cleanup_stale_heartbeats,
     _heartbeat_age,
@@ -124,8 +124,8 @@ class TestCleanupStaleHeartbeats:
     def test_removes_matching_files(self, tmp_path):
         """_cleanup_stale_heartbeats removes heartbeat files."""
         with (
-            patch("pi_loop.heartbeat.HEARTBEAT_DIR", str(tmp_path)),
-            patch("pi_loop.heartbeat.HEARTBEAT_PREFIX", "hb-"),
+            patch("omp_loop.heartbeat.HEARTBEAT_DIR", str(tmp_path)),
+            patch("omp_loop.heartbeat.HEARTBEAT_PREFIX", "hb-"),
         ):
             (tmp_path / "hb-123").write_text("data")
             (tmp_path / "hb-456").write_text("data")
@@ -155,7 +155,7 @@ class TestRunHeartbeatMonitor:
         proc = MagicMock()
         proc.poll.return_value = 0  # Process already done
         with patch(
-            "pi_loop.heartbeat._monitor_heartbeat",
+            "omp_loop.heartbeat._monitor_heartbeat",
             return_value={"status": "completed", "age_seconds": 0, "last_heartbeat_data": None},
         ):
             result = _run_heartbeat_monitor("/some/file", 60, time.time(), proc, 120)

@@ -1,6 +1,6 @@
 """Tests for CLI argument parsing via _create_parser."""
 
-from pi_loop.cli import _create_parser
+from omp_loop.cli import _create_parser
 
 
 class TestParserCreation:
@@ -10,7 +10,7 @@ class TestParserCreation:
         """_create_parser returns an ArgumentParser."""
         parser = _create_parser()
         assert parser is not None
-        assert parser.prog == "pi-loop"
+        assert parser.prog == "omp-loop"
 
     def test_parser_no_introspection(self):
         """Parser without for_introspection includes help."""

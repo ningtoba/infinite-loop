@@ -1,6 +1,6 @@
 {
   "timestamp": "2026-06-30",
-  "repository": "pi-loop",
+  "repository": "omp-loop",
   "analysisVersion": "iter-6",
   "summary": {
     "totalIssues": 97,
@@ -30,7 +30,7 @@
       "priority": "critical",
       "effort": "tiny",
       "impact": "Eliminates reflected/stored XSS when iteration summaries contain <script> payloads",
-      "files": ["pi_loop/loop.py"],
+      "files": ["omp_loop/loop.py"],
       "actions": [
         "Wrap summary with html.escape()",
         "Wrap iteration number n with html.escape(str(...))",
@@ -56,24 +56,24 @@
     },
     {
       "rank": 3,
-      "title": "Consolidate hardcoded /tmp paths under PI_LOOP_DATA_DIR (CRIT-001)",
+      "title": "Consolidate hardcoded /tmp paths under OMP_LOOP_DATA_DIR (CRIT-001)",
       "category": "reliability",
       "priority": "critical",
       "effort": "small",
       "impact": "Enables multi-instance deployment and container compatibility",
       "files": [
-        "pi_loop/loop.py",
-        "pi_loop/help_topics.py",
-        "pi_loop/preflight.py",
-        "pi_loop/status.py"
+        "omp_loop/loop.py",
+        "omp_loop/help_topics.py",
+        "omp_loop/preflight.py",
+        "omp_loop/status.py"
       ],
       "actions": [
         "Replace /tmp/infinite-loop-state.json in loop.py HTML dashboard with config-derived path",
-        "Replace /tmp/dash.html, /tmp/status.json in help_topics.py examples with $PI_LOOP_DATA_DIR placeholders",
+        "Replace /tmp/dash.html, /tmp/status.json in help_topics.py examples with $OMP_LOOP_DATA_DIR placeholders",
         "Make check_disk_space() accept data-directory argument instead of hardcoding /tmp",
         "Update STATUS_FILE_DEFAULT to consistently use _get_data_dir() fallback"
       ],
-      "reasoning": "5+ locations hardcode /tmp despite PI_LOOP_DATA_DIR env var existing. Breaks container deployments and multi-instance setups."
+      "reasoning": "5+ locations hardcode /tmp despite OMP_LOOP_DATA_DIR env var existing. Breaks container deployments and multi-instance setups."
     },
     {
       "rank": 4,
@@ -112,7 +112,7 @@
       "priority": "high",
       "effort": "large",
       "impact": "Fundamental maintainability improvement for the largest function in the codebase",
-      "files": ["pi_loop/loop.py"],
+      "files": ["omp_loop/loop.py"],
       "actions": [
         "Extract iteration lifecycle into IterationEngine class",
         "Extract notification dispatch into NotificationDispatcher class",
@@ -129,10 +129,10 @@
       "effort": "medium",
       "impact": "Test isolation and predictable concurrency behavior",
       "files": [
-        "pi_loop/error_recovery.py",
-        "pi_loop/functions.py",
-        "pi_loop/heartbeat.py",
-        "pi_loop/file_utils.py"
+        "omp_loop/error_recovery.py",
+        "omp_loop/functions.py",
+        "omp_loop/heartbeat.py",
+        "omp_loop/file_utils.py"
       ],
       "actions": [
         "Turn _ORIGINAL_* in error_recovery.py into ErrorRecoveryStrategy instance attributes",
@@ -148,7 +148,7 @@
       "priority": "medium",
       "effort": "tiny",
       "impact": "Reduces maintenance surface and false coverage reporting",
-      "files": ["pi_loop/validation.py", "pi_loop/loop.py"],
+      "files": ["omp_loop/validation.py", "omp_loop/loop.py"],
       "actions": [
         "Remove validate_json_output() from validation.py",
         "Remove _classify_progress() from loop.py",
@@ -179,7 +179,7 @@
       "effort": "small",
       "impact": "Prevents silent data loss on config write failures",
       "files": [
-        "pi_loop/config_file.py",
+        "omp_loop/config_file.py",
         "web_app/config_manager.py"
       ],
       "actions": [
@@ -196,7 +196,7 @@
       "priority": "medium",
       "effort": "tiny",
       "impact": "Consistent error logging pattern across the codebase",
-      "files": ["pi_loop/heartbeat.py"],
+      "files": ["omp_loop/heartbeat.py"],
       "actions": [
         "Replace remaining contextlib.suppress(OSError) with try/except+log patterns",
         "Verify heartbeat.py has zero silent suppress calls"
@@ -210,7 +210,7 @@
       "priority": "low",
       "effort": "tiny",
       "impact": "Debugging I/O issues becomes easier",
-      "files": ["pi_loop/heartbeat.py"],
+      "files": ["omp_loop/heartbeat.py"],
       "actions": [
         "In _heartbeat_age(), log at debug level when os.path.getmtime raises OSError",
         "Differentiate FileNotFoundError (expected before first heartbeat) from permission errors"
@@ -239,7 +239,7 @@
       "priority": "medium",
       "effort": "medium",
       "impact": "Separation of concerns; each config domain independently testable",
-      "files": ["pi_loop/config.py"],
+      "files": ["omp_loop/config.py"],
       "actions": [
         "Create IterationConfig, WorkerConfig, GitConfig, NotificationConfig, ArchiveConfig, SafetyConfig, LoggingConfig",
         "Compose in top-level AppConfig container",
@@ -283,9 +283,9 @@
       "priority": "low",
       "effort": "small",
       "impact": "Separation of concerns for dashboard logic",
-      "files": ["pi_loop/loop.py"],
+      "files": ["omp_loop/loop.py"],
       "actions": [
-        "Create pi_loop/dashboard.py",
+        "Create omp_loop/dashboard.py",
         "Move _build_dashboard_html to new module",
         "Import from dashboard.py in loop.py"
       ],

@@ -3,7 +3,7 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pi-loop"
+name = "omp-loop"
 description = "Autonomous task automation daemon — watches files, runs tasks, tracks progress in a JSON ledger"
 version = "14.39.0"
 license = { text = "MIT" }
@@ -12,11 +12,11 @@ requires-python = ">=3.10"
 dependencies = ['fastapi>=0.100.0', 'uvicorn[standard]>=0.20.0']
 
 [project.scripts]
-pi-loop = "pi_loop.cli:main"
-pi-loop-web = "web_app.__main__:main"
+omp-loop = "omp_loop.cli:main"
+omp-loop-web = "web_app.__main__:main"
 
 [tool.setuptools.packages.find]
-include = ["pi_loop*", "web_app*"]
+include = ["omp_loop*", "web_app*"]
 
 [project.optional-dependencies]
 test = [
@@ -58,12 +58,12 @@ warn_unused_configs = true
 ignore_missing_imports = true
 
 [tool.bandit]
-targets = ["pi_loop/", "web_app/"]
+targets = ["omp_loop/", "web_app/"]
 skips = ["B101"]
 confidence = "high"
 
 [tool.coverage.run]
-source = ["pi_loop", "web_app"]
+source = ["omp_loop", "web_app"]
 omit = ["*/tests/*", "*/__main__.py"]
 
 [tool.coverage.report]
@@ -81,4 +81,4 @@ asyncio_mode = "auto"
 addopts = "-v --tb=short --timeout=120"
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
-markers = ["smoke: marks smoke tests that need external tools like pi"]
+markers = ["smoke: marks smoke tests that need external tools like omp"]

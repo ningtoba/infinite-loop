@@ -1,15 +1,15 @@
-"""Tests for pi_loop.loop — main loop execution logic."""
+"""Tests for omp_loop.loop — main loop execution logic."""
 
 from unittest.mock import MagicMock, patch
 
-from pi_loop.loop import _build_dashboard_html, _evolve_goal, _execute_task, _request_shutdown, _validate_on_error_cmd
+from omp_loop.loop import _build_dashboard_html, _evolve_goal, _execute_task, _request_shutdown, _validate_on_error_cmd
 
 
 class TestRequestShutdown:
     def test_sets_shutdown_flag(self):
         """_request_shutdown sets the module-level shutdown flag."""
         _request_shutdown()
-        from pi_loop.loop import _shutdown_requested
+        from omp_loop.loop import _shutdown_requested
 
         assert _shutdown_requested.is_set()
 
@@ -27,11 +27,11 @@ class TestExecuteTask:
         assert isinstance(result, dict)
 
     def test_handles_pi_not_found(self):
-        """_execute_task handles missing 'pi' binary."""
-        with patch("subprocess.Popen", side_effect=FileNotFoundError("pi not found")):
+        """_execute_task handles missing 'omp' binary."""
+        with patch("subprocess.Popen", side_effect=FileNotFoundError("omp not found")):
             result = _execute_task("test goal", "", None, 10)
         assert "error" in result
-        assert "pi" in result.get("error", "")
+        assert "omp" in result.get("error", "")
 
     def test_retries_on_failure(self):
         """_execute_task retries on failure up to max_retries."""
@@ -40,12 +40,12 @@ class TestExecuteTask:
         mock_proc.stdout.readline.side_effect = [b"", b""]
         mock_proc.communicate.return_value = (b"error output", b"stderr")
 
-        with patch("subprocess.Popen", return_value=mock_proc), patch("pi_loop.loop.time.sleep"):
+        with patch("subprocess.Popen", return_value=mock_proc), patch("omp_loop.loop.time.sleep"):
             result = _execute_task("test goal", "", None, 10, max_retries=1)
         assert "error" in result
 
     def test_with_context(self):
-        """_execute_task passes context to pi."""
+        """_execute_task passes context to omp."""
         mock_proc = MagicMock()
         mock_proc.returncode = 0
         mock_proc.stdout.readline.side_effect = [b"", b""]
@@ -96,7 +96,7 @@ class TestBuildDashboardHtml:
         }
         html = _build_dashboard_html(state)
         assert "<!DOCTYPE html>" in html
-        assert "pi-loop Dashboard" in html
+        assert "omp-loop Dashboard" in html
         assert "❌" in html  # Error iteration
         assert "✅" in html  # Success iteration
         assert "running" in html

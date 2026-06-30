@@ -39,6 +39,8 @@ class LoopManager:
         self._worker_states: dict[str, dict[str, Any]] = {}
         self._worker_logs: dict[str, list[dict[str, Any]]] = {}  # wid -> log entries
         self._worker_term: dict[str, list[str]] = {}  # wid -> raw terminal lines (ANSI intact)
+        # Track reader tasks so they can be cancelled on restart (RACE-2)
+        self._reader_tasks: list[asyncio.Task] = []
         # Hydrate in-memory logs from the persisted log file so worker output
         # survives web UI restarts.  Skipped when PI_LOOP_NO_HYDRATE is set
         # (tests) so that test assertions are not polluted by real log data.
@@ -131,8 +133,9 @@ class LoopManager:
         if self.is_running:
             return {"success": False, "error": "Loop is already running"}
 
-        # Read current config from JSON
-        config = get_raw_config()
+        # Read current config from JSON — copy so mutations don't
+        # leak back into the stored config (M-5).
+        config = dict(get_raw_config())
 
         # When running inside Docker, the workdir is always mounted at /workdir.
         # On the host, use the user's actual path from config (or cwd if empty).
@@ -174,17 +177,21 @@ class LoopManager:
         self._live_iteration = {}
         self._worker_states = {}
 
+        # Cancel any stale reader task handles from a prior run
+        self._cancel_stale_readers()
+
         try:
-            self._process = await asyncio.wait_for(
-                asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    env={**os.environ.copy(), "PYTHONUNBUFFERED": "1"},
-                    preexec_fn=os.setsid,
-                ),
-                timeout=30,
-            )
+            async with self._lock:
+                self._process = await asyncio.wait_for(
+                    asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        env={**os.environ.copy(), "PYTHONUNBUFFERED": "1"},
+                        preexec_fn=os.setsid,
+                    ),
+                    timeout=30,
+                )
 
             # Verify process is alive before setting status
             await asyncio.sleep(0.1)
@@ -201,9 +208,12 @@ class LoopManager:
 
             self._add_log("info", f"Daemon started (PID: {self._process.pid})")
 
-            # Start log readers
-            asyncio.create_task(self._read_stream(self._process.stdout, "stdout"))
-            asyncio.create_task(self._read_stream(self._process.stderr, "stderr"))
+            # Start log readers — pass stream + pid explicitly to avoid stale references
+            # BUS-005: store task handles so they can be cancelled on restart
+            self._reader_tasks = [
+                asyncio.create_task(self._read_stream(self._process.stdout, "stdout", self._process)),
+                asyncio.create_task(self._read_stream(self._process.stderr, "stderr", self._process)),
+            ]
 
             # Start process monitor
             asyncio.create_task(self._monitor_process())
@@ -226,6 +236,8 @@ class LoopManager:
     async def stop(self) -> dict[str, Any]:
         """Stop the loop daemon — writes sentinel + immediately kills the
         process group (including any running pi chat session)."""
+        # Hold the lock for the ENTIRE kill+cleanup+nullify sequence
+        # to prevent concurrent start() from inserting a new process (RACE-1).
         async with self._lock:
             proc = self._process
             if not self.is_running and self._status != "paused":
@@ -274,6 +286,8 @@ class LoopManager:
 
         async with self._lock:
             self._process = None
+            # Cancel stale reader tasks so they don't accumulate (RACE-2)
+            self._cancel_stale_readers()
 
         self._add_log("info", "Daemon stopped")
 
@@ -317,11 +331,24 @@ class LoopManager:
             return {"success": False, "error": str(e)}
 
     def get_ledger(self) -> dict[str, Any]:
-        """Read the current ledger state."""
+        """Read the current ledger state (synchronous, called from sync contexts)."""
         try:
             if os.path.exists(self._ledger_path):
                 with open(self._ledger_path) as f:
                     return json.load(f)  # type: ignore[no-any-return]
+        except (json.JSONDecodeError, OSError):
+            pass
+        return {"status": "no_ledger", "iterations": [], "total_iterations": 0}
+
+    async def async_get_ledger(self) -> dict[str, Any]:
+        """Read the ledger asynchronously, offloading file I/O to a thread (M-4)."""
+        try:
+            exists = await asyncio.to_thread(os.path.exists, self._ledger_path)
+            if exists:
+                def _read_json():
+                    with open(self._ledger_path) as f:
+                        return json.load(f)
+                return await asyncio.to_thread(_read_json)
         except (json.JSONDecodeError, OSError):
             pass
         return {"status": "no_ledger", "iterations": [], "total_iterations": 0}
@@ -364,12 +391,49 @@ class LoopManager:
             "recent_logs": self._logs[-50:],
         }
 
-    async def _read_stream(self, stream, name: str) -> None:
+    async def async_get_status(self) -> dict[str, Any]:
+        """Async variant of get_status that offloads ledger file I/O to a thread (M-4)."""
+        ledger = await self.async_get_ledger()
+        stats = ledger.get("stats", {})
+        iterations = ledger.get("iterations", [])
+        latest = iterations[-1] if iterations else None
+
+        return {
+            "loop_status": self._status,
+            "pid": self._process.pid if self._process else None,
+            "ledger": {
+                "status": ledger.get("status", "unknown"),
+                "total_iterations": ledger.get("total_iterations", 0),
+                "started_at": ledger.get("started_at", ""),
+                "last_updated": ledger.get("last_updated", ""),
+                "goal": (ledger.get("initial_command") or "")[:120],
+                "evolved_goal": ledger.get("evolved_goal", ""),
+                "max_iterations": ledger.get("max_iterations", 0),
+                "tag": ledger.get("tag", ""),
+            },
+            "stats": {
+                "success_count": stats.get("success_count", 0),
+                "error_count": stats.get("error_count", 0),
+                "total_duration_seconds": stats.get("total_duration_seconds", 0),
+                "avg_duration_seconds": stats.get("avg_duration_seconds", 0),
+                "consecutive_errors": stats.get("consecutive_errors", 0),
+                "consecutive_successes": stats.get("consecutive_successes", 0),
+            },
+            "error_counts": ledger.get("error_type_counts", {}),
+            "mitigations": ledger.get("mitigations", {}),
+            "eta": ledger.get("eta", {}),
+            "latest_iteration": latest,
+            "live_iteration": self._live_iteration,
+            "worker_logs": {w: logs[-100:] for w, logs in self._worker_logs.items()},
+            "worker_term": {w: lines[-500:] for w, lines in self._worker_term.items()},
+            "recent_logs": self._logs[-50:],
+        }
+
+    async def _read_stream(self, stream, name: str, proc: asyncio.subprocess.Process | None = None) -> None:
         """Read lines from a subprocess stream, log them, and parse worker events.
-        Captures process reference locally to avoid BUG-005 race with stop().
+        Uses the explicitly-passed process reference instead of capturing self._process (RACE-2).
         """
-        local_proc = self._process  # BUG-005: capture locally
-        while local_proc and stream:
+        while proc and stream:
             try:
                 line = await stream.readline()
                 if not line:
@@ -603,6 +667,12 @@ class LoopManager:
 
     def __del__(self):
         self.close()
+
+    def _cancel_stale_readers(self):
+        """Cancel any reader tasks from a prior run to prevent zombie coroutines (RACE-2)."""
+        for t in self._reader_tasks:
+            t.cancel()
+        self._reader_tasks = []
 
     def _close_log(self):
         """Internal alias for close()."""

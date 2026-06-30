@@ -1,428 +1,433 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Web UI for the pi-loop autonomous task daemon"
-    />
-    <meta name="theme-color" content="#09090b" />
-    <title>pi-loop — Web UI</title>
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%CF%80%3C/text%3E%3C/svg%3E"
-    />
-    <link rel="stylesheet" href="/static/style.css" />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css"
-    />
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  </head>
-  <body>
-    <div id="app">
-      <!-- Sidebar -->
-      <nav id="sidebar">
-        <div class="sidebar-header">
-          <h1>&#x3C0; pi-loop</h1>
-          <span class="version">Web UI v2.0</span>
-        </div>
-        <div class="sidebar-nav" role="tablist">
-          <button
-            class="nav-btn active"
-            data-tab="dashboard"
-            role="tab"
-            aria-selected="true"
-          >
-            <span class="nav-icon">&#x25A3;</span> Dashboard
-          </button>
-          <button class="nav-btn" data-tab="config" role="tab">
-            <span class="nav-icon">&#x2699;</span> Configuration
-          </button>
-          <button class="nav-btn" data-tab="iterations" role="tab">
-            <span class="nav-icon">&#x25B7;</span> Iterations
-          </button>
-          <button class="nav-btn" data-tab="logs" role="tab">
-            <span class="nav-icon">&#x2261;</span> Logs
-          </button>
-          <button class="nav-btn" data-tab="workers" role="tab">
-            <span class="nav-icon">&#x2691;</span> Workers
-          </button>
-          <button class="nav-btn" data-tab="system" role="tab">
-            <span class="nav-icon">📊</span> System
-          </button>
-        </div>
-        <div class="sidebar-footer">
-          <button
-            class="nav-btn"
-            onclick="toggleTheme()"
-            style="margin-bottom: 8px"
-            aria-label="Toggle dark/light theme"
-            title="Toggle theme"
-          >
-            🌓 Theme
-          </button>
-          <div class="connection-status" id="connection-indicator">
-            <span class="conn-dot disconnected"></span>
-            <span id="connection-text">disconnected</span>
-          </div>
-        </div>
-      </nav>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Web UI for the pi-loop autonomous task daemon" />
+        <meta name="theme-color" content="#09090b" />
+        <title>pi-loop — Web UI</title>
+        <link
+            rel="icon"
+            type="image/svg+xml"
+            href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%CF%80%3C/text%3E%3C/svg%3E"
+        />
+        <link rel="stylesheet" href="/static/style.css" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+        <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    </head>
+    <body>
+        <div id="app">
+            <!-- Sidebar -->
+            <nav id="sidebar">
+                <div class="sidebar-header">
+                    <h1>&#x3C0; pi-loop</h1>
+                    <span class="version">Web UI v2.0</span>
+                </div>
+                <div class="sidebar-nav" role="tablist">
+                    <button
+                        class="nav-btn active"
+                        data-tab="dashboard"
+                        id="tab-btn-dashboard"
+                        role="tab"
+                        aria-controls="tab-dashboard"
+                        aria-selected="true"
+                        tabindex="0"
+                    >
+                        <span class="nav-icon">&#x25A3;</span> Dashboard
+                    </button>
+                    <button
+                        class="nav-btn"
+                        data-tab="config"
+                        id="tab-btn-config"
+                        role="tab"
+                        aria-controls="tab-config"
+                        tabindex="-1"
+                    >
+                        <span class="nav-icon">&#x2699;</span> Configuration
+                    </button>
+                    <button
+                        class="nav-btn"
+                        data-tab="iterations"
+                        id="tab-btn-iterations"
+                        role="tab"
+                        aria-controls="tab-iterations"
+                        tabindex="-1"
+                    >
+                        <span class="nav-icon">&#x25B7;</span> Iterations
+                    </button>
+                    <button
+                        class="nav-btn"
+                        data-tab="logs"
+                        id="tab-btn-logs"
+                        role="tab"
+                        aria-controls="tab-logs"
+                        tabindex="-1"
+                    >
+                        <span class="nav-icon">&#x2261;</span> Logs
+                    </button>
+                    <button
+                        class="nav-btn"
+                        data-tab="workers"
+                        id="tab-btn-workers"
+                        role="tab"
+                        aria-controls="tab-workers"
+                        tabindex="-1"
+                    >
+                        <span class="nav-icon">&#x2691;</span> Workers
+                    </button>
+                    <button
+                        class="nav-btn"
+                        data-tab="system"
+                        id="tab-btn-system"
+                        role="tab"
+                        aria-controls="tab-system"
+                        tabindex="-1"
+                    >
+                        <span class="nav-icon">📊</span> System
+                    </button>
+                </div>
+                <div class="sidebar-footer">
+                    <button
+                        class="nav-btn"
+                        data-action="toggle-theme"
+                        style="margin-bottom: 8px"
+                        aria-label="Toggle dark/light theme"
+                        title="Toggle theme"
+                    >
+                        🌓 Theme
+                    </button>
+                    <div class="connection-status" id="connection-indicator">
+                        <span class="conn-dot disconnected"></span>
+                        <span id="connection-text">disconnected</span>
+                    </div>
+                </div>
+            </nav>
 
-      <!-- Main content -->
-      <main id="main-content">
-        <!-- Dashboard Tab -->
-        <section id="tab-dashboard" class="tab-content active" role="tabpanel">
-          <div class="top-bar">
-            <h2>Dashboard</h2>
-            <div class="control-buttons">
-              <button
-                id="btn-start"
-                class="ctrl-btn start"
-                onclick="controlLoop('start')"
-                title="Start the loop"
-              >
-                &#x25B6; Start
-              </button>
-              <button
-                id="btn-pause"
-                class="ctrl-btn pause"
-                onclick="controlLoop('pause')"
-                title="Pause the loop"
-                disabled
-              >
-                &#x23F8; Pause
-              </button>
-              <button
-                id="btn-resume"
-                class="ctrl-btn resume"
-                onclick="controlLoop('resume')"
-                title="Resume the loop"
-                disabled
-              >
-                &#x25B6; Resume
-              </button>
-              <button
-                id="btn-stop"
-                class="ctrl-btn stop"
-                onclick="controlLoop('stop')"
-                title="Stop the loop"
-                disabled
-              >
-                &#x25A0; Stop
-              </button>
-              <button
-                id="btn-reset"
-                class="ctrl-btn secondary"
-                onclick="resetLedger()"
-                title="Clear iteration history"
-              >
-                &#x21BA; Reset Ledger
-              </button>
-            </div>
-          </div>
-
-          <!-- Status Cards -->
-          <div class="status-grid" aria-live="polite">
-            <div class="status-card">
-              <div class="card-label">Loop Status</div>
-              <div class="card-value">
-                <span id="loop-status-badge" class="badge stopped"
-                  >stopped</span
+            <!-- Main content -->
+            <main id="main-content">
+                <!-- Dashboard Tab -->
+                <section
+                    id="tab-dashboard"
+                    class="tab-content active"
+                    role="tabpanel"
+                    aria-labelledby="tab-btn-dashboard"
                 >
-              </div>
-            </div>
-            <div class="status-card">
-              <div class="card-label">Total Iterations</div>
-              <div class="card-value"><span id="stat-iterations">0</span></div>
-            </div>
-            <div class="status-card">
-              <div class="card-label">Success / Errors</div>
-              <div class="card-value">
-                <span id="stat-success-errors">0 / 0</span>
-              </div>
-            </div>
-            <div class="status-card">
-              <div class="card-label">Total Duration</div>
-              <div class="card-value"><span id="stat-duration">0s</span></div>
-            </div>
-            <div class="status-card">
-              <div class="card-label">Avg Duration</div>
-              <div class="card-value">
-                <span id="stat-avg-duration">0s</span>
-              </div>
-            </div>
-            <div class="status-card">
-              <div class="card-label">ETA</div>
-              <div class="card-value"><span id="stat-eta">N/A</span></div>
-            </div>
-          </div>
+                    <div class="top-bar">
+                        <h2>Dashboard</h2>
+                        <div class="control-buttons">
+                            <button
+                                id="btn-start"
+                                class="ctrl-btn start"
+                                data-action="control-loop"
+                                data-loop-action="start"
+                                title="Start the loop"
+                            >
+                                &#x25B6; Start
+                            </button>
+                            <button
+                                id="btn-pause"
+                                class="ctrl-btn pause"
+                                data-action="control-loop"
+                                data-loop-action="pause"
+                                title="Pause the loop"
+                                disabled
+                            >
+                                &#x23F8; Pause
+                            </button>
+                            <button
+                                id="btn-resume"
+                                class="ctrl-btn resume"
+                                data-action="control-loop"
+                                data-loop-action="resume"
+                                title="Resume the loop"
+                                disabled
+                            >
+                                &#x25B6; Resume
+                            </button>
+                            <button
+                                id="btn-stop"
+                                class="ctrl-btn stop"
+                                data-action="control-loop"
+                                data-loop-action="stop"
+                                title="Stop the loop"
+                                disabled
+                            >
+                                &#x25A0; Stop
+                            </button>
+                            <button
+                                id="btn-reset"
+                                class="ctrl-btn secondary"
+                                data-action="reset-ledger"
+                                title="Clear iteration history"
+                            >
+                                &#x21BA; Reset Ledger
+                            </button>
+                        </div>
+                    </div>
 
-          <!-- Progress Bar -->
-          <div class="progress-section" aria-live="polite">
-            <div class="progress-label">
-              <span>Progress</span>
-              <span id="progress-text">0%</span>
-            </div>
-            <div class="progress-bar">
-              <div
-                class="progress-fill"
-                id="progress-fill"
-                style="width: 0%"
-              ></div>
-            </div>
-          </div>
+                    <!-- Status Cards -->
+                    <div class="status-grid" aria-live="polite">
+                        <div class="status-card">
+                            <div class="card-label">Loop Status</div>
+                            <div class="card-value">
+                                <span id="loop-status-badge" class="badge stopped">stopped</span>
+                            </div>
+                        </div>
+                        <div class="status-card">
+                            <div class="card-label">Total Iterations</div>
+                            <div class="card-value"><span id="stat-iterations">0</span></div>
+                        </div>
+                        <div class="status-card">
+                            <div class="card-label">Success / Errors</div>
+                            <div class="card-value">
+                                <span id="stat-success-errors">0 / 0</span>
+                            </div>
+                        </div>
+                        <div class="status-card">
+                            <div class="card-label">Total Duration</div>
+                            <div class="card-value"><span id="stat-duration">0s</span></div>
+                        </div>
+                        <div class="status-card">
+                            <div class="card-label">Avg Duration</div>
+                            <div class="card-value">
+                                <span id="stat-avg-duration">0s</span>
+                            </div>
+                        </div>
+                        <div class="status-card">
+                            <div class="card-label">ETA</div>
+                            <div class="card-value"><span id="stat-eta">N/A</span></div>
+                        </div>
+                    </div>
 
-          <!-- Goal Info -->
-          <div class="info-row" aria-live="polite">
-            <div class="info-item">
-              <span class="info-label">Goal:</span>
-              <span class="info-value" id="info-goal">—</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Evolved:</span>
-              <span class="info-value" id="info-evolved">—</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Started:</span>
-              <span class="info-value" id="info-started">—</span>
-            </div>
-          </div>
+                    <!-- Progress Bar -->
+                    <div class="progress-section" aria-live="polite">
+                        <div class="progress-label">
+                            <span>Progress</span>
+                            <span id="progress-text">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
 
-          <!-- Error Breakdown -->
-          <div class="section" id="error-section" style="display: none">
-            <h3>Error Breakdown</h3>
-            <div class="error-grid" id="error-grid">
-              <div class="error-card etimeout" id="err-card-timeout">
-                <span class="ecount">0</span>
-                <span>Timeout</span>
-              </div>
-              <div class="error-card enetwork" id="err-card-network">
-                <span class="ecount">0</span>
-                <span>Network</span>
-              </div>
-              <div class="error-card eschema" id="err-card-schema">
-                <span class="ecount">0</span>
-                <span>Schema</span>
-              </div>
-              <div class="error-card eunknown" id="err-card-unknown">
-                <span class="ecount">0</span>
-                <span>Unknown</span>
-              </div>
-            </div>
-          </div>
+                    <!-- Goal Info -->
+                    <div class="info-row" aria-live="polite">
+                        <div class="info-item">
+                            <span class="info-label">Goal:</span>
+                            <span class="info-value" id="info-goal">—</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Evolved:</span>
+                            <span class="info-value" id="info-evolved">—</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Started:</span>
+                            <span class="info-value" id="info-started">—</span>
+                        </div>
+                    </div>
 
-          <!-- Mitigations -->
-          <div class="section" id="mitigation-section" style="display: none">
-            <h3>Active Mitigations</h3>
-            <div id="mitigation-list"></div>
-          </div>
+                    <!-- Error Breakdown -->
+                    <div class="section" id="error-section" style="display: none">
+                        <h3>Error Breakdown</h3>
+                        <div class="error-grid" id="error-grid">
+                            <div class="error-card etimeout" id="err-card-timeout">
+                                <span class="ecount">0</span>
+                                <span>Timeout</span>
+                            </div>
+                            <div class="error-card enetwork" id="err-card-network">
+                                <span class="ecount">0</span>
+                                <span>Network</span>
+                            </div>
+                            <div class="error-card eschema" id="err-card-schema">
+                                <span class="ecount">0</span>
+                                <span>Schema</span>
+                            </div>
+                            <div class="error-card eunknown" id="err-card-unknown">
+                                <span class="ecount">0</span>
+                                <span>Unknown</span>
+                            </div>
+                        </div>
+                    </div>
 
-          <!-- Live Iteration (real-time worker progress) -->
-          <div class="section" id="live-section" style="display: none">
-            <h3>
-              Live Iteration <span id="live-iter-num"></span>
-              <span id="live-elapsed"></span>
-            </h3>
-            <div class="worker-grid" id="worker-grid"></div>
-          </div>
+                    <!-- Mitigations -->
+                    <div class="section" id="mitigation-section" style="display: none">
+                        <h3>Active Mitigations</h3>
+                        <div id="mitigation-list"></div>
+                    </div>
 
-          <!-- Latest Iteration -->
-          <div class="section">
-            <h3>Latest Iteration</h3>
-            <div id="latest-iteration" class="latest-iter">
-              No iterations yet
-            </div>
-          </div>
+                    <!-- Live Iteration (real-time worker progress) -->
+                    <div class="section" id="live-section" style="display: none">
+                        <h3>
+                            Live Iteration <span id="live-iter-num"></span>
+                            <span id="live-elapsed"></span>
+                        </h3>
+                        <div class="worker-grid" id="worker-grid"></div>
+                    </div>
 
-          <!-- Recent Iterations Mini-Table -->
-          <div class="section">
-            <h3>Recent Iterations</h3>
-            <div class="table-wrap">
-              <table id="recent-iterations-table" aria-live="polite">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Type</th>
-                    <th>Duration</th>
-                    <th>Summary</th>
-                    <th>Status</th>
-                    <th>WT</th>
-                  </tr>
-                </thead>
-                <tbody id="recent-iterations-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+                    <!-- Latest Iteration -->
+                    <div class="section">
+                        <h3>Latest Iteration</h3>
+                        <div id="latest-iteration" class="latest-iter">No iterations yet</div>
+                    </div>
 
-        <!-- Configuration Tab -->
-        <section id="tab-config" class="tab-content" role="tabpanel">
-          <div class="top-bar">
-            <h2>Configuration</h2>
-            <div class="config-actions">
-              <button class="ctrl-btn secondary" onclick="saveConfig()">
-                &#x1F4BE; Save Config
-              </button>
-              <button class="ctrl-btn secondary" onclick="resetConfig()">
-                &#x21BA; Reset
-              </button>
-              <span id="config-saved-msg" class="saved-msg"></span>
-            </div>
-          </div>
+                    <!-- Recent Iterations Mini-Table -->
+                    <div class="section">
+                        <h3>Recent Iterations</h3>
+                        <div class="table-wrap">
+                            <table id="recent-iterations-table" aria-live="polite">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Type</th>
+                                        <th>Duration</th>
+                                        <th>Summary</th>
+                                        <th>Status</th>
+                                        <th>WT</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-iterations-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
 
-          <div class="config-layout">
-            <!-- Group sidebar -->
-            <div class="config-groups" id="config-groups">
-              <!-- Populated by JS -->
-            </div>
+                <!-- Configuration Tab -->
+                <section id="tab-config" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-config">
+                    <div class="top-bar">
+                        <h2>Configuration</h2>
+                        <div class="config-actions">
+                            <button class="ctrl-btn secondary" data-action="save-config">&#x1F4BE; Save Config</button>
+                            <button class="ctrl-btn secondary" data-action="reset-config">&#x21BA; Reset</button>
+                            <span id="config-saved-msg" class="saved-msg"></span>
+                        </div>
+                    </div>
 
-            <!-- Settings panel -->
-            <div class="config-panel" id="config-panel">
-              <div class="config-empty">
-                Select a configuration group from the left to edit settings.
-              </div>
-            </div>
-          </div>
-        </section>
+                    <div class="config-layout">
+                        <!-- Group sidebar -->
+                        <div class="config-groups" id="config-groups">
+                            <!-- Populated by JS -->
+                        </div>
 
-        <!-- Iterations Tab -->
-        <section id="tab-iterations" class="tab-content" role="tabpanel">
-          <div class="top-bar">
-            <h2>Iterations</h2>
-            <span class="subtitle" id="iterations-count">0 total</span>
-          </div>
-          <div class="table-wrap">
-            <table id="iterations-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Started</th>
-                  <th>Duration</th>
-                  <th>Type</th>
-                  <th>Classification</th>
-                  <th>Summary</th>
-                  <th>Error</th>
-                  <th>WT</th>
-                </tr>
-              </thead>
-              <tbody id="iterations-body"></tbody>
-            </table>
-          </div>
-          <div class="pagination" id="iterations-pagination"></div>
-        </section>
+                        <!-- Settings panel -->
+                        <div class="config-panel" id="config-panel">
+                            <div class="config-empty">Select a configuration group from the left to edit settings.</div>
+                        </div>
+                    </div>
+                </section>
 
-        <!-- Logs Tab -->
-        <section id="tab-logs" class="tab-content" role="tabpanel">
-          <div class="top-bar">
-            <h2>
-              Logs
-              <span
-                id="log-filter-badge"
-                class="tag tag-info"
-                style="display: none; margin-left: 8px"
-              ></span>
-            </h2>
-            <button
-              class="ctrl-btn secondary"
-              onclick="
-                filterWorkerLogs(null);
-                document
-                  .getElementById('log-container')
-                  .querySelectorAll('.log-entry')
-                  .forEach((e) => (e.style.display = ''));
-              "
-            >
-              Show All
-            </button>
-          </div>
-          <div class="log-container" id="log-container" aria-live="polite">
-            <div class="log-empty">
-              No logs yet. Start the loop to see output.
-            </div>
-          </div>
-        </section>
+                <!-- Iterations Tab -->
+                <section id="tab-iterations" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-iterations">
+                    <div class="top-bar">
+                        <h2>Iterations</h2>
+                        <span class="subtitle" id="iterations-count">0 total</span>
+                    </div>
+                    <div class="table-wrap">
+                        <table id="iterations-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Started</th>
+                                    <th>Duration</th>
+                                    <th>Type</th>
+                                    <th>Classification</th>
+                                    <th>Summary</th>
+                                    <th>Error</th>
+                                    <th>WT</th>
+                                </tr>
+                            </thead>
+                            <tbody id="iterations-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="iterations-pagination"></div>
+                </section>
 
-        <!-- Workers Tab -->
-        <section id="tab-workers" class="tab-content" role="tabpanel">
-          <div id="workers-cards-view">
-            <div class="top-bar">
-              <h2>Workers</h2>
-              <span class="subtitle" id="workers-subtitle"></span>
-            </div>
-            <div class="worker-cards-grid" id="worker-cards">
-              <div class="log-empty">
-                No workers active. Start the loop to see per-worker output.
-              </div>
-            </div>
-          </div>
-          <div id="workers-log-view" style="display: none">
-            <div class="top-bar">
-              <button class="ctrl-btn secondary" onclick="showWorkerCards()">
-                ← Back
-              </button>
-              <h2 id="worker-log-title">Worker #—</h2>
-              <span class="subtitle" id="worker-log-meta"></span>
-            </div>
-            <div
-              id="worker-terminal-container"
-              style="
-                height: calc(100vh - 160px);
-                padding: 4px;
-                background: #0d1117;
-                border-radius: 8px;
-              "
-            ></div>
-          </div>
-        </section>
-        <section id="tab-system" class="tab-content" role="tabpanel">
-          <div class="top-bar"><h2>System Resources</h2></div>
-          <div class="system-grid" id="system-grid">
-            <div class="status-card">
-              <div class="card-label">CPU Usage</div>
-              <div class="card-value"><span id="sys-cpu">0%</span></div>
-            </div>
-            <div class="status-card">
-              <div class="card-label">Memory</div>
-              <div class="card-value"><span id="sys-mem">0%</span></div>
-            </div>
-            <div class="status-card">
-              <div class="card-label">Disk Usage</div>
-              <div class="card-value"><span id="sys-disk">0%</span></div>
-            </div>
-            <div class="status-card">
-              <div class="card-label">Memory Used</div>
-              <div class="card-value"><span id="sys-mem-used">0 GB</span></div>
-            </div>
-          </div>
-          <div class="section">
-            <h3>CLI Preview</h3>
-            <div
-              id="cli-preview"
-              style="
-                background: var(--bg-tertiary);
-                border: 1px solid var(--border);
-                border-radius: var(--radius);
-                padding: 12px;
-                font-family: var(--font-mono);
-                font-size: 0.78rem;
-                color: var(--fg-secondary);
-                word-break: break-all;
-                cursor: pointer;
-              "
-              onclick="copyCliPreview()"
-              title="Click to copy"
-            >
-              Loading...
-            </div>
-          </div>
-        </section>
-      </main>
-    </div>
+                <!-- Logs Tab -->
+                <section id="tab-logs" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-logs">
+                    <div class="top-bar">
+                        <h2>
+                            Logs
+                            <span
+                                id="log-filter-badge"
+                                class="tag tag-info"
+                                style="display: none; margin-left: 8px"
+                            ></span>
+                        </h2>
+                        <button class="ctrl-btn secondary" data-action="show-all-logs">Show All</button>
+                    </div>
+                    <div class="log-container" id="log-container" aria-live="polite">
+                        <div class="log-empty">No logs yet. Start the loop to see output.</div>
+                    </div>
+                </section>
 
-    <script src="/static/app.js"></script>
-  </body>
+                <!-- Workers Tab -->
+                <section id="tab-workers" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-workers">
+                    <div id="workers-cards-view">
+                        <div class="top-bar">
+                            <h2>Workers</h2>
+                            <span class="subtitle" id="workers-subtitle"></span>
+                        </div>
+                        <div class="worker-cards-grid" id="worker-cards">
+                            <div class="log-empty">No workers active. Start the loop to see per-worker output.</div>
+                        </div>
+                    </div>
+                    <div id="workers-log-view" style="display: none">
+                        <div class="top-bar">
+                            <button class="ctrl-btn secondary" data-action="show-worker-cards">← Back</button>
+                            <h2 id="worker-log-title">Worker #—</h2>
+                            <span class="subtitle" id="worker-log-meta"></span>
+                        </div>
+                        <div
+                            id="worker-terminal-container"
+                            style="height: calc(100vh - 160px); padding: 4px; background: #0d1117; border-radius: 8px"
+                        ></div>
+                    </div>
+                </section>
+                <section id="tab-system" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-system">
+                    <div class="top-bar"><h2>System Resources</h2></div>
+                    <div class="system-grid" id="system-grid">
+                        <div class="status-card">
+                            <div class="card-label">CPU Usage</div>
+                            <div class="card-value"><span id="sys-cpu">0%</span></div>
+                        </div>
+                        <div class="status-card">
+                            <div class="card-label">Memory</div>
+                            <div class="card-value"><span id="sys-mem">0%</span></div>
+                        </div>
+                        <div class="status-card">
+                            <div class="card-label">Disk Usage</div>
+                            <div class="card-value"><span id="sys-disk">0%</span></div>
+                        </div>
+                        <div class="status-card">
+                            <div class="card-label">Memory Used</div>
+                            <div class="card-value"><span id="sys-mem-used">0 GB</span></div>
+                        </div>
+                    </div>
+                    <div class="section">
+                        <h3>CLI Preview</h3>
+                        <div
+                            id="cli-preview"
+                            style="
+                                background: var(--bg-tertiary);
+                                border: 1px solid var(--border);
+                                border-radius: var(--radius);
+                                padding: 12px;
+                                font-family: var(--font-mono);
+                                font-size: 0.78rem;
+                                color: var(--fg-secondary);
+                                word-break: break-all;
+                                cursor: pointer;
+                            "
+                            data-action="copy-cli-preview"
+                            title="Click to copy"
+                        >
+                            Loading...
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <script src="/static/app.js"></script>
+    </body>
 </html>

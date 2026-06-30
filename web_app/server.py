@@ -95,9 +95,8 @@ async def api_key_auth(request: Request, call_next):
     When the key is empty, auth is disabled entirely, preserving
     backward compat for local development.
     """
-    api_key = _API_KEY or os.environ.get("PI_LOOP_API_KEY", "")
-
-    if not api_key:
+    # Only use the startup-captured key, not os.environ (SEC-004)
+    if not _API_KEY:
         # No key configured — allow all requests (local-dev mode)
         return await call_next(request)
 
@@ -112,7 +111,7 @@ async def api_key_auth(request: Request, call_next):
         return await call_next(request)
 
     auth_header = request.headers.get("Authorization", "")
-    expected = f"Bearer {api_key}"
+    expected = f"Bearer {_API_KEY}"
 
     if auth_header != expected:
         return JSONResponse(
@@ -232,7 +231,7 @@ async def security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "0"  # Deprecated but suppresses legacy warnings
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "script-src 'self' https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
         "font-src 'self'; "
@@ -367,13 +366,18 @@ async def resume_loop():
 async def reset_ledger():
     """Reset the ledger — deletes iteration history so the next start is fresh."""
     try:
-        if os.path.exists(LEDGER_PATH):
-            os.remove(LEDGER_PATH)
-        if os.path.exists(LOCK_PATH):
-            os.remove(LOCK_PATH)
+        await asyncio.to_thread(_reset_ledger_files)
         return {"success": True, "message": "Ledger reset — next start will be fresh"}
     except OSError as e:
         return {"success": False, "error": str(e)}
+
+
+def _reset_ledger_files():
+    """Synchronous helper for reset_ledger, offloaded to thread pool."""
+    if os.path.exists(LEDGER_PATH):
+        os.remove(LEDGER_PATH)
+    if os.path.exists(LOCK_PATH):
+        os.remove(LOCK_PATH)
 
 
 # ── Status / Monitoring API ─────────────────────────────────────────────────
@@ -545,14 +549,13 @@ def _get_disk_info():
 @app.get("/api/system")
 async def system_resources():
     """Get system resource usage."""
-    cpu_percent = _get_cpu_percent()
-    # On first call, no delta is available yet; fall back to 0.0 for the API response
+    cpu_percent = await asyncio.to_thread(_get_cpu_percent)
     if cpu_percent is None:
         cpu_percent = 0.0
     return {
         "cpu_percent": cpu_percent,
-        "memory": _get_memory_info(),
-        "disk": _get_disk_info(),
+        "memory": await asyncio.to_thread(_get_memory_info),
+        "disk": await asyncio.to_thread(_get_disk_info),
     }
 
 
@@ -577,10 +580,13 @@ async def _broadcast_sse(data: dict[str, Any]) -> None:
 async def _sse_stream_impl(request: Request):
     """SSE endpoint implementation shared by /api/live and /live."""
     q: asyncio.Queue = asyncio.Queue(maxsize=32)
-    async with _sse_clients_lock:
-        _sse_clients.append(q)
 
     async def event_generator():
+        # Only register queue when the generator actually starts (M-3).
+        # If the client disconnects before this runs, the queue is never orphaned.
+        async with _sse_clients_lock:
+            _sse_clients.append(q)
+
         try:
             # Send initial status
             manager = get_loop_manager()
@@ -653,7 +659,7 @@ async def _status_poller():
             await asyncio.sleep(1)  # Quick retry when idle
             continue
         try:
-            status = manager.get_status()
+            status = await manager.async_get_status()
             live = status.get("live_iteration", {})
         except Exception:
             await asyncio.sleep(5)
@@ -736,7 +742,7 @@ def main():
         default_port = 8090
 
     parser = argparse.ArgumentParser(description="pi-loop Web UI Server")
-    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0) — all interfaces")
     parser.add_argument(
         "--port",
         type=int,

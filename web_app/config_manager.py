@@ -281,8 +281,33 @@ def _read_stored() -> dict[str, str]:
 
 
 def save_config(config: dict[str, str]) -> None:
-    """Persist config dict via pi_loop.config_file.save_config()."""
-    _save_config(config)
+    """Persist config dict via pi_loop.config_file.save_config().
+
+    Casts string values to their declared Python types so the downstream
+    config reader gets bool/int/float, not strings.
+    """
+    typed: dict[str, str | bool | int | float] = {}
+    for key, val in config.items():
+        meta = CONFIG_DEFAULTS.get(key)
+        if meta is None:
+            typed[key] = val
+            continue
+        t = meta.get("type", "string")
+        if t == "bool":
+            typed[key] = str(val).lower() == "true"
+        elif t == "int":
+            try:
+                typed[key] = int(val)
+            except (ValueError, TypeError):
+                typed[key] = val
+        elif t == "float":
+            try:
+                typed[key] = float(val)
+            except (ValueError, TypeError):
+                typed[key] = val
+        else:
+            typed[key] = val
+    _save_config(typed)
 
 
 def validate_config(config: dict[str, str]) -> dict[str, bool | list[str]]:

@@ -6,6 +6,21 @@ function setHTML(el, html) {
 	el.insertAdjacentHTML("beforeend", html);
 }
 
+/**
+ * Escape a string for safe interpolation in HTML attribute values AND text content.
+ * Handles & < > " ' and backtick for attribute-context safety.
+ */
+function escapeAttr(s) {
+	if (!s) return "";
+	return String(s)
+		.replace(/&/g, "&amp;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#x27;")
+		.replace(/`/g, "&#x60;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
+}
+
 const API = {
 	status: "/api/status",
 	ledger: "/api/ledger",
@@ -36,24 +51,41 @@ const ITERATIONS_PER_PAGE = 25;
 let lastLogIdx = -1; // append-only log tracking
 let workerLogFilter = null; // filter logs by worker ID
 let _lastSeenIterationCount = 0; // only refetch iterations when count changes
+let _configDirty = false; // M-7: track unsaved config changes
+const _systemIntervalId = null; // L-2: track system tab poller interval
 
 // Toast notification system
 let _toastContainer = null;
-function showError(msg) {
+function _ensureToastContainer() {
 	if (!_toastContainer) {
 		_toastContainer = document.createElement("div");
 		_toastContainer.className = "toast-container";
 		document.body.appendChild(_toastContainer);
 	}
+	return _toastContainer;
+}
+function showToast(msg, className, logFn) {
+	const c = _ensureToastContainer();
 	const t = document.createElement("div");
-	t.className = "toast toast-error";
+	t.className = "toast " + className;
 	t.textContent = msg;
-	_toastContainer.appendChild(t);
+	c.appendChild(t);
 	setTimeout(() => {
 		if (t.parentNode) t.parentNode.removeChild(t);
 	}, 5000);
-	// Also log to console for debugging
-	console.error("[UI] " + msg);
+	if (logFn) logFn("[UI] " + msg);
+}
+function showError(msg) {
+	showToast(msg, "toast-error", console.error);
+}
+function showSuccess(msg) {
+	showToast(msg, "toast-success", console.log);
+}
+function showWarning(msg) {
+	showToast(msg, "toast-warning", console.warn);
+}
+function showInfo(msg) {
+	showToast(msg, "toast-info", console.log);
 }
 
 // ── Worktree merge tooltip helper ────────────────────────────────────────
@@ -104,11 +136,69 @@ document.addEventListener("DOMContentLoaded", () => {
 	document.querySelectorAll(".nav-btn").forEach((btn) => {
 		btn.addEventListener("click", () => switchTab(btn.dataset.tab));
 	});
+
+	/* Wire up static controls via data-action (no inline onclick handlers) */
+	const actionMap = {
+		"toggle-theme": toggleTheme,
+		"control-loop": (btn) => controlLoop(btn.dataset.loopAction),
+		"reset-ledger": resetLedger,
+		"save-config": saveConfig,
+		"reset-config": resetConfig,
+		"show-all-logs": () => {
+			filterWorkerLogs(null);
+			document
+				.getElementById("log-container")
+				.querySelectorAll(".log-entry")
+				.forEach((e) => (e.style.display = ""));
+		},
+		"show-worker-cards": showWorkerCards,
+		"copy-cli-preview": copyCliPreview,
+	};
+	document.addEventListener("click", (e) => {
+		const btn = e.target.closest("[data-action]");
+		if (!btn) return;
+		const action = btn.dataset.action;
+		const handler = actionMap[action];
+		if (handler) {
+			e.preventDefault();
+			handler(btn);
+		}
+	});
+
+	// Ensure initial active tab has correct ARIA state
+	const activeTab = document.querySelector('.nav-btn[data-tab="dashboard"]');
+	if (activeTab) activeTab.setAttribute("aria-selected", "true");
+
 	initSSE();
 	fetchStatus();
 	setInterval(() => {
 		if (currentTab === "system") fetchSystem();
 	}, 5000);
+
+	// ── Tab-list keyboard navigation (A11Y-1) ───────────────────────
+	const tablist = document.querySelector('.sidebar-nav[role="tablist"]');
+	if (tablist) {
+		tablist.addEventListener("keydown", (e) => {
+			const tabsArray = Array.from(tablist.querySelectorAll('[role="tab"]'));
+			let idx = tabsArray.indexOf(document.activeElement);
+			if (idx === -1) {
+				idx = tabsArray.findIndex(
+					(t) => t.getAttribute("aria-selected") === "true",
+				);
+				if (idx === -1) idx = 0;
+			}
+			let newIdx = idx;
+			if (e.key === "ArrowRight") newIdx = (idx + 1) % tabsArray.length;
+			else if (e.key === "ArrowLeft")
+				newIdx = (idx - 1 + tabsArray.length) % tabsArray.length;
+			else if (e.key === "Home") newIdx = 0;
+			else if (e.key === "End") newIdx = tabsArray.length - 1;
+			else return;
+			e.preventDefault();
+			tabsArray[newIdx].focus();
+			tabsArray[newIdx].click();
+		});
+	}
 });
 
 // eslint-disable-next-line
@@ -141,18 +231,44 @@ window.addEventListener("resize", () => {
 	}, 250);
 });
 
-function switchTab(tab) {
+function switchTab(tab, skipDirtyCheck) {
+	// If there are unsaved config changes, warn before navigating (M-7)
+	if (!skipDirtyCheck && _configDirty && currentTab !== "config" && tab !== "config") {
+		if (!confirm("You have unsaved configuration changes. Discard them?")) return;
+		_configDirty = false;
+	}
+
 	currentTab = tab;
 	document.querySelectorAll(".nav-btn").forEach((b) => {
 		b.classList.remove("active");
+		b.setAttribute("aria-selected", "false");
+		b.setAttribute("tabindex", "-1");
 	});
 	var btn = document.querySelector('.nav-btn[data-tab="' + tab + '"]');
-	if (btn) btn.classList.add("active");
+	if (btn) {
+		btn.classList.add("active");
+		btn.setAttribute("aria-selected", "true");
+		btn.setAttribute("tabindex", "0");
+	}
 	document.querySelectorAll(".tab-content").forEach((s) => {
 		s.classList.remove("active");
 	});
 	var tc = document.getElementById("tab-" + tab);
 	if (tc) tc.classList.add("active");
+
+	// Dispose xterm terminals when LEAVING the Workers tab (MEM-1)
+	if (currentTab !== "workers") {
+		Object.values(_workerTerminals).forEach((t) => {
+			try {
+				t.term.dispose();
+			} catch (_e) {
+				console.warn("xterm dispose failed", _e);
+			}
+		});
+		_workerTerminals = {};
+		_activeWorkerLog = null;
+	}
+
 	if (tab === "config" && !configData) loadConfig();
 	if (tab === "config") fetchCliPreview();
 	if (tab === "iterations") loadIterations();
@@ -161,11 +277,14 @@ function switchTab(tab) {
 		showWorkerCards();
 		fetchStatus();
 	}
-	if (tab === "system") {
-		fetchSystem();
-		fetchCliPreview();
-	}
 }
+
+// Mark config as dirty on any input change (M-7)
+document.addEventListener("input", (e) => {
+	if (e.target.closest && e.target.closest("#config-panel")) {
+		_configDirty = true;
+	}
+});
 
 // ── SSE (push-based updates, no polling) ─────────────────────────────────
 let _sseRetryDelay = 1000; // initial reconnect delay (ms)
@@ -218,11 +337,14 @@ function initSSE() {
 	sseSource.onopen = () => {
 		updateConnectionStatus(true);
 		_sseResetRetry();
+		// Reset tracking state on reconnect so we don't skip iterations (DATA-1)
+		_lastSeenIterationCount = 0;
+		lastLogIdx = -1;
 	};
 	sseSource.onerror = () => {
 		updateConnectionStatus(false);
-		sseSource.close();
-		setTimeout(initSSE, _sseNextRetry());
+		if (sseSource) sseSource.close();
+		setTimeout(() => initSSE(), _sseNextRetry());
 	};
 }
 
@@ -522,8 +644,8 @@ function updateLiveIteration(live) {
 				const dur = w.duration_seconds
 					? w.duration_seconds.toFixed(0) + "s"
 					: "...";
-				return `<div class="worker-card ${cls}" data-wid="${escapeHtml(w.id)}" onclick="filterWorkerLogs('${escapeHtml(w.id)}')" title="Click to filter logs by Worker #${escapeHtml(w.id)}">
-      <div class="wid">Worker #${escapeHtml(w.id)}</div>
+				return `<div class="worker-card ${cls}" data-wid="${escapeAttr(w.id)}" data-action="filter-worker-logs" title="Click to filter logs by Worker #${escapeAttr(w.id)}">
+      <div class="wid">Worker #${escapeAttr(w.id)}</div>
       <div class="wstatus">${label}</div>
       <div class="wdur">${dur}</div>
     </div>`;
@@ -577,6 +699,20 @@ function appendLog(entry) {
 
 	if (wasAtBottom) container.scrollTop = container.scrollHeight;
 }
+
+/* Delegated handler for worker-card clicks */
+document.addEventListener("click", (e) => {
+	const card = e.target.closest("[data-action='filter-worker-logs']");
+	if (card) {
+		filterWorkerLogs(card.dataset.wid || null);
+	}
+});
+document.addEventListener("click", (e) => {
+	const card = e.target.closest("[data-action='show-worker-log']");
+	if (card) {
+		showWorkerLog(card.dataset.wid || null);
+	}
+});
 
 function filterWorkerLogs(wid) {
 	if (workerLogFilter === wid) {
@@ -719,10 +855,27 @@ function renderConfigGroups() {
 		renderConfigPanel(configGroups[0].id);
 	}
 }
+function _castConfigValue(k, raw) {
+	const meta = configData && configData[k];
+	if (!meta || !meta.type) return raw;
+	if (meta.type === "int") {
+		const n = parseInt(raw, 10);
+		return isNaN(n) ? raw : n;
+	}
+	if (meta.type === "float") {
+		const n = parseFloat(raw);
+		return isNaN(n) ? raw : n;
+	}
+	if (meta.type === "bool") {
+		return raw === "true";
+	}
+	return raw;
+}
+
 function flushConfigGroup() {
 	document.querySelectorAll('#config-panel [id^="cfg-"]').forEach((f) => {
 		const k = f.name || f.id.replace("cfg-", "");
-		if (k) configValues[k] = f.value;
+		if (k) configValues[k] = _castConfigValue(k, f.value);
 	});
 }
 function renderConfigPanel(groupId) {
@@ -760,7 +913,7 @@ function renderConfigPanel(groupId) {
 				const desc = meta.description || "";
 				let input;
 				if (meta.type === "bool")
-					input = `<select name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}"><option value="false"${v === "false" ? " selected" : ""}>false</option><option value="true"${v === "true" ? " selected" : ""}>true</option></select>`;
+					input = `<select name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}"><option value="false"${String(v) === "false" ? " selected" : ""}>false</option><option value="true"${String(v) === "true" ? " selected" : ""}>true</option></select>`;
 				else if (meta.type === "select" && meta.options)
 					input = `<select name="${escapeHtml(key)}" id="cfg-${escapeHtml(key)}">${meta.options.map((o) => `<option value="${escapeHtml(o)}"${v === o ? " selected" : ""}>${escapeHtml(o)}</option>`).join("")}</select>`;
 				else if (meta.multiline)
@@ -774,7 +927,7 @@ function renderConfigPanel(groupId) {
 			.join(""),
 	);
 }
-async function saveConfig() {
+async async function saveConfig() {
 	flushConfigGroup();
 	try {
 		const res = await fetch(API.config, {
@@ -783,9 +936,12 @@ async function saveConfig() {
 			body: JSON.stringify({ ...configValues }),
 		});
 		const data = await res.json();
-		data.success
-			? showSavedMsg("Saved!")
-			: alert("Failed: " + (data.message || "unknown"));
+		if (data.success) {
+			_configDirty = false;
+			showSavedMsg("Saved!");
+		} else {
+			alert("Failed: " + (data.message || "unknown"));
+		}
 	} catch (err) {
 		alert("Error: " + err.message);
 	}
@@ -804,6 +960,16 @@ function showSavedMsg(t) {
 }
 
 // ── Iterations Table ──────────────────────────────────────────────────────
+/* Delegated handler for pagination clicks */
+document.addEventListener("click", (e) => {
+	const btn = e.target.closest(
+		"[data-action='page-prev'],[data-action='page-next']",
+	);
+	if (!btn) return;
+	const page = parseInt(btn.dataset.page, 10);
+	if (!isNaN(page)) loadIterations(page);
+});
+
 async function loadIterations(page = 0) {
 	iterationsPage = page;
 	try {
@@ -844,7 +1010,7 @@ async function loadIterations(page = 0) {
 		pc.insertAdjacentHTML(
 			"beforeend",
 			tp > 1
-				? `<button ${iterationsPage === 0 ? "disabled" : ""} onclick="loadIterations(${iterationsPage - 1})">← Prev</button><span class="page-info">Page ${iterationsPage + 1} of ${tp}</span><button ${iterationsPage >= tp - 1 ? "disabled" : ""} onclick="loadIterations(${iterationsPage + 1})">Next →</button>`
+				? `<button ${iterationsPage === 0 ? "disabled" : ""} data-action="page-prev" data-page="${iterationsPage - 1}">← Prev</button><span class="page-info">Page ${iterationsPage + 1} of ${tp}</span><button ${iterationsPage >= tp - 1 ? "disabled" : ""} data-action="page-next" data-page="${iterationsPage + 1}">Next →</button>`
 				: "",
 		);
 	} catch (err) {
@@ -910,6 +1076,14 @@ function createWorkerTerminal(wid) {
 	return term;
 }
 
+/* Delegated handler for worker-card-item clicks */
+document.addEventListener("click", (e) => {
+	const card = e.target.closest("[data-action='show-worker-log']");
+	if (card) {
+		showWorkerLog(card.dataset.wid || null);
+	}
+});
+
 function renderWorkers(data) {
 	_allWorkerData = data;
 	const container = document.getElementById("worker-cards");
@@ -961,7 +1135,7 @@ function renderWorkers(data) {
 						: w.status === "error"
 							? "Error"
 							: "Running";
-				return `<div class="worker-card-item ${cls}" onclick="showWorkerLog('${escapeHtml(w.id)}')">
+				return `<div class="worker-card-item ${cls}" data-action="show-worker-log" data-wid="${escapeAttr(w.id)}">
       <div class="wc-wid">Worker #${escapeHtml(w.id)}</div>
       <div class="wc-status">${label}</div>
       <div class="wc-dur">${dur}</div>
@@ -975,6 +1149,17 @@ function renderWorkers(data) {
 }
 
 function showWorkerLog(wid) {
+	// Dispose previous terminal before creating a new one (MEM-1)
+	if (_activeWorkerLog !== null && _workerTerminals[_activeWorkerLog]) {
+		try {
+			_workerTerminals[_activeWorkerLog].term.dispose();
+		} catch (_e) {
+			console.warn("xterm dispose for previous worker failed", _e);
+		}
+		delete _workerTerminals[_activeWorkerLog];
+		delete _lastWorkerTermIdx[_activeWorkerLog];
+	}
+
 	_activeWorkerLog = wid;
 	document.getElementById("workers-cards-view").style.display = "none";
 	document.getElementById("workers-log-view").style.display = "";
@@ -1040,8 +1225,7 @@ function escapeHtml(s) {
 	if (!s) return "";
 	const d = document.createElement("div");
 	d.textContent = String(s);
-	return d.innerHTML /* no-inner-html: reading SVG text content */
-		.replace(/'/g, "&#39;");
+	return d.innerHTML; /* no-inner-html: reading SVG text content */
 }
 function updateConnectionStatus(ok) {
 	document.querySelector("#connection-indicator .conn-dot").className =

@@ -29,25 +29,38 @@
 	--transition: 150ms ease;
 	--font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
 	--sidebar-w: 240px;
+	--radius-sm: 6px;
+	--radius: 8px;
+	--radius-lg: 12px;
+	--transition: 150ms ease;
+	--font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
 }
 
 @media (prefers-color-scheme: light) {
 	:root {
 		--bg-primary: #f5f5f9;
 		--bg-secondary: #ffffff;
-		--bg-tertiary: #eeeef4;
+		--bg-tertiary: #f0f0f6;
 		--bg-card: #ffffff;
 		--bg-hover: #eaeaf0;
 		--border: #d4d4de;
 		--border-light: #e0e0e8;
 		--fg-primary: #1a1a2e;
-		--fg-secondary: #555570;
+		--fg-secondary: #5a5a75;
 		--fg-muted: #808090;
 		--fg-dim: #b0b0c0;
 		--accent: #5b4cdb;
 		--accent-dim: #4338ca;
-		--accent-glow: rgba(91, 76, 219, 0.08);
-		--shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+		--accent-glow: rgba(91, 76, 219, 0.12);
+		--shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+		--success: #2e7d32;
+		--success-bg: rgba(46, 125, 50, 0.08);
+		--warning: #e65100;
+		--warning-bg: rgba(230, 81, 0, 0.08);
+		--danger: #c62828;
+		--danger-bg: rgba(198, 40, 40, 0.08);
+		--info: #1565c0;
+		--info-bg: rgba(21, 101, 192, 0.08);
 	}
 }
 
@@ -884,8 +897,23 @@ html {
 	.nav-icon {
 		width: auto;
 	}
+	/* Show sidebar footer on mobile — compact connection + theme (M-6) */
 	.sidebar-footer {
-		display: none;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 8px 4px;
+		font-size: 0;
+	}
+	.sidebar-footer .nav-btn {
+		width: 36px;
+		height: 36px;
+		padding: 0;
+		margin-bottom: 4px !important;
+	}
+	.sidebar-footer .connection-status {
+		font-size: 0;
+		gap: 4px;
 	}
 	#main-content {
 		padding: 16px;
@@ -1017,6 +1045,15 @@ html {
 	--accent: #5b4cdb;
 	--accent-dim: #4338ca;
 	--accent-glow: rgba(91, 76, 219, 0.12);
+	--shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	--success: #2e7d32;
+	--success-bg: rgba(46, 125, 50, 0.08);
+	--warning: #e65100;
+	--warning-bg: rgba(230, 81, 0, 0.08);
+	--danger: #c62828;
+	--danger-bg: rgba(198, 40, 40, 0.08);
+	--info: #1565c0;
+	--info-bg: rgba(21, 101, 192, 0.08);
 }
 
 /* Dark theme via data-theme attribute (two-way toggle) */
@@ -1043,13 +1080,6 @@ html {
 	--danger-bg: rgba(255, 23, 68, 0.08);
 	--info: #448aff;
 	--info-bg: rgba(68, 138, 255, 0.08);
-	--radius-sm: 6px;
-	--radius: 8px;
-	--radius-lg: 12px;
-	--shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-	--transition: 150ms ease;
-	--font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
-	--sidebar-w: 240px;
 }
 
 /* CLI Preview Copy Feedback */

@@ -232,29 +232,47 @@ def extract_json_from_output(stdout: str) -> dict | None:
 
     text = "\n".join(lines)
 
+    def _is_escaped_quote(pos: int) -> bool:
+        """Return True if the quote at *pos* is preceded by an odd number of backslashes."""
+        count = 0
+        i = pos - 1
+        while i >= 0 and text[i] == "\\":
+            count += 1
+            i -= 1
+        return count % 2 == 1
+
     # Strategy 1: Scan backwards looking for the LAST JSON object
     brace_depth = 0
     in_json = False
+    in_string = False
     json_chars: list[str] = []
-    for ch in reversed(text):
-        if ch == "}":
-            brace_depth += 1
-            in_json = True
-            json_chars.insert(0, ch)
-        elif ch == "{":
-            brace_depth -= 1
-            in_json = True
-            json_chars.insert(0, ch)
-            if brace_depth == 0:
-                candidate = "".join(json_chars)
-                try:
-                    return cast(dict, json.loads(candidate))
-                except json.JSONDecodeError:
-                    pass
-                in_json = False
-                json_chars = []
-                brace_depth = 0
-        elif in_json:
+    for i in range(len(text) - 1, -1, -1):
+        ch = text[i]
+
+        # Track whether we are inside a JSON string literal
+        if ch == '"' and not _is_escaped_quote(i):
+            in_string = not in_string
+
+        # Only count braces when outside a string
+        if not in_string:
+            if ch == "}":
+                brace_depth += 1
+                in_json = True
+            elif ch == "{":
+                brace_depth -= 1
+                in_json = True
+                if brace_depth == 0:
+                    candidate = "".join(json_chars)
+                    try:
+                        return cast(dict, json.loads(candidate))
+                    except json.JSONDecodeError:
+                        pass
+                    in_json = False
+                    json_chars = []
+                    brace_depth = 0
+
+        # Always collect characters that belong to the candidate JSON
+        if in_json:
             json_chars.insert(0, ch)
 
     # Strategy 2: Forward scan — find ALL JSON blocks, return last valid one
@@ -265,23 +283,28 @@ def extract_json_from_output(stdout: str) -> dict | None:
         if start < 0:
             break
         depth = 0
+        in_string = False
         j = start
         while j < len(text):
             ch = text[j]
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    candidate = text[start : j + 1]
-                    try:
-                        obj = json.loads(candidate)
-                        json_objects.append(obj)
-                        i = j + 1
-                        break
-                    except json.JSONDecodeError:
-                        i = j + 1
-                        break
+
+            if ch == '"' and not _is_escaped_quote(j):
+                in_string = not in_string
+            elif not in_string:
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        candidate = text[start : j + 1]
+                        try:
+                            obj = json.loads(candidate)
+                            json_objects.append(obj)
+                            i = j + 1
+                            break
+                        except json.JSONDecodeError:
+                            i = j + 1
+                            break
             j += 1
         else:
             i = start + 1

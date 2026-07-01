@@ -62,6 +62,8 @@ def _validate_on_error_cmd(cmd: str, allow_metachars: bool = False) -> tuple[boo
             "&": "ampersand (backgrounding)",
             "\n": "newline (multi-line command)",
             "\r": "carriage return",
+            ">": "output redirection",
+            "<": "input redirection",
         }
         for char, desc in dangerous.items():
             if char in cmd:

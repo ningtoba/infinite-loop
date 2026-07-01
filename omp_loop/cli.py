@@ -283,9 +283,9 @@ complete -F _omp_loop_completions omp-loop
 """)
     elif shell == "zsh":
         # Compute separator outside the f-string to avoid SyntaxError
-        # on Python <3.12 (backslash \ in f-string expression parts).
+        # on Python 3.10/3.11 (backslash \ in f-string expression parts).
         _zsh_sep = chr(92) + chr(10) + "        "
-        _zsh_flags = _zsh_sep.join(f"--{f}" for f in sorted(flag_names) if not f.startswith("--") and f != "--help")
+        _zsh_flags = _zsh_sep.join(f for f in sorted(flag_names) if f.startswith("--") and f != "--help")
         print(f"""#compdef omp-loop
 compdef _omp_loop omp-loop
 function _omp_loop() {{

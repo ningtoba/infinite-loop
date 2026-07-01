@@ -181,7 +181,7 @@ ruff==0.15.20
     # via omp-loop (pyproject.toml)
 safety==3.8.1
     # via omp-loop (pyproject.toml)
-safety-schemas==0.0.16
+safety-schemas==0.0.18
     # via safety
 shellingham==1.5.4
     # via typer

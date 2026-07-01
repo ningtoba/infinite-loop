@@ -52,7 +52,7 @@ dparse==0.6.4
     # via
     #   safety
     #   safety-schemas
-fastapi==0.138.1
+fastapi==0.139.0
     # via omp-loop (pyproject.toml)
 filelock==3.29.4
     # via

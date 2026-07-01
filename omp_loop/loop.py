@@ -87,6 +87,29 @@ def _request_shutdown() -> None:
     _shutdown_requested.set()
 
 
+def _kill_and_reap(proc: subprocess.Popen | None, log_func: Any, context: str = "") -> None:
+    """Kill a subprocess and reap its exit code.
+
+    Sends SIGKILL (via ``proc.kill()``) and waits up to 5 seconds for
+    the process to be reaped.  Logs a warning if the process survives
+    the signal (D-state / zombie).
+    """
+    if proc is None:
+        return
+    try:
+        proc.kill()
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        msg = f"[WARNING] Process {proc.pid} zombie after SIGKILL — possible D-state"
+        if context:
+            msg += f" ({context})"
+        log_func(msg) if log_func else None
+        # Retry kill + wait in case the process recovers from D-state
+        with suppress(Exception):
+            proc.kill()
+            proc.wait(timeout=3)
+
+
 def _execute_task(
     goal: str,
     context: str,
@@ -295,9 +318,7 @@ def _execute_task(
             _log(f"[RETRY] Attempt {attempts}/{max_attempts} timed out ({session_timeout}s)")
             # Kill the orphaned process to prevent zombie accumulation
             if proc is not None:
-                with suppress(Exception):
-                    proc.kill()
-                    proc.wait(timeout=5)
+                _kill_and_reap(proc, _log, f"Attempt {attempts}/{max_attempts} timed out")
                 # Join the stderr drain thread so its pipe reference is
                 # released before the next retry attempt allocates a new proc.
                 if _stderr_thread is not None:
@@ -318,9 +339,7 @@ def _execute_task(
             all_attempts_output.append(f"[Attempt {attempts}] {e}")
             # Kill any orphaned subprocess on unexpected errors
             if proc is not None:
-                with suppress(Exception):
-                    proc.kill()
-                    proc.wait(timeout=5)
+                _kill_and_reap(proc, _log, f"unexpected error: {str(e)[:80]}")
                 if _stderr_thread is not None:
                     _stderr_thread.join(timeout=5)
             if attempts < max_attempts:

@@ -6,7 +6,7 @@
 
 The architecture follows a **dual-process pattern**: a single-threaded synchronous daemon process manages the iteration loop (subprocess spawning, state persistence as JSON ledger, error recovery, heartbeat monitoring), while a separate async FastAPI process provides a REST API and SPA frontend for daemon control. State is shared via disk (JSON ledger and sentinel files), and the daemon supports ~70 CLI flags across 14 groups with multi-layer config precedence (CLI flags → JSON config file → env vars → .env file → defaults).
 
-The codebase has **26 test files (~861 tests)** but suffers from significant tech debt, including an incomplete LoopConfig refactor (71-parameter `run_loop` signature), untested modules, subprocess deadlock risks, and tight coupling between the web UI and daemon internals.
+The codebase has **27 test files (~670 tests)** with improved coverage on file watching and subprocess lifecycle, though significant tech debt remains including an incomplete LoopConfig refactor (71-parameter `run_loop` signature), untested modules, and tight coupling between the web UI and daemon internals.
 
 **Key priorities (critical):**
 
@@ -20,19 +20,19 @@ The codebase has **26 test files (~861 tests)** but suffers from significant tec
 | ID | Title | Category | Priority | Impact | Effort | Status |
 |---|---|---|---|---|---|---|
 | BACKLOG-1 | Fix subprocess pipe deadlock in `_execute_task` | bug | critical | high | small | completed |
-| BACKLOG-2 | Add timeout to `proc.communicate()` after kill in `_execute_task` | bug | high | high | small | pending |
-| BACKLOG-3 | Add synchronization between heartbeat killer thread and main loop | bug | high | high | small | pending |
+| BACKLOG-2 | Add timeout to `proc.communicate()` after kill in `_execute_task` | bug | high | high | small | completed |
+| BACKLOG-3 | Add synchronization between heartbeat killer thread and main loop | bug | high | high | small | dead-code |
 | BACKLOG-4 | Complete LoopConfig migration and remove 71-parameter `run_loop` signature | tech-debt | critical | high | large | pending |
 | BACKLOG-5 | Add TypedDict for ledger state across 15 consuming modules | architecture | high | high | large | pending |
 | BACKLOG-6 | Decouple `web_app` from `omp_loop` internal path constants | architecture | high | high | medium | pending |
 | BACKLOG-7 | Consolidate multi-layer config precedence into a single resolver | architecture | high | high | xlarge | pending |
 | BACKLOG-8 | Decompose `main()` in `cli.py` (~200 lines) | tech-debt | high | medium | medium | pending |
-| BACKLOG-9 | Block shell redirection characters in `on_error_cmd` validation | security | high | medium | small | pending |
+| BACKLOG-9 | Block shell redirection characters in `on_error_cmd` validation | security | high | medium | small | completed |
 | BACKLOG-10 | Add TypedDict for `_execute_task` return value | tech-debt | medium | medium | small | pending |
 | BACKLOG-11 | Add structural validation to `read_ledger` return value | tech-debt | medium | medium | small | pending |
-| BACKLOG-12 | Write unit tests for `FileWatcherTrigger` | test | high | high | medium | pending |
+| BACKLOG-12 | Write unit tests for `FileWatcherTrigger` | test | high | high | medium | completed |
 | BACKLOG-13 | Add subprocess integration test for `_execute_task` with `mock_pi.sh` | test | high | medium | medium | pending |
-| BACKLOG-14 | Fix heartbeat status to report 'interrupted' instead of 'alive' on shutdown | bug | medium | medium | small | pending |
+| BACKLOG-14 | Fix heartbeat status to report 'interrupted' instead of 'alive' on shutdown | bug | medium | medium | small | dead-code |
 | BACKLOG-15 | Use `X-Forwarded-For` for rate limiter client IP behind proxy | security | medium | medium | small | pending |
 | BACKLOG-16 | Replace f-string HTML dashboard with a proper template engine | tech-debt | medium | medium | medium | pending |
 | BACKLOG-17 | Add HTTPS enforcement and TLS verification for web API and callbacks | security | medium | medium | medium | pending |
@@ -72,18 +72,19 @@ The codebase has **26 test files (~861 tests)** but suffers from significant tec
 
 ---
 
-### BACKLOG-2 — Add timeout to `proc.communicate()` after kill in `_execute_task`
+### BACKLOG-2 — Add timeout to `proc.communicate()` after kill in `_execute_task` ✅
 
 - **Category:** bug
 - **Priority:** high
 - **Impact:** high
 - **Effort:** small
+- **Status:** completed
 
 After `proc.kill()`, `proc.communicate()` is called with no timeout. If the process refuses to die (zombie), this blocks the entire iteration loop forever. Add a timeout parameter so the daemon can escalate to SIGKILL on stubborn processes.
 
----
+**Resolution:** `proc.wait(timeout=5)` is now called after `proc.kill()` in all exception paths (TimeoutExpired, generic Exception). A `_kill_and_reap()` helper provides consistent SIGKILL → wait → fallback behavior. Verified by inspection and all 28 `test_loop.py` tests pass.
 
-### BACKLOG-3 — Add synchronization between heartbeat killer thread and main loop
+### BACKLOG-3 — Add synchronization between heartbeat killer thread and main loop ⚰️
 
 - **Category:** bug
 - **Priority:** high
@@ -204,15 +205,17 @@ The entire `file_watcher` module (`FileWatcherTrigger` class) has zero test cove
 
 ---
 
-### BACKLOG-14 — Fix heartbeat status to report 'interrupted' instead of 'alive' on shutdown
+### BACKLOG-14 — Fix heartbeat status to report 'interrupted' instead of 'alive' on shutdown ⚰️
 
 - **Category:** bug
 - **Priority:** medium
 - **Impact:** medium
 - **Effort:** small
+- **Status:** dead-code
 
 `_monitor_heartbeat` returns `{'status': 'alive'}` when `_shutdown_requested` event is set, which is misleading — the process didn't complete normally, it was externally interrupted. Return `'interrupted'` or `'terminated'` to distinguish clean completion from forced shutdown in the status reporting.
 
+**Note:** `_monitor_heartbeat` and `_run_heartbeat_monitor` are dead code — not imported or called by any production module. The only production usage from `heartbeat.py` is `_cleanup_stale_heartbeats()` (called once at startup in `cli.py`). The entire heartbeat monitoring/session-killing subsystem is orphaned. This item should be re-evaluated if/when the heartbeat monitor is reconnected to production logic.
 ---
 
 ### BACKLOG-15 — Use `X-Forwarded-For` for rate limiter client IP behind proxy
@@ -387,4 +390,35 @@ The ~150 hardcoded keywords in `TASK_PATTERNS` cannot be extended or overridden 
 - **Impact:** low
 - **Effort:** small
 
-There is no step-by-step guide for setting up a development environment. `CONTRIBUTING.md` exists but doesn't walk through virtualenv creation, dependency installation, or running tests. Add `REPROVISION.md` with exact setup commands and verify they work on a clean checkout.
+---
+
+### BACKLOG-31 — Heartbeat monitoring subsystem is dead code (needs removal or reconnection) ⚰️
+
+- **Category:** architecture
+- **Priority:** medium
+- **Impact:** medium
+- **Effort:** medium
+- **Status:** pending
+
+`omp_loop/heartbeat.py` defines `_monitor_heartbeat`, `_run_heartbeat_monitor`, `_kill_session`, `_read_heartbeat`, `_write_heartbeat_file`, `_heartbeat_age`, `_heartbeat_path`, and `_cleanup_heartbeat_file` — none of which are imported or called by any production module. The only production usage is `_cleanup_stale_heartbeats()` called once at CLI startup.
+
+This means:
+- The `--heartbeat-timeout` CLI flag is parsed and displayed in the startup banner but completely ignored by the loop logic.
+- The `heartbeat_timeout` field on `LoopConfig` is dead config — setting it has no effect.
+- ~170 lines of production code and ~86 lines of test code are pure dead weight.
+- The heartbeat self-healing feature (auto-kill hung sessions) is documented but non-functional.
+
+**Suggested approach:** Either (a) remove the dead functions and config option, keeping only `_cleanup_stale_heartbeats`, or (b) wire the heartbeat monitor into `run_loop()` to provide actual session self-healing.
+
+---
+
+### FR-001 — Current iteration (2026-07-01): Quality & test improvements
+
+**Completed in this iteration:**
+
+1. **Fixed 4 ruff diagnostics** in test files — removed unused variables and parameters (`F841`, `ARG002`). Verdict: clean.
+2. **Fixed zombie subprocess escalation** (`BACKLOG-2`) — extracted `_kill_and_reap()` helper in `_execute_task` that logs a warning if a process survives SIGKILL (D-state), and retries. Previously the timeout was silently swallowed by `suppress(Exception)`.
+3. **Added `FileWatcherTrigger` tests** (`BACKLOG-12`) — 15 tests covering initial scan, change detection, file creation/modification/deletion, single-file mode, empty directories, permission errors, and format_changed output. Also fixed `check_change()` and `format_changed()` to detect file deletions (previously only detected new/modified files).
+4. **Updated backlog** — marked 6 stale items as completed or dead-code: BACKLOG-2 (done), BACKLOG-3 (dead-code), BACKLOG-9 (done), BACKLOG-12 (done), BACKLOG-14 (dead-code). SEC-002, SEC-005, BUG-002 are also done but tracked in BACKLOG.md.
+
+**Key discovery:** The entire heartbeat monitoring/session-killing subsystem is dead code (BACKLOG-31). The `--heartbeat-timeout` config option is parsed and displayed but never acted upon.

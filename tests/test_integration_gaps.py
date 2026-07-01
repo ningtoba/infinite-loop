@@ -232,7 +232,7 @@ class TestCliMainDispatch:
 class TestCliContextFile:
     """CLI --context-file loading with real filesystem."""
 
-    def test_context_file_loaded(self, tmp_path, capsys):
+    def test_context_file_loaded(self, tmp_path):
         """--context-file loads content from disk."""
         from omp_loop import cli as cli_mod
 
@@ -281,7 +281,7 @@ class TestCliContextFile:
 class TestCliConfigFile:
     """CLI --config file loading."""
 
-    def test_config_file_loaded(self, tmp_path, capsys):
+    def test_config_file_loaded(self, tmp_path):
         """--config loads JSON from disk."""
         from omp_loop import cli as cli_mod
 
@@ -306,7 +306,7 @@ class TestCliConfigFile:
         ):
             cli_mod.main()
 
-    def test_corrupt_config_file_does_not_crash(self, tmp_path, capsys):
+    def test_corrupt_config_file_does_not_crash(self, tmp_path):
         """Corrupt --config file logs warning and continues."""
         from omp_loop import cli as cli_mod
 

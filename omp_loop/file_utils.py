@@ -197,7 +197,7 @@ def write_status_file(status_path: str, state: dict, iteration: int = 0, status:
 def check_sentinel(path: str) -> str | None:
     if path and os.path.exists(path):
         with open(path) as f:
-            content = f.read().strip()
+            content = f.read(1024).strip()
         os.remove(path)
         return content
     return None
@@ -207,7 +207,7 @@ def check_sentinel_no_remove(path: str) -> str | None:
     """Read sentinel without removing it. Used for pause/resume polling."""
     if path and os.path.exists(path):
         with open(path) as f:
-            content = f.read().strip()
+            content = f.read(1024).strip()
         return content
     return None
 

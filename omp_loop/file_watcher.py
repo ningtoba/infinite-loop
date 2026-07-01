@@ -37,9 +37,15 @@ class FileWatcherTrigger:
         if self._last_state is None:
             self._last_state = current
             return True  # Initial scan counts as a "change"
+        # Check for new or modified files
         for path, mtime in current.items():
             old = self._last_state.get(path)
             if old is None or abs(mtime - old) > 0.01:
+                self._last_state = current
+                return True
+        # Check for deleted files
+        for path in self._last_state:
+            if path not in current:
                 self._last_state = current
                 return True
         self._last_state = current
@@ -51,10 +57,15 @@ class FileWatcherTrigger:
         if self._last_state is None:
             return ""
         changed = []
+        # New or modified files
         for path, mtime in current.items():
             old = self._last_state.get(path)
             if old is None or abs(mtime - old) > 0.01:
                 changed.append(path)
+        # Deleted files
+        for path in self._last_state:
+            if path not in current:
+                changed.append(f"{path} (deleted)")
         self._last_state = current
         return ", ".join(changed[:10]) if changed else ""
 

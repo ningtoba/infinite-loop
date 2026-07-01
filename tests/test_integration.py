@@ -558,8 +558,7 @@ class TestErrorRecoveryCycle:
             use_library=False,
             workers=1,
         )
-        assert len(actions1) >= 1
-        level_after_1 = mitigations["mitigation_level"]
+        assert len(actions1) >= 1  # verify mitigation applied
 
         # 3rd success: full unwind
         _, _, _, _, _, actions3 = _adapt_to_error(
@@ -1075,7 +1074,7 @@ class TestLoopManagerRealPaths:
             _fu_mod.LEDGER_PATH = old_fu_path
             _lm_mod.LEDGER_PATH = old_lm_path
 
-    def test_get_status_with_real_paths(self, tmp_path):
+    def test_get_status_with_real_paths(self):
         """LoopManager.get_status works with real paths."""
         from web_app.loop_manager import LoopManager
 
@@ -1775,7 +1774,7 @@ class TestDaemonLogIntegration:
         assert "First message" in content
         assert "Second message" in content
 
-    def test_no_daemon_logger_does_not_crash(self, tmp_path):
+    def test_no_daemon_logger_does_not_crash(self):
         """_log works when _daemon_logger is None (no crash)."""
         import omp_loop.file_utils as _fu
         from omp_loop.file_utils import _log

@@ -57,7 +57,7 @@ lint-all:
 
 security:
 	bandit -r omp_loop/ web_app/ -f json -o bandit-report.json
-	safety check -r requirements.txt -r requirements-dev.txt --continue-on-error
+	safety scan --continue-on-error --file requirements.txt --file requirements-dev.txt
 
 test:
 	$(PYTHON) -m pytest tests/ -v --cov=omp_loop --cov=web_app --cov-report=term-missing

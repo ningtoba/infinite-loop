@@ -39,6 +39,7 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 # # SSE client tracking
 _sse_clients: list[asyncio.Queue] = []
 _sse_clients_lock = asyncio.Lock()
+_last_ledger_mtime: float = 0.0
 
 # Server start timestamp for uptime reporting
 _server_start_time: float = 0.0

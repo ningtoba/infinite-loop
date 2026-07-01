@@ -17,7 +17,6 @@ from omp_loop.file_utils import (
     extract_json_from_output,
     read_ledger,
     write_ledger,
-    write_status_file,
 )
 
 
@@ -124,7 +123,7 @@ class TestReadLedger:
     def test_reads_existing(self, tmp_path):
         """read_ledger reads an existing ledger file."""
         ledger_path = tmp_path / "ledger.json"
-        ledger_path.write_text(json.dumps({"status": "running"}))
+        ledger_path.write_text(json.dumps({"status": "running", "iterations": [], "stats": {}, "total_iterations": 0, "last_updated": "2024-01-01T00:00:00"}))
         with patch("omp_loop.file_utils.LEDGER_PATH", str(ledger_path)), patch("omp_loop.file_utils.FileLock"):
             data = read_ledger()
         assert data is not None
@@ -143,36 +142,6 @@ class TestReadLedger:
         with patch("omp_loop.file_utils.LEDGER_PATH", str(ledger_path)), patch("omp_loop.file_utils.FileLock"):
             data = read_ledger()
         assert data is None
-
-
-class TestWriteStatusFile:
-    def test_writes_file(self, tmp_path):
-        """write_status_file writes a JSON status line."""
-        status_path = str(tmp_path / "status.json")
-        state = {"total_iterations": 5, "stats": {"total_duration_seconds": 30.0}}
-        with patch("omp_loop.file_utils.os.getpid", return_value=12345):
-            write_status_file(status_path, state, iteration=3, status="running")
-        data = json.loads((tmp_path / "status.json").read_text())
-        assert data["pid"] == 12345
-        assert data["iteration"] == 3
-        assert data["status"] == "running"
-        assert data["total_iterations"] == 5
-
-    def test_empty_path_does_nothing(self):
-        """write_status_file with empty path does nothing."""
-        with patch("builtins.open") as mock_open:
-            write_status_file("", {}, iteration=0, status="running")
-        mock_open.assert_not_called()
-
-    def test_error_logged(self):
-        """write_status_file logs on OSError."""
-        with (
-            patch("omp_loop.file_utils._log") as mock_log,
-            patch("builtins.open", side_effect=OSError("permission denied")),
-        ):
-            write_status_file("/nonexistent/status.json", {}, iteration=0)
-        # Check an error was logged (at least one call about the failure)
-        assert mock_log.call_count > 0
 
 
 class TestCheckSentinel:

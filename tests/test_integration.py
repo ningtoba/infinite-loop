@@ -1647,7 +1647,7 @@ class TestFileLockIntegration:
         _cfg.LOCK_PATH = lock_path
 
         try:
-            state = {"status": "running", "iterations": [], "total_iterations": 0}
+            state = {"status": "running", "iterations": [], "stats": {}, "total_iterations": 0, "last_updated": "2024-01-01T00:00:00"}
             write_ledger(state)
             assert tmp_path.joinpath("ledger.json").exists()
 
@@ -1685,7 +1685,7 @@ class TestFileLockIntegration:
         from omp_loop.file_utils import FileLock
 
         # Pre-write initial state so threads only need to append
-        write_ledger({"status": "running", "iterations": [], "total_iterations": 0})
+        write_ledger({"status": "running", "iterations": [], "stats": {}, "total_iterations": 0, "last_updated": "2024-01-01T00:00:00"})
 
         errors = []
 
@@ -1695,7 +1695,7 @@ class TestFileLockIntegration:
                 with FileLock():
                     import json
 
-                    data = {"status": "running", "iterations": [], "total_iterations": 0}
+                    data = {"status": "running", "iterations": [], "stats": {}, "total_iterations": 0, "last_updated": "2024-01-01T00:00:00"}
                     try:
                         with open(ledger_path) as f:
                             data = json.load(f)

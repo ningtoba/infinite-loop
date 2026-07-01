@@ -13,11 +13,25 @@ _max_output_chars_global = 2000  # default, overridden at runtime
 
 
 def set_max_output_chars(val: int) -> None:
+    """Set the maximum output characters for task execution.
+
+    Controls the module-level global ``_max_output_chars_global`` (default: 2000).
+    This value is used throughout the loop to truncate task output, preventing
+    unbounded token usage from excessively long responses.
+
+    Args:
+        val: Maximum number of characters to retain from task output.
+    """
     global _max_output_chars_global
     _max_output_chars_global = val
 
 
 def get_max_output_chars() -> int:
+    """Get the current maximum output character limit.
+
+    Returns the value of the module-level global ``_max_output_chars_global``
+    (default: 2000), which caps output length from task execution.
+    """
     return _max_output_chars_global
 
 

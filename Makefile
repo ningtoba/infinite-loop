@@ -1,4 +1,4 @@
-.PHONY: install install-dev lint format test test-ci test-simple lint-all mypy security pre-commit pre-commit-run clean help web web-dev update-lock verify-lock
+.PHONY: install install-dev lint format test test-ci test-simple lint-all mypy security check pre-commit pre-commit-run clean help web web-dev update-lock verify-lock
 
 PYTHON := $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
 
@@ -15,6 +15,7 @@ help:
 	@echo "  lint          Run ruff check on omp_loop/ and web_app/"
 	@echo "  format        Run ruff format (in-place) on omp_loop/ and web_app/"
 	@echo "  lint-all      Full CI check: lint + format check (no write)"
+	@echo "  check         Run lint -> mypy -> test -> security (stops on first failure)"
 	@echo "  security      Run security scanning (bandit + safety)"
 	@echo "  test          Run tests with pytest (verbose + coverage)"
 	@echo "  test-simple   Run tests with pytest only - no coverage"
@@ -43,6 +44,12 @@ verify-lock:
 	cmp requirements.txt /tmp/omp-loop-reqs.txt || { echo "LOCK OUTDATED: re-run 'make update-lock'"; exit 1; }
 	cmp requirements-dev.txt /tmp/omp-loop-reqs-dev.txt || { echo "LOCK OUTDATED: re-run 'make update-lock'"; exit 1; }
 	rm -f /tmp/omp-loop-reqs.txt /tmp/omp-loop-reqs-dev.txt
+
+check:
+	$(MAKE) lint
+	$(MAKE) mypy
+	$(MAKE) test-simple
+	$(MAKE) security
 
 lint:
 	ruff check omp_loop/ web_app/

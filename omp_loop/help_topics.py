@@ -249,7 +249,7 @@ def _run_healthcheck() -> None:
     )
 
     # 4. Ledger I/O
-    test_data = {"healthcheck": True, "timestamp": ts}
+    test_data = {"status": "running", "iterations": [], "stats": {}, "total_iterations": 0, "last_updated": ts, "healthcheck": True, "timestamp": ts}
     write_ledger(test_data)
     ledger_read = read_ledger()
     ledger_ok = ledger_read is not None and ledger_read.get("healthcheck")

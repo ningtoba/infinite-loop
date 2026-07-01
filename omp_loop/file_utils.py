@@ -5,10 +5,11 @@ import json
 import logging
 import logging.handlers
 import os
+import random
 import re
 import time
 from datetime import datetime, timezone
-from typing import cast
+from typing import TypedDict, cast
 
 from .color_utils import colorizer as _cu
 from .config import LEDGER_PATH, LOCK_PATH, LOG_DATE_FORMAT, LOG_FORMAT
@@ -44,7 +45,7 @@ class FileLock:
                 if remaining <= 0:
                     os.close(fd)
                     raise TimeoutError(f"Could not acquire lock on {self.path} within {self.timeout}s") from None
-                time.sleep(min(delay, remaining))
+                time.sleep(min(delay, remaining) * random.uniform(0.8, 1.2))
                 delay = min(delay * 2, max_delay)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -143,6 +144,15 @@ def _init_daemon_log(log_file: str, max_mb: int = 10) -> logging.Logger:
 # ---------------------------------------------------------------------------
 
 
+class LedgerState(TypedDict, total=False):
+    """Schema for the ledger JSON file persisted to disk."""
+    status: str
+    iterations: list
+    stats: dict
+    total_iterations: int
+    last_updated: str
+
+
 def write_ledger(state: dict) -> None:
     os.makedirs(os.path.dirname(LEDGER_PATH), exist_ok=True)
     tmp_path = LEDGER_PATH + ".tmp"
@@ -151,42 +161,29 @@ def write_ledger(state: dict) -> None:
             json.dump(state, f, indent=2, default=str)
         os.replace(tmp_path, LEDGER_PATH)
 
-
 def read_ledger() -> dict | None:
+    """Read and validate the ledger JSON file.
+
+    Returns the ledger dict on success, or None if the file is missing,
+    contains invalid JSON, or fails structural validation.
+    """
     if not os.path.exists(LEDGER_PATH):
         return None
     try:
         with FileLock(), open(LEDGER_PATH) as f:
-            return cast(dict, json.load(f))
+            data = cast(dict, json.load(f))
     except (json.JSONDecodeError, FileNotFoundError, TimeoutError):
         return None
 
+    # Structural validation: ensure required keys exist
+    required_keys = {"status", "iterations", "stats", "total_iterations", "last_updated"}
+    if not required_keys.issubset(data):
+        missing = required_keys - set(data)
+        _log(f"[LEDGER] WARN: ledger missing required keys: {missing}", level="WARNING")
+        return None
 
-# ---------------------------------------------------------------------------
-# Status file
-# ---------------------------------------------------------------------------
+    return data
 
-
-def write_status_file(status_path: str, state: dict, iteration: int = 0, status: str = "running") -> None:
-    """Write a lightweight one-line status file for external monitoring."""
-    if not status_path:
-        return
-    try:
-        os.makedirs(os.path.dirname(status_path) or ".", exist_ok=True)
-        line = json.dumps(
-            {
-                "pid": os.getpid(),
-                "iteration": iteration,
-                "status": status,
-                "total_iterations": state.get("total_iterations", 0),
-                "total_duration_seconds": state.get("stats", {}).get("total_duration_seconds", 0),
-                "last_updated": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-        with open(status_path, "w") as f:
-            f.write(line + "\n")
-    except OSError as e:
-        _log(f"[STATUS] Failed to write status file {status_path}: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -241,39 +238,6 @@ def extract_json_from_output(stdout: str) -> dict | None:
             i -= 1
         return count % 2 == 1
 
-    # Strategy 1: Scan backwards looking for the LAST JSON object
-    brace_depth = 0
-    in_json = False
-    in_string = False
-    json_chars: list[str] = []
-    for i in range(len(text) - 1, -1, -1):
-        ch = text[i]
-
-        # Track whether we are inside a JSON string literal
-        if ch == '"' and not _is_escaped_quote(i):
-            in_string = not in_string
-
-        # Only count braces when outside a string
-        if not in_string:
-            if ch == "}":
-                brace_depth += 1
-                in_json = True
-            elif ch == "{":
-                brace_depth -= 1
-                in_json = True
-                if brace_depth == 0:
-                    candidate = "".join(json_chars)
-                    try:
-                        return cast(dict, json.loads(candidate))
-                    except json.JSONDecodeError:
-                        pass
-                    in_json = False
-                    json_chars = []
-                    brace_depth = 0
-
-        # Always collect characters that belong to the candidate JSON
-        if in_json:
-            json_chars.insert(0, ch)
 
     # Strategy 2: Forward scan — find ALL JSON blocks, return last valid one
     json_objects = []

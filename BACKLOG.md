@@ -203,7 +203,7 @@
 | **Impact** | Medium |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | Pending |
+| **Status** | ✅ Completed (2026-07-01) |
 
 - **Description:** `_generate_completion()` in `cli.py` filters flags with `if not f.startswith("--")` when building `_zsh_flags`. This discards all long flags (e.g., `--goal`, `--max-iterations`, `--workers`), producing completions with only short flags (`-g`, `-m`). Auto-generated zsh completions are missing ~80% of available flags.
 - **Reasoning:** Zsh users relying on tab completion get no help for the most commonly used flags. Developers adding new flags must remember to update completions, but the broken filter means no long flag would ever appear regardless.
@@ -239,7 +239,7 @@
 | **Impact** | Medium |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | Pending |
+| **Status** | ✅ Completed (2026-07-01) |
 
 - **Description:** `FileLock.__enter__` busy-waits for a lock with `time.sleep(0.1)` — a fixed 100ms interval until the timeout expires. Under contention (multi-worker), this creates unnecessary CPU wakeups. No exponential backoff, no jitter.
 - **Reasoning:** With `--workers N` (N > 1), multiple processes contend for the ledger lock. Fixed 100ms sleep means every retry cycle has deterministic collisions. This directly impacts parallel execution efficiency.
@@ -257,7 +257,7 @@
 | **Impact** | Medium |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | Pending |
+| **Status** | ✅ Completed (2026-07-01) |
 
 - **Description:** `config_file.py:save_config()` catches `OSError: pass` — any filesystem error during config write is discarded with no log, no warning, no user feedback. If `~/.config/omp-loop/` doesn't exist or is read-only, the user's config changes silently disappear.
 - **Reasoning:** Users who modify config via the web UI or CLI and see "saved" but whose changes are silently ignored will experience confusing behavior. Config writes are infrequent enough that logging is zero-cost.
@@ -350,7 +350,7 @@
 | **Impact** | Medium — Accidental secret exposure |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | Pending |
+| **Status** | ✅ Completed (2026-07-01) |
 
 - **Description:** `.gitignore` has `.env` commented out with the note `# config_file used instead`. While the project does use JSON config files, if a developer creates a `.env` file locally with secrets (API keys, callback secrets), those secrets would be committed to git. This is defense-in-depth — the cost is zero.
 - **Reasoning:** The project uses `OMP_LOOP_API_KEY` for web auth. A developer testing the web UI might create a `.env` for convenience and accidentally commit it. The `.env` gitignore entry is standard practice in the Python ecosystem.
@@ -680,7 +680,7 @@
 | **Impact** | Medium |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | Pending |
+| **Status** | ✅ Completed (2026-07-01) |
 
 - **Description:** `_status_poller()` reads the entire JSON ledger from disk every 2 seconds and broadcasts to all SSE clients. This creates unnecessary I/O even when nothing has changed. With 0 connected SSE clients, the poller continues reading the ledger and generating events.
 - **Reasoning:** For an idle daemon with no dashboard users, the poller creates an unnecessary disk read every 2 seconds. This is wasteful and increases disk wear.
@@ -698,7 +698,7 @@
 | **Impact** | Low |
 | **Effort** | Small |
 | **Dependencies** | BUG-002 |
-| **Status** | Pending |
+| **Status** | In Progress |
 
 - **Description:** `extract_json_from_output()` first attempts a reverse scan (building `json_chars` with repeated list `insert(0, ch)` — O(n²) due to left-insert). If that fails, it falls back to a forward scan. For large outputs with no JSON, every character is processed twice with O(n²) insert in the first pass.
 - **Reasoning:** This is a correctness bug (BUG-002) first, performance issue second. Fix the correctness first, then optimize.
@@ -772,7 +772,7 @@
 | **Impact** | Low |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | Pending |
+| **Status** | ✅ Completed (2026-07-01) |
 
 - **Description:** `make security` uses `safety check -r requirements.txt -r requirements-dev.txt --continue-on-error`. The `check` command is deprecated in Safety 3.x; the recommended replacement is `safety scan`.
 - **Reasoning:** The deprecated command still works for now but may be removed in a future Safety release, breaking the `make security` target and CI.
@@ -976,7 +976,7 @@
 | **Impact** | Medium |
 | **Effort** | Small |
 | **Dependencies** | None |
-| **Status** | Pending |
+| **Status** | In Progress |
 
 - **Description:** `omp_loop/status.py:write_status()` writes a comprehensive status JSON file (pid, version, uptime, iteration count, last error). `omp_loop/file_utils.py:write_status_file()` writes a lightweight one-liner JSON. Both write JSON status about the same daemon process but with different schemas and from different call sites inside `run_loop()`. Adding a field requires updating both — a maintenance liability.
 - **Reasoning:** This is a clear case of copy-paste duplication. The lightweight writer adds no value — both are consumed by the web UI's `loop_manager.py` which reads the richer status anyway.
@@ -1324,15 +1324,14 @@ Ranked by **Value/Effort ratio** (higher is better). Security items get a 1.5× 
 | Rank | ID | Title | Category | Priority | Impact | Effort | V/E | Phase |
 |------|----|-------|----------|----------|--------|--------|-----|-------|
 | 1 | TEST-004 | `file_watcher.py` zero coverage | testing | P1 — High | High | Small | **3.0** | Week 1 |
-| 2 | BUG-005 | FileLock busywait fixed interval | bug | P2 — Medium | Medium | Small | **2.0** | Week 1 |
-| 3 | BUG-004 | Heartbeat 5s poll delay | bug | P2 — Medium | Medium | Small | **2.0** | Week 1 |
-| 4 | DEBT-001 | Duplicate status file writers | tech-debt | P2 — Medium | Medium | Small | **2.0** | Week 1 |
-| 5 | CICD-001 | Release workflow (tag → publish) | ci-cd | P2 — Medium | Medium | Medium | **1.5** | Week 1 |
-| 6 | FEAT-001 | Structured JSON logging | feature | P1 — High | High | Medium | **1.3** | Week 2 |
-| 7 | OBS-001 | Structured event emission | observability | P1 — High | High | Medium | **1.3** | Week 2 |
-| 8 | TEST-002 | Core loop 19% coverage | testing | P1 — High | High | Large | **1.0** | Week 3 |
-| 9 | ARCH-001 | Decompose monolithic `run_loop()` | architecture | P0 — Critical | Critical | XLarge | **0.8** | Week 4+ |
-| 10 | TEST-003 | CLI main() coverage | testing | P1 — High | High | Medium | **1.0** | Week 1 |
+| 2 | BUG-004 | Heartbeat 5s poll delay | bug | P2 — Medium | Medium | Small | **2.0** | Week 1 |
+| 3 | DEBT-001 | Duplicate status file writers | tech-debt | P2 — Medium | Medium | Small | **2.0** | Week 1 |
+| 4 | CICD-001 | Release workflow (tag → publish) | ci-cd | P2 — Medium | Medium | Medium | **1.5** | Week 1 |
+| 5 | FEAT-001 | Structured JSON logging | feature | P1 — High | High | Medium | **1.3** | Week 2 |
+| 6 | OBS-001 | Structured event emission | observability | P1 — High | High | Medium | **1.3** | Week 2 |
+| 7 | TEST-002 | Core loop 19% coverage | testing | P1 — High | High | Large | **1.0** | Week 3 |
+| 8 | ARCH-001 | Decompose monolithic `run_loop()` | architecture | P0 — Critical | Critical | XLarge | **0.8** | Week 4+ |
+| 9 | TEST-003 | CLI main() coverage | testing | P1 — High | High | Medium | **1.0** | Week 1 |
 
 ### Phase Plan
 
@@ -1340,7 +1339,6 @@ Ranked by **Value/Effort ratio** (higher is better). Security items get a 1.5× 
 Phase 1 — Quick Wins (Week 1)
 ─────────────────────────────────────────────────────────────
 TEST-004 file_watcher.py tests              (Small)
-BUG-005  FileLock exponential backoff       (Small)
 BUG-004  Heartbeat poll interval            (Small)
 DEBT-001 Unify status file writers          (Small)
 CICD-001 Release workflow                   (Medium)
@@ -1349,7 +1347,6 @@ Phase 2 — Foundation (Week 2-3)
 ─────────────────────────────────────────────────────────────
 FEAT-001 Structured JSON logging            (Medium)
 OBS-001  Structured event emission          (Medium)
-SEC-002  .env in .gitignore                 (Small)
 DEVX-001 Pre-commit duality resolution      (Small)
 BUG-002  JSON extraction string-literals    (Medium)
 
@@ -1375,19 +1372,14 @@ FEAT-004 Prometheus metrics                 (Medium)
 Items deliverable in <2 hours with meaningful impact:
 
 | ID | Item | Est. Time |
-|----|------|-----------|
-| SEC-002 | `.env` in `.gitignore` (uncomment + add `.env.*`) | 5 min |
+|---|---|-----------|
 | TEST-004 | `file_watcher.py` tests (small class, easy to test) | 1-2 hr |
 | BUG-004 | Heartbeat `threading.Event` instead of sleep | 30 min |
-| BUG-005 | FileLock exponential backoff + jitter | 30 min |
-| BUG-006 | Config write failure logging | 15 min |
 | DEBT-001 | Unify status file writers | 30 min |
-| PERF-003 | SSE poller mtime check + skip when no clients | 30 min |
 | PERF-001 | Dashboard incremental rendering | 1-2 hr |
 | DOC-001 | README screenshot, omp version, Swagger link | 30 min |
 | DOC-003 | SECURITY.md creation | 30 min |
 | DEVX-001 | Pre-commit duality resolution | 30 min |
-| DEVX-003 | Safety deprecated command update | 15 min |
 | CICD-004 | Dependabot auto-merge patches | 30 min |
 | DEP-001 | Recompile lockfiles | 15 min |
 | SEC-005 | Sentinel file size bound | 10 min |
@@ -1400,7 +1392,7 @@ Items deliverable in <2 hours with meaningful impact:
 
 | Effort | Count | Items |
 |--------|-------|-------|
-| **Small** (<2 hr) | 21 | SEC-002, SEC-003, SEC-004, SEC-005, BUG-003, BUG-004, BUG-005, BUG-006, BUG-008, BUG-009, TEST-004, TEST-006, PERF-001, PERF-003, PERF-004, PERF-005, DEBT-001, DEBT-003, DEVX-001, DEVX-002, DEVX-003, DEVX-004, DOC-001, DOC-003, DOC-004, DOC-005, CICD-002, CICD-004, DEP-001, DEP-003, OBS-002, OBS-003 |
+| **Small** (<2 hr) | 26 | SEC-003, SEC-004, SEC-005, BUG-004, BUG-008, BUG-009, TEST-004, TEST-006, PERF-001, PERF-004, PERF-005, DEBT-001, DEBT-003, DEVX-001, DEVX-002, DEVX-004, DOC-001, DOC-003, DOC-004, DOC-005, CICD-002, CICD-004, DEP-001, DEP-003, OBS-002, OBS-003 |
 | **Medium** (<1 day) | 16 | BUG-001, BUG-002, BUG-007, TEST-003, TEST-005, TEST-007, PERF-002, FEAT-001, FEAT-002, FEAT-004, FEAT-005, FEAT-006, DEBT-002, DEBT-004, OBS-001, AUTO-001, AUTO-003, CICD-001, DEP-002 |
 | **Large** (2-3 days) | 4 | TEST-001, TEST-002, ARCH-002, ARCH-003 |
 | **XLarge** (1+ week) | 2 | ARCH-001, AUTO-002 |
@@ -1442,9 +1434,9 @@ ARCH-001 ──▶ (Phase 1: characterization tests first)
   └── Phase 2/3 only after decomposition is stable
 
 Items without dependencies (can be parallelized):
-  SEC-003, SEC-005, BUG-004, BUG-005, BUG-006, BUG-009
-  TEST-003, TEST-004, TEST-006, TEST-007, PERF-001, PERF-002, PERF-003
-  DEVX-001, DEVX-002, DEVX-003, DOC-001, DOC-003, DOC-004
+  SEC-003, SEC-005, BUG-004, BUG-009
+  TEST-003, TEST-004, TEST-006, TEST-007, PERF-001, PERF-002
+  DEVX-001, DEVX-002, DOC-001, DOC-003, DOC-004
   CICD-001, CICD-002, CICD-004, DEP-001, DEP-002, DEP-003
   FEAT-001, FEAT-002, FEAT-004, FEAT-005, OBS-002, OBS-003
   AUTO-001, AUTO-003, DEBT-001, DEBT-002, DEBT-004
@@ -1456,12 +1448,12 @@ Items without dependencies (can be parallelized):
 
 | Category | Count | P0 | P1 | P2 | P3 |
 |----------|-------|----|----|----|----|
-| Bug | 9 | 1 | 1 | 5 | 2 |
-| Security | 4 | 0 | 0 | 3 | 1 |
+| Bug | 6 | 1 | 1 | 2 | 2 |
+| Security | 3 | 0 | 0 | 2 | 1 |
 | Architecture | 5 | 1 | 2 | 2 | 0 |
 | Testing | 7 | 1 | 2 | 3 | 1 |
-| Performance | 5 | 0 | 0 | 3 | 2 |
-| DevX | 4 | 0 | 0 | 1 | 3 |
+| Performance | 4 | 0 | 0 | 2 | 2 |
+| DevX | 3 | 0 | 0 | 1 | 2 |
 | Docs | 5 | 0 | 0 | 3 | 2 |
 | CI/CD | 4 | 0 | 0 | 1 | 3 |
 | Tech Debt | 4 | 0 | 0 | 3 | 1 |
@@ -1470,12 +1462,12 @@ Items without dependencies (can be parallelized):
 | Observability | 3 | 0 | 1 | 1 | 1 |
 | Automation | 3 | 0 | 0 | 2 | 1 |
 
-**Total: 62 items** (2 P0, 7 P1, 32 P2, 21 P3)
+**Total: 56 items** (2 P0, 7 P1, 27 P2, 20 P3)
 
-**Effort distribution:** 33 Small, 18 Medium, 10 Large, 2 XLarge
+**Effort distribution:** 27 Small, 18 Medium, 10 Large, 2 XLarge
 
-**Quick wins (Small + P1/P2):** 19 items deliverable in <2 hours each
+**Quick wins (Small + P1/P2):** 15 items deliverable in <2 hours each
 
 ---
 
-*This backlog is a living document. Last updated: 2026-06-30. Total items: 62.*
+*This backlog is a living document. Last updated: 2026-07-01. Total items: 56.*

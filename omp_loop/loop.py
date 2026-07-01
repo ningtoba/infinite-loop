@@ -27,7 +27,7 @@ from .config import VERSION, LoopConfig, _get_data_dir
 from .error_recovery import _adapt_to_error, _set_originals
 from .error_utils import _suggest_actionable_fix
 from .events import emit_event
-from .file_utils import _log, write_ledger, write_status_file
+from .file_utils import _log, write_ledger
 from .functions import (
     _build_progressive_context,
     _cycle_goal,
@@ -451,24 +451,22 @@ def _shutdown(
     git: bool = False,
     workers: int = 1,
     last_error: str | None = None,
-    write_status_file_entry: bool = True,
 ) -> None:
     """Unified shutdown sequence — set status, persist state, print summary."""
     state["status"] = stop_reason
     state["last_updated"] = datetime.now(timezone.utc).isoformat()
     write_ledger(state)
-    write_status_file(status_file, state, iteration_count, stop_reason)
-    if write_status_file_entry:
-        from typing import Any
 
-        kwargs: dict[str, Any] = {
-            "running": False,
-            "iteration_count": iteration_count,
-            "version": VERSION,
-        }
-        if last_error is not None:
-            kwargs["last_error"] = last_error
-        _write_status_file(status_file, **kwargs)
+    from typing import Any
+
+    kwargs: dict[str, Any] = {
+        "running": False,
+        "iteration_count": iteration_count,
+        "version": VERSION,
+    }
+    if last_error is not None:
+        kwargs["last_error"] = last_error
+    _write_status_file(status_file, **kwargs)
     emit_event(
         "shutdown",
         reason=stop_reason,
@@ -707,9 +705,7 @@ def run_loop(
                     goal=goal,
                     git=git,
                     workers=workers,
-                    write_status_file_entry=False,
                 )
-                return
         else:
             # Prefer evolved goal if one exists (consumed with pop to avoid stale reuse)
             if evolve and "evolved_goal" in state:

@@ -1174,7 +1174,7 @@ class TestShutdownExtended:
     """Extended _shutdown tests beyond test_integration.py."""
 
     def test_shutdown_without_status_file_entry(self, tmp_path):
-        """_shutdown with write_status_file_entry=False."""
+        """_shutdown always writes status file now (unified writer)."""
         from omp_loop.file_utils import write_ledger
         from omp_loop.loop import _shutdown
 
@@ -1186,10 +1186,8 @@ class TestShutdownExtended:
             iteration_count=0,
             status_file=str(tmp_path / "status.json"),
             stop_reason="stopped: test",
-            write_status_file_entry=False,
         )
         assert state["status"] == "stopped: test"
-
     def test_shutdown_with_last_error(self, tmp_path):
         """_shutdown includes last_error in status file."""
         from omp_loop.loop import _shutdown

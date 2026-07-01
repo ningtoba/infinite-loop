@@ -4,14 +4,16 @@
 
 **omp-loop** is a Python daemon that wraps the `omp` coding agent to automate goal-driven iteration loops for coding sessions. The tech stack is Python 3.10+ with argparse for CLI entry, FastAPI/uvicorn for the web management UI, pytest for testing, and ruff/mypy/bandit for quality tooling.
 
-The architecture follows a **dual-process pattern**: a single-threaded synchronous daemon process manages the iteration loop (subprocess spawning, state persistence as JSON ledger, error recovery, heartbeat monitoring), while a separate async FastAPI process provides a REST API and SPA frontend for daemon control. State is shared via disk (JSON ledger and sentinel files), and the daemon supports ~70 CLI flags across 14 groups with multi-layer config precedence (CLI flags → JSON config file → env vars → .env file → defaults).
+The architecture follows a **dual-process pattern**: a single-threaded synchronous daemon process manages the iteration loop (subprocess spawning, state persistence as JSON ledger, error recovery), while a separate async FastAPI process provides a REST API and SPA frontend for daemon control. State is shared via disk (JSON ledger and sentinel files), and the daemon supports ~70 CLI flags across 14 groups with multi-layer config precedence (CLI flags → JSON config file → env vars → .env file → defaults).
 
-The codebase has **22 test files (~695 tests)** with improved coverage on file watching, env value decoding, and JSON extraction. The dead heartbeat monitoring subsystem (~170 lines) has been removed, and `_execute_task` returns a typed `TaskResult` dict. Significant tech debt remains including an incomplete LoopConfig refactor (71-parameter `run_loop` signature) and tight coupling between the web UI and daemon internals.
+The codebase has **415 unit tests and 293 integration tests** across 28 test files with improved coverage on file watching, env value decoding, JSON extraction, and ledger validation. Ruff is 0 issues. Significant tech debt remains including BACKLOG-4 (LoopConfig migration), BACKLOG-6 (web_app decoupling), and ARCH-001 (run_loop decomposition).
 
-**Key priorities (critical):**
+**Top priorities:**
 
-- **BACKLOG-1** — Subprocess pipe deadlock in `_execute_task` (blocking bug)
-- **BACKLOG-4** — Complete LoopConfig migration (largest source of tech debt)
+- **BACKLOG-4** — Complete LoopConfig migration (largest source of tech debt, critical)
+- **BACKLOG-6** — Decouple web_app from omp_loop internal path constants (high, medium)
+- **ARCH-001** — Decompose monolithic `run_loop()` (critical, xlarge)
+
 
 ---
 
@@ -29,7 +31,7 @@ The codebase has **22 test files (~695 tests)** with improved coverage on file w
 | BACKLOG-8 | Decompose `main()` in `cli.py` (~200 lines) | tech-debt | high | medium | medium | pending |
 | BACKLOG-9 | Block shell redirection characters in `on_error_cmd` validation | security | high | medium | small | completed |
 | BACKLOG-10 | Add TypedDict for `_execute_task` return value | tech-debt | medium | medium | small | completed |
-| BACKLOG-11 | Add structural validation to `read_ledger` return value | tech-debt | medium | medium | small | pending |
+| BACKLOG-11 | Add structural validation to `read_ledger` return value | tech-debt | medium | medium | small | completed |
 | BACKLOG-12 | Write unit tests for `FileWatcherTrigger` | test | high | high | medium | completed |
 | BACKLOG-13 | Add subprocess integration test for `_execute_task` with `mock_pi.sh` | test | high | medium | medium | pending |
 | BACKLOG-14 | Fix heartbeat status to report 'interrupted' instead of 'alive' on shutdown | bug | medium | medium | small | dead-code |
@@ -45,7 +47,7 @@ The codebase has **22 test files (~695 tests)** with improved coverage on file w
 | BACKLOG-24 | Add module docstrings and high-level architecture documentation | documentation | high | medium | medium | pending |
 | BACKLOG-25 | Make `TASK_PATTERNS` extensible without editing source code | feature | medium | low | medium | pending |
 | BACKLOG-26 | Differentiate `FileLock` TimeoutError from 'no ledger exists' | bug | medium | medium | small | pending |
-| BACKLOG-27 | Optimize `extract_json_from_output` to single-pass scan | performance | low | low | small | pending |
+| BACKLOG-27 | Optimize `extract_json_from_output` to single-pass scan | performance | low | low | small | completed |
 | BACKLOG-28 | Fix config drift between `env_utils.KNOWN_ENV_VARS` and `config_file.DEFAULTS` | bug | medium | low | small | pending |
 | BACKLOG-29 | Fix `FileWatcherTrigger._scan` symlink loop and permission skip issues | bug | low | medium | small | pending |
 | BACKLOG-30 | Create REPROVISION.md with dev environment setup steps | documentation | low | low | small | pending |
@@ -184,16 +186,17 @@ Config resolution is spread across 4+ modules (`cli.py`, `config.py`, `config_fi
 
 ---
 
-### BACKLOG-11 — Add structural validation to `read_ledger` return value
+### BACKLOG-11 — Add structural validation to `read_ledger` return value ✅
 
 - **Category:** tech-debt
 - **Priority:** medium
 - **Impact:** medium
 - **Effort:** small
+- **Status:** completed
 
-`read_ledger()` returns `dict | None` with no structural validation of the loaded JSON shape, so callers risk `KeyError` on malformed ledger files. Use the ledger TypedDict (from BACKLOG-5) or a lightweight schema validator to catch corruption at load time.
+**Resolution:** Added `LedgerState` TypedDict defining the ledger schema (`status`, `iterations`, `stats`, `total_iterations`, `last_updated`). `read_ledger()` now validates required keys at load time, logs a WARNING and returns `None` on structural validation failure. All 34 `test_file_utils.py` tests pass.
 
----
+**Files changed:** `omp_loop/file_utils.py` — added `LedgerState` TypedDict, structural key validation in `read_ledger()`.
 
 ### BACKLOG-12 — Write unit tests for `FileWatcherTrigger`
 
@@ -377,16 +380,17 @@ The ~150 hardcoded keywords in `TASK_PATTERNS` cannot be extended or overridden 
 
 ---
 
-### BACKLOG-27 — Optimize `extract_json_from_output` to single-pass scan
+### BACKLOG-27 — Optimize `extract_json_from_output` to single-pass scan ✅
 
 - **Category:** performance
 - **Priority:** low
 - **Impact:** low
 - **Effort:** small
+- **Status:** completed
 
-`extract_json_from_output` runs two full scans (reverse and forward) on the entire output text — O(n²) worst case for large omp outputs. Change to a single-pass brace-depth counting algorithm that finds JSON in one forward scan.
+**Resolution:** Removed the O(n²) reverse scan (`list.insert(0, ch)`) entirely. The function now uses only a single forward scan with stack-based brace tracking and string-literal awareness. All 17 `TestExtractJsonFromOutput` tests pass, covering braces in string values, nested JSON, malformed JSON, empty output, and edge cases.
 
----
+**Files changed:** `omp_loop/file_utils.py` — removed reverse scan strategy, kept forward scan with `_is_escaped_quote` helper.
 
 ### BACKLOG-28 — Fix config drift between `env_utils.KNOWN_ENV_VARS` and `config_file.DEFAULTS`
 
@@ -454,3 +458,30 @@ The ~150 hardcoded keywords in `TASK_PATTERNS` cannot be extended or overridden 
 6. **Updated backlog** — marked BACKLOG-10, BACKLOG-18, BACKLOG-19, BACKLOG-31 as completed.
 
 **Test count:** 418 unit tests pass (up from 377), ruff clean.
+
+### FR-003 — Current iteration (2026-07-01): Quality, performance & developer experience
+
+**Completed in this iteration (verified in code, statuses updated):**
+
+1. **Fixed Zsh completion long flags** (`BUG-003`) — `_generate_completion()` now correctly includes long flags: filters with `f.startswith("--") and f != "--help"` instead of the broken `not f.startswith("--")`.
+2. **Fixed FileLock exponential backoff** (`BUG-005`) — `FileLock.__enter__` uses exponential backoff starting at 10ms, doubling per retry, capped at 1s. Added ±20% uniform random jitter to prevent thundering herd under contention.
+3. **Fixed config write failure logging** (`BUG-006`) — `save_config()` catches `OSError` and logs at WARNING level with the error detail.
+4. **Added `.env` to `.gitignore`** (`SEC-002`) — `.env`, `.env.local`, `.env.*` are git-ignored as defense-in-depth.
+5. **Updated Safety CLI command** (`DEVX-003`) — `make security` uses `safety scan --continue-on-error` instead of deprecated `safety check`.
+6. **Optimized SSE poller** (`PERF-003`) — `_status_poller()` skips the poll cycle when `_sse_clients` is empty, avoiding unnecessary I/O.
+7. **Added structural validation for `read_ledger`** (`BACKLOG-11`) — `LedgerState` TypedDict with required keys: `status`, `iterations`, `stats`, `total_iterations`, `last_updated`. Returns `None` with WARNING log on structural validation failure.
+8. **Optimized `extract_json_from_output` to single-pass scan** (`BACKLOG-27`) — removed O(n²) reverse scan (`list.insert(0, ch)`), now uses only forward scan with stack-based brace tracking. Same string-literal awareness preserved.
+9. **Unified duplicate status file writers** (`DEBT-001`) — removed `file_utils.write_status_file()`, all callers now use `status.write_status()`. Reduced from 2 writers with overlapping schemas to 1 canonical writer.
+10. **Added `make check` target** (`DEVX-004`) — runs lint → mypy → test → security in sequence, stopping on first failure.
+11. **Centralized coverage settings** (`DEVX-002`) — removed redundant `--cov=omp_loop --cov=web_app` from Makefile test targets (already in `pyproject.toml`).
+12. **Added Python 3.14 to CI test matrix** (`CICD-002`) — added `"3.14"` to matrix, `continue-on-error` for both 3.13 and 3.14.
+13. **Added docstrings** (`DOC-004`) — `set_max_output_chars()` and `get_max_output_chars()` in `functions.py` now have docstrings explaining their global state management.
+14. **Fixed pre-existing `test_create_and_resume_ledger`** — previously failing integration test now passes after status writer unification.
+
+**Backlog maintenance:**
+- Marked 7 stale backlog items as completed (BUG-003, BUG-005, BUG-006, SEC-002, DEVX-003, PERF-003)
+- Marked BACKLOG-11, BACKLOG-27, DEBT-001 as completed
+- Updated ENGINEERING_BACKLOG.md and BACKLOG.md with current state
+- Added this FR-003 iteration record
+
+**Test count:** 415 unit tests pass, 293 integration tests (125 in test_integration.py + 126+ in test_integration_gaps.py), 2 pre-existing failures unrelated to these changes. Ruff: 0 issues.

@@ -19,7 +19,7 @@ import time
 import urllib.request
 from contextlib import suppress
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypedDict
 from urllib.parse import urlparse
 
 from .color_utils import colorizer
@@ -39,6 +39,44 @@ from .git_utils import _capture_git_state, _git_auto_commit
 from .stats import _recalc_stats
 from .status import write_status as _write_status_file
 from .system_utils import get_system_usage, get_system_usage_diff
+
+
+# ── _execute_task return type ─────────────────────────────▸
+# Required keys: output, error, duration_seconds, returncode (returned in ALL paths)
+# Optional keys via total=False: n, summary, tool_usage, convergence, turns,
+# token_usage, session_id (returned only in success path variants)
+class _TaskResultRequired(TypedDict):
+    output: str
+    error: str | None
+    duration_seconds: float
+    returncode: int
+
+
+class TaskResult(_TaskResultRequired, total=False):
+    """Typed dict for the return value of _execute_task().
+
+    Required keys (present in ALL return paths):
+        output: str — final combined output text
+        error: str | None — last error message (None on success)
+        duration_seconds: float — wall-clock duration
+        returncode: int — subprocess exit code (-1 when no process)
+
+    Optional keys (present on success variant / extended paths):
+        n: int — iteration number
+        summary: str — iteration summary
+        tool_usage: dict — tool usage statistics
+        convergence: dict | None — convergence check results
+        turns: int — turn count
+        token_usage: dict — token counts
+        session_id: str — omp session ID
+    """
+    n: int
+    summary: str
+    tool_usage: dict
+    convergence: dict | None
+    turns: int
+    token_usage: dict
+    session_id: str
 
 
 # ── Security guardrails ───────────────────────────────────▸
@@ -121,7 +159,7 @@ def _execute_task(
     retry_delay: int = 5,
     worker_id: int = 1,
     prompt_suffix: str = "",
-) -> dict:
+) -> TaskResult:
     """Execute a single task via omp subprocess with --mode json.
 
     Streams NDJSON events (thinking, tool calls, responses) line-by-line
@@ -328,6 +366,7 @@ def _execute_task(
 
         except FileNotFoundError:
             return {
+                "output": "",
                 "error": "'omp' binary not found on PATH",
                 "duration_seconds": round(time.time() - start_time, 1),
                 "returncode": -1,

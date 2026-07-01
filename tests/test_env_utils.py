@@ -2,8 +2,11 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from omp_loop.env_utils import (
     KNOWN_ENV_VARS,
+    _decode_env_var_value,
     _find_closest_match,
     check_env_file,
     format_validation_results,
@@ -159,3 +162,123 @@ class TestCheckEnvFile:
         ):
             check_env_file("/tmp/.env")
         assert mock_log.call_count > 0
+
+
+class TestDecodeEnvVarValue:
+    """Parametrized tests for ``_decode_env_var_value``."""
+
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            # Truthy booleans
+            ("true", True),
+            ("True", True),
+            ("TRUE", True),
+            ("1", True),
+            ("yes", True),
+            ("on", True),
+            # Falsy booleans
+            ("false", False),
+            ("False", False),
+            ("FALSE", False),
+            ("0", False),
+            ("no", False),
+            ("off", False),
+        ],
+    )
+    def test_booleans(self, raw, expected):
+        """_decode_env_var_value decodes boolean variants."""
+        assert _decode_env_var_value(raw) is expected
+
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("-1", -1),
+            ("2147483647", 2147483647),
+            ("999999999999999", 999999999999999),
+            ("42", 42),
+            ("0x1A", 26),   # hex
+            ("0o10", 8),    # octal
+            ("0b101", 5),   # binary
+        ],
+    )
+    def test_integers(self, raw, expected):
+        """_decode_env_var_value decodes integer strings."""
+        result = _decode_env_var_value(raw)
+        assert result == expected
+        assert isinstance(result, int)
+
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("3.14", 3.14),
+            ("0.0", 0.0),
+            ("-2.5", -2.5),
+            ("1e10", 1e10),
+            ("inf", float("inf")),
+            ("-inf", float("-inf")),
+            ("nan", float("nan")),
+        ],
+    )
+    def test_floats(self, raw, expected):
+        """_decode_env_var_value decodes float strings."""
+        result = _decode_env_var_value(raw)
+        assert isinstance(result, float)
+        if raw == "nan":
+            assert result != result  # nan is never equal to itself
+        else:
+            assert result == expected
+
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ('''b"escaped\\nnewline"''', "escaped\nnewline"),
+            ('''b"hello"''', "hello"),
+            ('''b"tab\\there"''', "tab\there"),
+            ('''b"carriage\\rreturn"''', "carriage\rreturn"),
+            ('''b"back\\slash"''', 'back\\slash'),
+            ('''b' "nested" ' ''', ' "nested" '),
+        ],
+    )
+    def test_bytes_literals(self, raw, expected):
+        """_decode_env_var_value decodes Python bytes literals."""
+        result = _decode_env_var_value(raw)
+        assert result == expected
+        assert isinstance(result, str)
+
+    @pytest.mark.parametrize(
+        "raw",
+        [None, "", "   ", "\t\n", "\r\n"],
+    )
+    def test_empty_and_none(self, raw):
+        """_decode_env_var_value returns None for empty/None inputs."""
+        assert _decode_env_var_value(raw) is None
+
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("  true  ", True),
+            ("  false  ", False),
+            ("  42  ", 42),
+            ("  3.14  ", 3.14),
+            ("  hello  ", "hello"),
+        ],
+    )
+    def test_whitespace_handling(self, raw, expected):
+        """_decode_env_var_value strips whitespace before decoding."""
+        assert _decode_env_var_value(raw) == expected
+
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("hello world", "hello world"),
+            ("not-a-number", "not-a-number"),
+            ("true-ish", "true-ish"),
+            ("b'missing_quote", "b'missing_quote"),  # incomplete bytes literal
+            ("""{ "not": "json" }""", """{ "not": "json" }"""),  # not JSON
+            ("", None),  # empty -> None, NOT the empty string
+        ],
+    )
+    def test_malformed_and_fallback(self, raw, expected):
+        """_decode_env_var_value falls back to stripped string for unrecognised input."""
+        assert _decode_env_var_value(raw) == expected

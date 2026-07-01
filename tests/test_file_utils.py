@@ -252,3 +252,64 @@ class TestExtractJsonFromOutput:
         """extract_json_from_output returns None for broken JSON."""
         result = extract_json_from_output('{"key": "value"')
         assert result is None
+
+    # ── Edge case tests (BACKLOG-19) ────────────────────────────────────
+
+    def test_braces_in_string_values(self):
+        """extract_json_from_output handles braces inside JSON string values (BUG-002)."""
+        output = '{"key": "if (x) { y }"}'
+        result = extract_json_from_output(output)
+        assert result is not None
+        assert result["key"] == "if (x) { y }"
+
+    def test_braces_in_string_values_with_nesting(self):
+        """extract_json_from_output handles nested braces in string values."""
+        output = '{"outer": {"inner": "function() { return {a: 1}; }"}}'
+        result = extract_json_from_output(output)
+        assert result is not None
+        assert result["outer"]["inner"] == "function() { return {a: 1}; }"
+
+    def test_extra_trailing_comma_returns_none(self):
+        """extract_json_from_output returns None for JSON with trailing comma."""
+        result = extract_json_from_output('{"key": "value",}')
+        assert result is None
+
+    def test_extra_trailing_comma_skips_block(self):
+        """extract_json_from_output skips extra-comma blocks, returns earlier valid."""
+        output = '{"first": 1} garbage {"second": 2,}'
+        result = extract_json_from_output(output)
+        assert result is not None
+        assert result["first"] == 1
+
+    def test_escaped_quotes_in_strings(self):
+        """extract_json_from_output handles escaped double-quotes inside strings."""
+        output = '{"key": "he said \\"hello\\""}'
+        result = extract_json_from_output(output)
+        assert result is not None
+        assert result["key"] == 'he said "hello"'
+
+    def test_escaped_backslashes(self):
+        """extract_json_from_output handles escaped backslashes in strings."""
+        output = '{"path": "C:\\\\Users\\\\name"}'
+        result = extract_json_from_output(output)
+        assert result is not None
+        assert result["path"] == "C:\\Users\\name"
+
+    def test_multiple_json_mixed_validity(self):
+        """extract_json_from_output returns last valid JSON when some blocks are invalid."""
+        output = '{"first": 1} broken {"second": 2} garbage {"third": 3}}'
+        result = extract_json_from_output(output)
+        assert result is not None
+        assert result["third"] == 3
+
+    def test_empty_json_object(self):
+        """extract_json_from_output handles the empty JSON object {}."""
+        result = extract_json_from_output("{}")
+        assert result == {}
+
+    def test_deeply_nested_arrays(self):
+        """extract_json_from_output handles deeply nested arrays alongside objects."""
+        output = '{"data": [1, [2, [3, {"deep": "value"}]]]}'
+        result = extract_json_from_output(output)
+        assert result is not None
+        assert result["data"][1][1][1]["deep"] == "value"

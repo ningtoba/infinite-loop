@@ -10,6 +10,7 @@ Loading order (last wins):
 
 import difflib
 import os
+import re
 
 from .color_utils import colorizer
 from .file_utils import _log
@@ -109,6 +110,13 @@ DEPRECATED_ENV_VARS: set[str] = set()
 
 # Internal / non-config env vars that are expected but not user-settable
 INTERNAL_ENV_VARS: set[str] = set()
+
+# Regex for matching Python bytes literals like b"..." or b'...'
+_BYTES_LITERAL_RE = re.compile(r"""^b(['"])(.*)\1$""", re.DOTALL)
+
+# Truthy / falsy string values
+_TRUTHY: frozenset = frozenset({"true", "1", "yes", "on"})
+_FALSY: frozenset = frozenset({"false", "0", "no", "off"})
 
 # ── Sensible defaults for every known env var ─────────────────────────────────
 # Used when no source (config file, .env, os.environ) provides a value.
@@ -526,3 +534,45 @@ def check_env_file(env_path: str | None = None) -> int:
 
     has_issues = any(r["type"] in ("typo", "unknown", "deprecated", "warning") for r in results)
     return 1 if has_issues else 0
+
+
+# ── Value decoding — env vars arrive as strings; decode to sensible Python types ──
+
+
+def _decode_env_var_value(raw: str | None) -> bool | int | float | str | None:
+    """Decode an env-var string value to a sensible Python type.
+
+    Strips whitespace, then attempts parsing in order: boolean → int → float → bytes literal.
+    Falls back to the stripped string. Returns ``None`` for empty/``None`` input.
+    """
+    if raw is None:
+        return None
+    stripped = raw.strip()
+    if not stripped:
+        return None
+
+    # Boolean
+    if stripped.lower() in _TRUTHY:
+        return True
+    if stripped.lower() in _FALSY:
+        return False
+
+    # Integer (decimal, hex 0x, octal 0o, binary 0b)
+    try:
+        return int(stripped, 0)
+    except (ValueError, TypeError):
+        pass
+
+    # Float
+    try:
+        return float(stripped)
+    except (ValueError, TypeError):
+        pass
+
+    # Python bytes literal  b"..."  or  b'...'
+    m = _BYTES_LITERAL_RE.match(stripped)
+    if m:
+        # Decode escape sequences like \\n → \n
+        return m.group(2).encode("latin1").decode("unicode_escape")
+
+    return stripped

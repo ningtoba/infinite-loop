@@ -1,6 +1,6 @@
 .PHONY: install install-dev lint format test test-ci test-simple lint-all mypy security pre-commit pre-commit-run clean help web web-dev update-lock verify-lock
 
-PYTHON := python3
+PYTHON := $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
 
 help:
 	@echo "━━━ omp-loop — Makefile ━━━"

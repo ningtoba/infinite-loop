@@ -62,17 +62,18 @@ class TestColorizeLogTags:
 
 
 class TestLog:
-    def test_logs_to_stdout(self, capsys):
-        """_log prints to stdout."""
+    def test_logs_to_stderr(self, capsys):
+        """log prints to stderr, the correct stream for diagnostics."""
         _log("test message", level="INFO")
         captured = capsys.readouterr()
-        assert "test message" in captured.out
+        assert "test message" in captured.err
+        assert captured.out == ""  # no output on stdout
 
     def test_log_level_debug(self, capsys):
-        """_log handles DEBUG level."""
+        """log handles DEBUG level."""
         _log("debug msg", level="DEBUG")
         captured = capsys.readouterr()
-        assert "debug msg" in captured.out
+        assert "debug msg" in captured.err
 
 
 class TestInitLogger:

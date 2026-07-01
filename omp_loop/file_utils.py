@@ -7,6 +7,7 @@ import logging.handlers
 import os
 import random
 import re
+import sys
 import time
 from datetime import datetime, timezone
 from typing import TypedDict, cast
@@ -105,13 +106,35 @@ def _colorize_log_tags(msg: str) -> str:
     return msg
 
 
-def _log(msg: str, level: str = "INFO") -> None:
+def log(msg: str, level: str = "INFO") -> None:
+    """Log a message to the daemon log file with a timestamp and tag.
+
+    This is the canonical logging function for the daemon. All modules
+    should use ``log()`` rather than ``print()`` for persistent logging.
+
+    Parameters
+    ----------
+    msg:
+        The message to log.
+    level:
+        Log level string (e.g. ``"INFO"``, ``"WARNING"``, ``"ERROR"``).
+        Case-insensitive; mapped to stdlib logging levels.
+    """
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
-    colored_msg = _colorize_log_tags(msg)
-    print(f"[{ts}] {colored_msg}", flush=True)
+    tag = level.upper()[:5]
+    colored = _colorize_log_tags(f"[{ts}] [{tag}] {msg}")
+    print(colored, file=sys.stderr, flush=True)
     if _daemon_logger is not None:
         log_level = getattr(logging, level.upper(), logging.INFO)
         _daemon_logger.log(log_level, msg)
+
+
+def _log(msg: str, level: str = "INFO") -> None:
+    """Backward-compatible alias for :func:`log`.
+
+    Deprecated: use ``log()`` instead.
+    """
+    log(msg, level)
 
 
 def _init_logger(log_file: str, max_mb: int = 10) -> logging.Logger:

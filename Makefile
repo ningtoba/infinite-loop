@@ -16,6 +16,7 @@ help:
 	@echo "  format        Run ruff format (in-place) on omp_loop/ and web_app/"
 	@echo "  lint-all      Full CI check: lint + format check (no write)"
 	@echo "  check         Run lint -> mypy -> test -> security (stops on first failure)"
+	@echo "  test-fast    Run unit tests only (no integration, ~2s)"
 	@echo "  security      Run security scanning (bandit + safety)"
 	@echo "  test          Run tests with pytest (verbose + coverage)"
 	@echo "  test-simple   Run tests with pytest only - no coverage"
@@ -74,6 +75,10 @@ test-ci:
 
 test-simple:
 	$(PYTHON) -m pytest tests/ -v
+
+test-fast:
+	$(PYTHON) -m pytest tests/ -q --timeout=60 --ignore=tests/test_integration.py --ignore=tests/test_integration_deep.py --ignore=tests/test_integration_gaps.py
+
 
 mypy:
 	$(PYTHON) -m mypy omp_loop/ web_app/ --ignore-missing-imports --warn-unused-configs

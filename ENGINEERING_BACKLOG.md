@@ -485,3 +485,199 @@ The ~150 hardcoded keywords in `TASK_PATTERNS` cannot be extended or overridden 
 - Added this FR-003 iteration record
 
 **Test count:** 415 unit tests pass, 293 integration tests (125 in test_integration.py + 126+ in test_integration_gaps.py), 2 pre-existing failures unrelated to these changes. Ruff: 0 issues.
+
+---
+
+### FR-004 — Current iteration (2026-07-01): Backlog expansion + foundational improvements
+
+**Completed in this iteration:**
+
+1. **Discovered 9 new backlog items** across testing, API, security, and infrastructure gaps.
+2. **Added `make test-fast` target** — runs only unit tests (skips integration tests), completing in ~1.5s instead of 300+ seconds.
+3. **Promoted `_log` to public `log` API** — added `log()` function to `file_utils.py` as the canonical logger, kept `_log` as backward-compat alias. All 7 consuming modules continue to work without changes.
+4. **Added `SlidingWindowRateLimiter` unit tests** — first dedicated web_app unit tests covering check, remaining, reset, window expiry, per-IP isolation, and concurrent safety.
+5. **Updated ENGINEERING_BACKLOG.md** — added 9 new items (NEW-001 through NEW-009) with prioritized entries in the backlog table.
+
+**Test count:** 415+ unit tests pass, ruff clean, web_app rate_limiter tests added.
+
+---
+
+## New Backlog Items (discovered 2026-07-01)
+
+### NEW-001 — web_app has zero dedicated unit tests
+
+| Field | Value |
+|-------|-------|
+| **Category** | test |
+| **Priority** | high |
+| **Impact** | high |
+| **Effort** | large |
+| **Status** | pending |
+
+**Description:** The `web_app` module has zero dedicated unit tests. Critical parsing logic (`_parse_daemon_line` with 6+ fragile regex patterns), event handling (`_handle_event`), lifecycle methods (`start_daemon`, `stop_daemon`, `get_status`), `SlidingWindowRateLimiter`, and `build_cli_args()` are all untested. This is the largest testing gap in the codebase.
+
+**Reasoning:** The web layer is the primary user interface. Regex-based parsing of daemon output is fragile and any log format change silently breaks the UI. Without regression tests, every change to `loop_manager.py` or `server.py` is a roll of the dice.
+
+**Suggested Approach:** Phase 1: Add unit tests for `SlidingWindowRateLimiter` and `config_manager.build_cli_args()` (self-contained, no mocking). Phase 2: Add `_parse_daemon_line` tests with representative log-line fixtures. Phase 3: Add `LoopManager` lifecycle tests with mocked subprocess.
+
+**Affected Files:** `web_app/rate_limiter.py`, `web_app/config_manager.py`, `web_app/loop_manager.py`, `web_app/server.py`
+
+---
+
+### NEW-002 — `_log` is a private function used as public API across 7+ modules
+
+| Field | Value |
+|-------|-------|
+| **Category** | api |
+| **Priority** | medium |
+| **Impact** | medium |
+| **Effort** | small |
+| **Status** | ✅ Completed (2026-07-01) |
+
+**Description:** `file_utils._log()` is a private function (underscore prefix) that is imported and used by 7+ modules: `env_utils.py`, `error_recovery.py`, `functions.py`, `heartbeat.py`, `loop.py`, `preflight.py`, `state.py`, `validation.py`. The underscore signals "internal implementation detail" but it's effectively a public API.
+
+**Reasoning:** A function imported across the entire module tree should not be prefixed as private. This creates cognitive dissonance for new contributors and violates the convention that `_` means "not for external use."
+
+**Suggested Approach:** Add a public `log()` function with the same body, keep `_log` as a backward-compatible alias. Update imports in consuming modules to use `log` instead of `_log` as a follow-up.
+
+**Affected Files:** `omp_loop/file_utils.py`
+
+---
+
+### NEW-003 — `validation.py` is a stub — `load_json_schema` exists but no actual validation
+
+| Field | Value |
+|-------|-------|
+| **Category** | bug |
+| **Priority** | high |
+| **Impact** | high |
+| **Effort** | medium |
+| **Status** | pending |
+
+**Description:** `validation.py` defines `load_json_schema()` which loads a JSON Schema file, but there is NO validation function. The `--output-schema` CLI flag parses a schema and stores it in `LoopConfig.output_schema`, but nothing validates spawned session output against the schema. The feature is a no-op — users think output is being validated, but it isn't.
+
+**Reasoning:** This is a user-facing feature gap. The CLI flag exists, the schema is loaded, but the validation step was never implemented. Users who configure `--output-schema` expect their output to be validated, but no validation occurs.
+
+**Suggested Approach:** Add `validate_output(output: str, schema: dict) -> tuple[bool, list[str]]` function that validates JSON output against the loaded schema using Python's `jsonschema` library (or manual validation for simple cases). Wire it into `_execute_task()` in `loop.py`. Add comprehensive tests.
+
+**Affected Files:** `omp_loop/validation.py`, `omp_loop/loop.py`, `tests/test_validation.py`
+
+---
+
+### NEW-004 — Events protocol has no schema documentation
+
+| Field | Value |
+|-------|-------|
+| **Category** | documentation |
+| **Priority** | medium |
+| **Impact** | medium |
+| **Effort** | small |
+| **Status** | pending |
+
+**Description:** `emit_event()` in `events.py` emits 8+ event types (`spawn`, `worker_response`, `iteration_start`, `iteration_complete`, `error_type`, `heartbeat`, `term`, `progress`) consumed by `LoopManager._handle_event()`. There is no documentation of the event schema — no TypedDicts, no docstring tables, no type annotations for event payloads.
+
+**Reasoning:** Any new event type or payload field change requires cross-referencing emitter and consumer code. This is a documentation debt that causes bugs when event shapes diverge.
+
+**Suggested Approach:** Add TypedDict definitions for each event type in `events.py`, document the schema in the module docstring, and add structured logging assertions in tests.
+
+**Affected Files:** `omp_loop/events.py`, `web_app/loop_manager.py`
+
+---
+
+### NEW-005 — CDN scripts loaded without SRI integrity hashes
+
+| Field | Value |
+|-------|-------|
+| **Category** | security |
+| **Priority** | medium |
+| **Impact** | low |
+| **Effort** | small |
+| **Status** | pending |
+
+**Description:** `index.html` loads xterm.js and xterm-addon-fit from `cdn.jsdelivr.net` without `integrity` attributes. If the CDN is compromised, malicious JavaScript would execute in the context of the omp-loop web UI. The CSP `script-src` includes `cdn.jsdelivr.net` which would allow the compromised script to execute.
+
+**Reasoning:** Subresource Integrity (SRI) is a defense-in-depth measure. Without it, a CDN compromise could exfiltrate the API key or ledger data.
+
+**Suggested Approach:** Add `integrity` and `crossorigin="anonymous"` attributes to both `<script>` tags. Generate the correct SRI hash by fetching the current files and computing `openssl dgst -sha384 -binary | base64`.
+
+**Affected Files:** `web_app/static/index.html`
+
+---
+
+### NEW-006 — Python 3.14 CI `continue-on-error` masks real compatibility issues
+
+| Field | Value |
+|-------|-------|
+| **Category** | ci |
+| **Priority** | medium |
+| **Impact** | medium |
+| **Effort** | small |
+| **Status** | pending |
+
+**Description:** The CI test matrix has `continue-on-error: true` for both Python 3.13 and 3.14 (line 139 of `.github/workflows/ci.yml`). This means CI always passes even if 3.13 or 3.14 tests fail. Any Python 3.14-specific regression is silently invisible in CI status checks.
+
+**Reasoning:** CI should fail when tests fail. The `continue-on-error` was added as a temporary measure during the 3.14 transition but has become permanent. Either fix 3.14 compatibility issues or remove 3.14 from the matrix entirely rather than masking failures.
+
+**Suggested Approach:** Audit 3.14-specific failures, fix or document them, then remove `continue-on-error` for 3.14 (keep for 3.13 if still needed).
+
+**Affected Files:** `.github/workflows/ci.yml`
+
+---
+
+### NEW-007 — Integration tests take 300+ seconds to run, no fast feedback target
+
+| Field | Value |
+|-------|-------|
+| **Category** | devx |
+| **Priority** | medium |
+| **Impact** | medium |
+| **Effort** | small |
+| **Status** | ✅ Completed (2026-07-01) |
+
+**Description:** The full test suite (708 tests) takes 300+ seconds to run due to slow integration tests. There is no Makefile target for running only unit tests (~1.5s). Developers must manually construct the `pytest` ignore flags, which is error-prone and slows iteration.
+
+**Reasoning:** Fast feedback is critical for developer productivity. A 300-second test cycle encourages developers to skip testing before committing. Adding a `make test-fast` target that runs only unit tests in ~1.5s removes this friction.
+
+**Suggested Approach:** Add `make test-fast` target that runs unit tests only: `python -m pytest tests/ --ignore=tests/test_integration.py --ignore=tests/test_integration_deep.py --ignore=tests/test_integration_gaps.py -q --timeout=60`.
+
+**Affected Files:** `Makefile`
+
+---
+
+### NEW-008 — `config_file.py` uses `INFINITE_LOOP_*` prefix instead of `OMP_LOOP_*`
+
+| Field | Value |
+|-------|-------|
+| **Category** | bug |
+| **Priority** | low |
+| **Impact** | low |
+| **Effort** | small |
+| **Status** | pending |
+
+**Description:** `omp_loop/config_file.py` `DEFAULTS` uses the old `INFINITE_LOOP_*` prefix for all env var keys (e.g., `INFINITE_LOOP_GOAL`, `INFINITE_LOOP_MAX_ITERATIONS`), while the rest of the codebase uses `OMP_LOOP_*`. This drift means config_file defaults are never applied to the actual env vars used by the application.
+
+**Reasoning:** The `INFINITE_LOOP_*` keys in `config_file.py` are effectively dead code — they don't match the `OMP_LOOP_*` vars that `env_utils` and the rest of the app use. This is a rename artifact that was missed during the pi-loop → omp-loop migration.
+
+**Suggested Approach:** Rename all `INFINITE_LOOP_*` keys to `OMP_LOOP_*` in `config_file.py`. Update any consumers. Add a test that detects prefix drift between `config_file.DEFAULTS` and `env_utils.KNOWN_ENV_VARS`.
+
+**Affected Files:** `omp_loop/config_file.py`, `omp_loop/env_utils.py`
+
+---
+
+### NEW-009 — Frontend JavaScript has zero automated tests
+
+| Field | Value |
+|-------|-------|
+| **Category** | test |
+| **Priority** | medium |
+| **Impact** | medium |
+| **Effort** | large |
+| **Status** | pending |
+
+**Description:** The 1374-line `web_app/static/app.js` SPA frontend has zero automated tests. The `escapeAttr()` function, SSE event handling, tab switching, config editing, iteration display, worker terminal rendering, and all UI logic are untested. There is no test runner configured for JavaScript.
+
+**Reasoning:** The frontend contains complex UI logic including SSE event stream processing, DOM manipulation, state management, and API interaction. Without tests, every frontend change risks regressions in the only user-facing interface.
+
+**Suggested Approach:** Add a JavaScript test framework (vitest or jest with jsdom). Start with unit tests for pure functions (`escapeAttr`, `_wtTooltip`, number formatting), then add DOM interaction tests for critical paths (SSE event handling, tab switching, config save).
+
+**Affected Files:** `web_app/static/app.js`

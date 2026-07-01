@@ -464,7 +464,7 @@ function updateDashboard(data) {
 			logContainer.innerHTML = logs.map((entry) => {
 				const ts = entry.timestamp ? entry.timestamp.slice(11, 19) : "";
 				const msg = escapeHtml(entry.message);
-				return `<div class="wll-entry"><span class="wll-ts">${ts}</span><span class="wll-msg">${msg}</span></div>`;
+				return '<div class="wll-entry"><span class="wll-ts">' + ts + '</span><span class="wll-msg">' + msg + '</span></div>';
 			}).join("");
 			logContainer.scrollTop = logContainer.scrollHeight;
 		}
@@ -1208,7 +1208,7 @@ function showWorkerLog(wid) {
 	logContainer.innerHTML = logs.map((entry) => {
 		const ts = entry.timestamp ? entry.timestamp.slice(11, 19) : "";
 		const msg = escapeHtml(entry.message);
-		return `<div class="wll-entry"><span class="wll-ts">${ts}</span><span class="wll-msg">${msg}</span></div>`;
+		return '<div class="wll-entry"><span class="wll-ts">' + ts + '</span><span class="wll-msg">' + msg + '</span></div>';
 	}).join("");
 	logContainer.scrollTop = logContainer.scrollHeight;
 

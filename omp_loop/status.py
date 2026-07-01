@@ -1,6 +1,5 @@
 """Status file writer — emits a JSON status snapshot for web UI consumption.
 
-The web_app server reads this file to get live loop status without
 importing omp_loop runtime modules directly.
 """
 

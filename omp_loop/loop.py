@@ -97,6 +97,7 @@ def _execute_task(
     max_retries: int = 0,
     retry_delay: int = 5,
     worker_id: int = 1,
+    prompt_suffix: str = "",
 ) -> dict:
     """Execute a single task via omp subprocess with --mode json.
 
@@ -106,9 +107,10 @@ def _execute_task(
     Returns a result dict with 'output' (final assistant text), 'error',
     'duration_seconds', etc.
     """
-    cmd = ["omp", "-a", "--mode", "json", goal]
-    if context:
-        cmd.extend(["--append-system-prompt", context])
+    # Append magic keywords from prompt_suffix config
+    if prompt_suffix:
+        goal = goal + " " + prompt_suffix
+    cmd = ["omp", "--mode", "json", goal]
 
     print(f"[SPAWN (worker #{worker_id})] omp --mode json -- {goal[:60]}")
 
@@ -247,12 +249,19 @@ def _execute_task(
                             attempt_final_text_parts.append(block.get("text", ""))
 
             duration = time.time() - attempt_start
+            # Ensure the process exit code is reaped before checking returncode
+            proc.poll()
             stdout_text = "\n".join(attempt_raw_lines)
 
             if _stderr_thread is not None:
                 _stderr_thread.join(timeout=10)
             stderr_text = "".join(_stderr_buf)
 
+            # Write stderr lines to the terminal so errors appear in web UI worker detail
+            for _err_line in _stderr_buf:
+                _err_line = _err_line.rstrip("\n").rstrip("\r")
+                if _err_line:
+                    _term(_err_line)
             status_str = "ok" if proc.returncode == 0 else "failed"
             print(f"[WORKER (worker #{worker_id})] Response in {duration:.1f}s (status={status_str})")
             emit_event(
@@ -264,6 +273,7 @@ def _execute_task(
             )
             sys.stdout.flush()
 
+
             if proc.returncode == 0:
                 final_output = "\n".join(attempt_final_text_parts) if attempt_final_text_parts else stdout_text
                 return {
@@ -274,14 +284,13 @@ def _execute_task(
                 }
             else:
                 last_error = f"exit code {proc.returncode}: {stderr_text[:500] or stdout_text[:500]}"
+                _term(f"\x1b[31mError: {last_error}\x1b[0m")
                 all_attempts_output.append(f"[Attempt {attempts}] {last_error}")
-                if attempts < max_attempts:
-                    _log(f"[RETRY] Attempt {attempts}/{max_attempts} failed: {last_error[:120]}")
-                    time.sleep(retry_delay)
 
         except subprocess.TimeoutExpired:
             duration = time.time() - attempt_start
             last_error = f"timeout after {session_timeout}s"
+            _term(f"\x1b[31mError: {last_error}\x1b[0m")
             all_attempts_output.append(f"[Attempt {attempts}] {last_error}")
             _log(f"[RETRY] Attempt {attempts}/{max_attempts} timed out ({session_timeout}s)")
             # Kill the orphaned process to prevent zombie accumulation
@@ -305,6 +314,7 @@ def _execute_task(
         except Exception as e:
             duration = time.time() - attempt_start
             last_error = str(e)
+            _term(f"\x1b[31mError: {last_error}\x1b[0m")
             all_attempts_output.append(f"[Attempt {attempts}] {e}")
             # Kill any orphaned subprocess on unexpected errors
             if proc is not None:
@@ -666,6 +676,7 @@ def run_loop(
             max_turns=max_turns,
             max_retries=max_retries,
             retry_delay=retry_delay,
+            prompt_suffix=prompt_suffix,
         )
 
         total_duration = result["duration_seconds"]

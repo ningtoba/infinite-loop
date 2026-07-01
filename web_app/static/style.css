@@ -863,42 +863,14 @@ td.summary-col {
 /* ── Worker Detail Layout ────────────────────────────────────────────── */
 .worker-detail-layout {
 	display: flex;
-	gap: 12px;
+	flex-direction: column;
+	gap: 8px;
 	height: calc(100vh - 160px);
 }
 .worker-detail-layout > * {
-	flex: 1;
 	min-width: 0;
 }
-.worker-log-list {
-	background: var(--bg-card);
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	padding: 8px;
-	overflow-y: auto;
-	font-family: 'JetBrains Mono', 'Fira Code', monospace;
-	font-size: 12px;
-	line-height: 1.5;
-	max-height: 100%;
-}
-.wll-entry {
-	display: flex;
-	gap: 8px;
-	padding: 2px 4px;
-	border-bottom: 1px solid var(--border);
-}
-.wll-entry:last-child {
-	border-bottom: none;
-}
-.wll-ts {
-	color: var(--fg-dim);
-	flex-shrink: 0;
-	font-size: 11px;
-}
-.wll-msg {
-	color: var(--fg);
-	word-break: break-all;
-}
+
 
 /* ── Worker Card Preview ─────────────────────────────────────────────── */
 .worker-card-item .wc-preview {

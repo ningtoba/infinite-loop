@@ -456,18 +456,20 @@ function updateDashboard(data) {
 		);
 	}
 
-	// Refresh worker log list if viewing a worker detail
+	// Feed new structured log entries to the active worker terminal
 	if (_activeWorkerLog !== null && data.worker_logs) {
 		const logs = data.worker_logs[_activeWorkerLog] || [];
-		const logContainer = document.getElementById("worker-log-list");
-		if (logContainer) {
-			logContainer.innerHTML = logs.map((entry) => {
-				const ts = entry.timestamp ? entry.timestamp.slice(11, 19) : "";
-				const msg = escapeHtml(entry.message);
-				return '<div class="wll-entry"><span class="wll-ts">' + ts + '</span><span class="wll-msg">' + msg + '</span></div>';
-			}).join("");
-			logContainer.scrollTop = logContainer.scrollHeight;
+		const t = _workerTerminals[_activeWorkerLog];
+		const prevIdx = _lastLogIdxForWorker[_activeWorkerLog] || 0;
+		if (t) {
+			for (let i = prevIdx; i < logs.length; i++) {
+				const entry = logs[i];
+				const ts = entry.timestamp ? entry.timestamp.slice(11, 19) : "--:--:--";
+				const msg = entry.message || "";
+				t.term.write("\x1b[2m" + ts + "\x1b[0m " + msg + "\r\n");
+			}
 		}
+		_lastLogIdxForWorker[_activeWorkerLog] = logs.length;
 	}
 
 	// Append new log entries
@@ -1050,9 +1052,10 @@ async function loadIterations(page = 0) {
 // ── Workers Tab (cards → click for real xterm.js terminal) ─────────────
 let _lastWorkerLogCounts = {};
 const _lastWorkerTermIdx = {};
+const _lastLogIdxForWorker = {};
 let _activeWorkerLog = null;
 let _allWorkerData = null;
-let _workerTerminals = {}; // wid -> {term, fit}
+let _workerTerminals = {}; // wid -> {term, fit, ro}
 
 function createWorkerTerminal(wid) {
 	const container = document.getElementById("worker-terminal-container");
@@ -1091,16 +1094,43 @@ function createWorkerTerminal(wid) {
 	const fitAddon = new FitAddon.FitAddon();
 	term.loadAddon(fitAddon);
 	term.open(container);
-	fitAddon.fit();
 
-	_workerTerminals[wid] = { term, fit: fitAddon };
-	_lastWorkerTermIdx[wid] = 0;
+	// ResizeObserver: fit terminal only when container has real dimensions.
+	// Avoids the xterm RenderService crash from calling fit() before layout settles.
+	const ro = new ResizeObserver(() => {
+		if (container.clientWidth > 0 && container.clientHeight > 0) {
+			try {
+				fitAddon.fit();
+			} catch (_e) {
+				/* xterm fit may throw during initial layout — safe to ignore */
+			}
+		}
+	});
+	ro.observe(container);
 
-	// Feed existing terminal output
+	_workerTerminals[wid] = { term, fit: fitAddon, ro };
+
+	// Write structured logs first as informational terminal lines,
+	// then feed existing terminal output.
+	const logs = _allWorkerData
+		? (_allWorkerData.worker_logs || {})[wid] || []
+		: [];
+	for (const entry of logs) {
+		const ts = entry.timestamp ? entry.timestamp.slice(11, 19) : "--:--:--";
+		const msg = entry.message || "";
+		term.write("\x1b[2m" + ts + "\x1b[0m " + msg + "\r\n");
+	}
+	_lastLogIdxForWorker[wid] = logs.length;
+
 	const termLines = _allWorkerData
 		? (_allWorkerData.worker_term || {})[wid] || []
 		: [];
-	termLines.forEach((line) => term.write(line + "\r\n"));
+	let idx = 0;
+	for (const line of termLines) {
+		term.write(line + "\r\n");
+		idx++;
+	}
+	_lastWorkerTermIdx[wid] = idx;
 
 	return term;
 }
@@ -1176,17 +1206,23 @@ function renderWorkers(data) {
       <div class="wc-wid">Worker #${escapeHtml(w.id)}</div>
       <div class="wc-status">${label}${errInfo}</div>
       <div class="wc-dur">${dur}</div>
-      <div class="wc-preview">${lastLogPreview || (termLines.length + " lines")}</div>
+      <div class="wc-preview">${lastLogPreview || (termLines.length + " lines")}</div>`;
+		}).join(""));
+}
+
 function showWorkerLog(wid) {
-	// Dispose previous terminal before creating a new one (MEM-1)
+	// Dispose previous terminal + ResizeObserver before creating a new one
 	if (_activeWorkerLog !== null && _workerTerminals[_activeWorkerLog]) {
+		const prev = _workerTerminals[_activeWorkerLog];
 		try {
-			_workerTerminals[_activeWorkerLog].term.dispose();
+			if (prev.ro) prev.ro.disconnect();
+			prev.term.dispose();
 		} catch (_e) {
 			console.warn("xterm dispose for previous worker failed", _e);
 		}
 		delete _workerTerminals[_activeWorkerLog];
 		delete _lastWorkerTermIdx[_activeWorkerLog];
+		delete _lastLogIdxForWorker[_activeWorkerLog];
 	}
 
 	_activeWorkerLog = wid;
@@ -1203,15 +1239,6 @@ function showWorkerLog(wid) {
 	document.getElementById("worker-log-meta").textContent =
 		termLines.length + " terminal lines, " + logs.length + " log entries";
 
-	// Render structured log list
-	const logContainer = document.getElementById("worker-log-list");
-	logContainer.innerHTML = logs.map((entry) => {
-		const ts = entry.timestamp ? entry.timestamp.slice(11, 19) : "";
-		const msg = escapeHtml(entry.message);
-		return '<div class="wll-entry"><span class="wll-ts">' + ts + '</span><span class="wll-msg">' + msg + '</span></div>';
-	}).join("");
-	logContainer.scrollTop = logContainer.scrollHeight;
-
 	createWorkerTerminal(wid);
 }
 
@@ -1219,6 +1246,7 @@ function showWorkerCards() {
 	_activeWorkerLog = null;
 	Object.values(_workerTerminals).forEach((t) => {
 		try {
+			if (t.ro) t.ro.disconnect();
 			t.term.dispose();
 		} catch (e) {
 			console.warn("showWorkerCards dispose failed", e);

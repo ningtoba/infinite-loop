@@ -13,7 +13,6 @@ dependencies = ['fastapi>=0.100.0', 'uvicorn[standard]>=0.20.0']
 
 [project.scripts]
 omp-loop = "omp_loop.cli:main"
-omp-loop-web = "web_app.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["omp_loop*", "web_app*"]

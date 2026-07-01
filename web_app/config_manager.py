@@ -26,6 +26,13 @@ CONFIG_DEFAULTS: dict[str, dict[str, Any]] = {
         "required": True,
         "multiline": True,
     },
+    "INFINITE_LOOP_PROMPT_SUFFIX": {
+        "default": "",
+        "type": "string",
+        "group": "core",
+        "label": "Prompt Suffix",
+        "description": "Magic keywords appended to every goal prompt (e.g. 'ultrathink orchestrate')",
+    },
     "INFINITE_LOOP_CONTEXT": {
         "default": "",
         "type": "string",
@@ -358,6 +365,7 @@ def build_cli_args(config: dict[str, str]) -> list[str]:
         "INFINITE_LOOP_WATCH_POLL": "--watch-poll",
         "INFINITE_LOOP_KEEP_ITERATIONS": "--keep-iterations",
         "INFINITE_LOOP_MAX_IDLE_ITERATIONS": "--max-idle-iterations",
+        "INFINITE_LOOP_PROMPT_SUFFIX": "--prompt-suffix",
     }
 
     for env_key, flag in str_flags.items():

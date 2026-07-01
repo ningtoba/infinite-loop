@@ -6,12 +6,13 @@
 
 The architecture follows a **dual-process pattern**: a single-threaded synchronous daemon process manages the iteration loop (subprocess spawning, state persistence as JSON ledger, error recovery), while a separate async FastAPI process provides a REST API and SPA frontend for daemon control. State is shared via disk (JSON ledger and sentinel files), and the daemon supports ~70 CLI flags across 14 groups with multi-layer config precedence (CLI flags → JSON config file → env vars → .env file → defaults).
 
-The codebase has **415 unit tests and 293 integration tests** across 28 test files with improved coverage on file watching, env value decoding, JSON extraction, and ledger validation. Ruff is 0 issues. Significant tech debt remains including BACKLOG-4 (LoopConfig migration), BACKLOG-6 (web_app decoupling), and ARCH-001 (run_loop decomposition).
+The codebase has **445 unit tests and 293 integration tests** across 29 test files with improved coverage on output validation, dead code removed from LoopConfig (22 fields), and reduced `run_loop` complexity. Ruff is 0 issues. Significant tech debt remains including BACKLOG-4 (LoopConfig migration — Wave 1 complete), BACKLOG-6 (web_app decoupling), and ARCH-001 (run_loop decomposition).
 
 **Top priorities:**
 
-- **BACKLOG-4** — Complete LoopConfig migration (largest source of tech debt, critical)
+- **BACKLOG-4** — Complete LoopConfig migration Wave 2: inline remaining cfg fields in run_loop (high, large)
 - **BACKLOG-6** — Decouple web_app from omp_loop internal path constants (high, medium)
+- **NEW-001** — web_app unit tests (high, large)
 - **ARCH-001** — Decompose monolithic `run_loop()` (critical, xlarge)
 
 
@@ -23,8 +24,7 @@ The codebase has **415 unit tests and 293 integration tests** across 28 test fil
 |---|---|---|---|---|---|---|
 | BACKLOG-1 | Fix subprocess pipe deadlock in `_execute_task` | bug | critical | high | small | completed |
 | BACKLOG-2 | Add timeout to `proc.communicate()` after kill in `_execute_task` | bug | high | high | small | completed |
-| BACKLOG-3 | Add synchronization between heartbeat killer thread and main loop | bug | high | high | small | dead-code |
-| BACKLOG-4 | Complete LoopConfig migration and remove 71-parameter `run_loop` signature | tech-debt | critical | high | large | pending |
+| BACKLOG-4 | Complete LoopConfig migration — Wave 1 (dead fields removed), Wave 2 pending | tech-debt | high | high | large | partial |
 | BACKLOG-5 | Add TypedDict for ledger state across 15 consuming modules | architecture | high | high | large | pending |
 | BACKLOG-6 | Decouple `web_app` from `omp_loop` internal path constants | architecture | high | high | medium | pending |
 | BACKLOG-7 | Consolidate multi-layer config precedence into a single resolver | architecture | high | high | xlarge | pending |
@@ -502,6 +502,26 @@ The ~150 hardcoded keywords in `TASK_PATTERNS` cannot be extended or overridden 
 
 ---
 
+---
+
+### FR-005 — Current iteration (2026-07-01): Dead code removal + output schema validation
+
+**Completed in this iteration:**
+
+1. **Removed 22 dead LoopConfig fields** (`BACKLOG-4 Wave 1`) — removed fields that were extracted into locals in `run_loop()` but never read: `compact_every`, `archive_dir`, `archive_retention`, `archive_max_size`, `no_tool_shortcut`, `auto_toolsets`, `failure_learning`, `watch_dir`, `watch_poll`, `notify_on_completion`, `notify_pushbullet`, `notify_ntfy`, `notify_ntfy_server`, `resume_session_id`, `continue_session`, `skills`, `ignore_rules`, `yolo`, `ignore_user_config`, `spawn_source`, `safe_mode`, `accept_hooks`.
+2. **Removed 19 corresponding CLI flags** from `parser.py` — flags that parsed but never affected behavior.
+3. **Removed 3 dead extraction lines** for `webhook_port`, `worktree`, `resume` (fields kept, extractions removed).
+4. **Removed `# ruff: noqa: ARG001, F841`** blanket suppression from `loop.py` — no longer needed since all dead locals are removed.
+5. **Fixed pre-existing F841 bug** — `stderr_text` variable was assigned but never used; removed and rewired error path to use `_stderr_buf` directly. Restored missing `else:` keyword that was lost during earlier cleanup.
+6. **Implemented output schema validation** (`NEW-003`) — `validate_output()` in `validation.py` validates JSON output against JSON Schema with type checking and required-key enforcement. Wired into `_execute_task()` success path. Non-JSON output is skipped (not an error).
+7. **Added 15 unit tests** for `validate_output()` covering: no schema, valid JSON matching schema, property type validation (string/integer/number/boolean/array/object), missing required keys, type mismatches, non-JSON output (skipped), JSON extracted from text, multiple missing required keys, absent optional keys, and unknown type specifiers.
+8. **Added 4 unit tests** for `load_json_schema()` covering valid file, nonexistent file, invalid JSON, non-dict JSON.
+9. **Updated ENGINEERING_BACKLOG.md** — marked NEW-003 as completed, updated BACKLOG-4 to partial, updated executive summary and top priorities.
+10. **Cleaned up `web_app/config_manager.py`** — removed `INFINITE_LOOP_WATCH_DIR` and `INFINITE_LOOP_WATCH_POLL` dead entries.
+11. **Fixed `--yolo` test reference** — removed dead flag from `test_cli_with_all_bool_flags`.
+
+**Test count:** 445 unit tests pass (up from 430), ruff clean, output validation now functional.
+
 ## New Backlog Items (discovered 2026-07-01)
 
 ### NEW-001 — web_app has zero dedicated unit tests
@@ -552,7 +572,7 @@ The ~150 hardcoded keywords in `TASK_PATTERNS` cannot be extended or overridden 
 | **Priority** | high |
 | **Impact** | high |
 | **Effort** | medium |
-| **Status** | pending |
+| **Status** | ✅ Completed (2026-07-01) |
 
 **Description:** `validation.py` defines `load_json_schema()` which loads a JSON Schema file, but there is NO validation function. The `--output-schema` CLI flag parses a schema and stores it in `LoopConfig.output_schema`, but nothing validates spawned session output against the schema. The feature is a no-op — users think output is being validated, but it isn't.
 

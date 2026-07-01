@@ -144,7 +144,6 @@ def main() -> None:
         reset_goals=args.reset_goals,
     )
     state["toolsets"] = toolsets_list
-    state["compact_every"] = args.compact_every
     state["max_iterations"] = args.max_iterations
     state["retry_delay"] = args.retry_delay
     state["workdir"] = args.workdir or ""
@@ -165,12 +164,9 @@ def main() -> None:
     state["keep_iterations"] = args.keep_iterations
     state["tag"] = args.tag
     state["prompt_suffix"] = args.prompt_suffix
-    state["no_tool_shortcut"] = args.no_tool_shortcut
     state["max_turns"] = args.max_turns
     state["output_schema_file"] = args.output_schema_file or ""
     state["output_schema_inline"] = args.output_schema or ""
-    state["yolo"] = args.yolo
-    state["ignore_user_config"] = args.ignore_user_config
     write_ledger(state)
 
     # Load config from file (command-line args override file values)
@@ -236,8 +232,6 @@ def main() -> None:
         cfg.notify_cmd = args.notify_cmd or None
         cfg.on_error_cmd = args.on_error_cmd or None
         cfg.allow_error_metachars = args.allow_error_metachars
-        cfg.auto_toolsets = not args.no_auto_toolsets
-        cfg.failure_learning = not args.no_failure_learning
         cfg.html_dashboard = args.status_html
         try:
             parsed_schema = json.loads(args.output_schema) if args.output_schema else None
@@ -248,8 +242,6 @@ def main() -> None:
             load_json_schema(args.output_schema_file) if args.output_schema_file else None
         )
         cfg.checkpoints = False
-        cfg.resume_session_id = state.get("resume_session_id", "")
-        cfg.accept_hooks = False
         run_loop(cfg, state)
 
     _log(f"[DONE] Daemon finished. Ledger at {LEDGER_PATH}")

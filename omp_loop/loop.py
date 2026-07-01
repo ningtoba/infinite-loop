@@ -4,11 +4,6 @@ Simplified task execution loop that spawns subprocess workers and tracks
 progress in a JSON ledger.
 """
 
-# ruff: noqa: ARG001, F841 — many run_loop() params are part of the 71-param
-# signature tracked as TECHDEPT-001; fixing unused args requires the
-# LoopConfig dataclass refactor. F841 covers dead local assignments from
-# the cfg.* local-extraction block.
-
 import html
 import json
 import os
@@ -23,13 +18,12 @@ from typing import Any, TypedDict
 from urllib.parse import urlparse
 
 from .color_utils import colorizer
-from .config import VERSION, LoopConfig, _get_data_dir
+from .config import VERSION, LoopConfig
 from .error_recovery import _adapt_to_error, _set_originals
 from .error_utils import _suggest_actionable_fix
 from .events import emit_event
 from .file_utils import _log, write_ledger
 from .functions import (
-    _build_progressive_context,
     _cycle_goal,
     _handle_cooldown,
     _load_goals_file,
@@ -39,6 +33,7 @@ from .git_utils import _capture_git_state, _git_auto_commit
 from .stats import _recalc_stats
 from .status import write_status as _write_status_file
 from .system_utils import get_system_usage, get_system_usage_diff
+from .validation import validate_output
 
 
 # ── _execute_task return type ─────────────────────────────▸
@@ -150,15 +145,14 @@ def _kill_and_reap(proc: subprocess.Popen | None, log_func: Any, context: str = 
 
 def _execute_task(
     goal: str,
-    context: str,
     workdir: str | None,
     session_timeout: int,
     max_output_chars: int = 2000,
-    max_turns: int = 500,
     max_retries: int = 0,
     retry_delay: int = 5,
     worker_id: int = 1,
     prompt_suffix: str = "",
+    output_schema: dict | None = None,
 ) -> TaskResult:
     """Execute a single task via omp subprocess with --mode json.
 
@@ -316,7 +310,6 @@ def _execute_task(
 
             if _stderr_thread is not None:
                 _stderr_thread.join(timeout=10)
-            stderr_text = "".join(_stderr_buf)
 
             # Write stderr lines to the terminal so errors appear in web UI worker detail
             for _err_line in _stderr_buf:
@@ -332,11 +325,18 @@ def _execute_task(
                 status=status_str,
                 returncode=proc.returncode,
             )
-            sys.stdout.flush()
-
-
             if proc.returncode == 0:
                 final_output = "\n".join(attempt_final_text_parts) if attempt_final_text_parts else stdout_text
+
+                # Validate output against schema if configured
+                validation_errors: list[str] = []
+                if output_schema is not None:
+                    is_valid, validation_errors = validate_output(final_output, output_schema)
+                    if not is_valid:
+                        for verr in validation_errors:
+                            _term(f"[SCHEMA] Validation error: {verr}")
+                        _log(f"[SCHEMA] Output validation failed ({len(validation_errors)} error(s))")
+
                 return {
                     "output": final_output[:max_output_chars] if max_output_chars else final_output,
                     "error": None,
@@ -344,25 +344,19 @@ def _execute_task(
                     "returncode": 0,
                 }
             else:
-                last_error = f"exit code {proc.returncode}: {stderr_text[:500] or stdout_text[:500]}"
+                last_error = f"exit code {proc.returncode}: {''.join(_stderr_buf)[:500] or stdout_text[:500]}"
                 _term(f"\x1b[31mError: {last_error}\x1b[0m")
                 all_attempts_output.append(f"[Attempt {attempts}] {last_error}")
-
-        except subprocess.TimeoutExpired:
-            duration = time.time() - attempt_start
-            last_error = f"timeout after {session_timeout}s"
-            _term(f"\x1b[31mError: {last_error}\x1b[0m")
-            all_attempts_output.append(f"[Attempt {attempts}] {last_error}")
-            _log(f"[RETRY] Attempt {attempts}/{max_attempts} timed out ({session_timeout}s)")
-            # Kill the orphaned process to prevent zombie accumulation
-            if proc is not None:
-                _kill_and_reap(proc, _log, f"Attempt {attempts}/{max_attempts} timed out")
-                # Join the stderr drain thread so its pipe reference is
-                # released before the next retry attempt allocates a new proc.
-                if _stderr_thread is not None:
-                    _stderr_thread.join(timeout=5)
-            if attempts < max_attempts:
-                time.sleep(retry_delay)
+                _log(f"[RETRY] Attempt {attempts}/{max_attempts} failed ({last_error[:80]})")
+                # Kill the orphaned process to prevent zombie accumulation
+                if proc is not None:
+                    _kill_and_reap(proc, _log, f"Attempt {attempts}/{max_attempts} failed")
+                    # Join the stderr drain thread so its pipe reference is
+                    # released before the next retry attempt allocates a new proc.
+                    if _stderr_thread is not None:
+                        _stderr_thread.join(timeout=5)
+                if attempts < max_attempts:
+                    time.sleep(retry_delay)
 
         except FileNotFoundError:
             return {
@@ -398,11 +392,8 @@ def _print_shutdown_summary(
     iteration_count: int,
     stop_reason: str,
     goal: str = "",
-    git: bool = False,
-    workers: int = 1,
 ) -> None:
     """Print a comprehensive shutdown summary banner."""
-    data_dir = _get_data_dir()
     iters = state.get("iterations", [])
     total = iteration_count
     total_dur = state.get("stats", {}).get("total_duration_seconds", 0)
@@ -448,8 +439,6 @@ def _shutdown(
     stop_reason: str,
     *,
     goal: str = "",
-    git: bool = False,
-    workers: int = 1,
     last_error: str | None = None,
 ) -> None:
     """Unified shutdown sequence — set status, persist state, print summary."""
@@ -473,7 +462,7 @@ def _shutdown(
         iteration_count=iteration_count,
         last_error=last_error,
     )
-    _print_shutdown_summary(state, iteration_count, stop_reason, goal=goal, git=git, workers=workers)
+    _print_shutdown_summary(state, iteration_count, stop_reason, goal=goal)
 
 
 def run_loop(
@@ -491,11 +480,9 @@ def run_loop(
 
     # ── Extract locals from config (for minimal diff vs old signature) ──
     goal = cfg.goal
-    context = cfg.context
     workdir = cfg.workdir
     sentinel_path = cfg.sentinel_path
     max_iterations = cfg.max_iterations
-    compact_every = cfg.compact_every
     retry_delay = cfg.retry_delay
     session_timeout = cfg.session_timeout
     status_file = cfg.status_file
@@ -508,25 +495,15 @@ def run_loop(
     max_output_chars = cfg.max_output_chars
     profile = cfg.profile
     model = cfg.model
-    provider = cfg.provider
     http_callback = cfg.http_callback
     http_callback_secret = cfg.http_callback_secret
     keep_iterations = cfg.keep_iterations
-    archive_dir = cfg.archive_dir
-    archive_retention = cfg.archive_retention
-    archive_max_size = cfg.archive_max_size
     max_retries = cfg.max_retries
     on_error_cmd = cfg.on_error_cmd
     tag = cfg.tag
     prompt_suffix = cfg.prompt_suffix
-    no_tool_shortcut = cfg.no_tool_shortcut
     max_turns = cfg.max_turns
-    auto_toolsets = cfg.auto_toolsets
-    failure_learning = cfg.failure_learning
     html_dashboard = cfg.html_dashboard
-    webhook_port = cfg.webhook_port
-    watch_dir = cfg.watch_dir
-    watch_poll = cfg.watch_poll
     cooldown = cfg.cooldown
     goals_file = cfg.goals_file
     stop_at_goals_end = cfg.stop_at_goals_end
@@ -538,24 +515,9 @@ def run_loop(
     store_git_diff = cfg.store_git_diff
     startup_delay = cfg.startup_delay
     notify_desktop = cfg.notify_desktop
-    notify_on_completion = cfg.notify_on_completion
-    notify_pushbullet = cfg.notify_pushbullet
-    notify_ntfy = cfg.notify_ntfy
-    notify_ntfy_server = cfg.notify_ntfy_server
     use_library = cfg.use_library
     pass_session_id = cfg.pass_session_id
     checkpoints = cfg.checkpoints
-    resume = cfg.resume
-    resume_session_id = cfg.resume_session_id
-    skills = cfg.skills
-    ignore_rules = cfg.ignore_rules
-    yolo = cfg.yolo
-    ignore_user_config = cfg.ignore_user_config
-    spawn_source = cfg.spawn_source
-    safe_mode = cfg.safe_mode
-    accept_hooks = cfg.accept_hooks
-    worktree = cfg.worktree
-    continue_session = cfg.continue_session
     track_goals = cfg.track_goals
     reset_goals = cfg.reset_goals
     heartbeat_timeout = cfg.heartbeat_timeout
@@ -566,9 +528,7 @@ def run_loop(
     _set_originals(session_timeout, cooldown, use_library, workers)
 
     iteration_count = state["total_iterations"]
-    existing_summaries = [it.get("summary", "") for it in state.get("iterations", [])]
     consecutive_errors = state.get("stats", {}).get("consecutive_errors", 0)
-    consecutive_successes = state.get("stats", {}).get("consecutive_successes", 0)
     consecutive_idle = 0
 
     goals_tuples = _load_goals_file(goals_file, goal)
@@ -633,8 +593,6 @@ def run_loop(
                 status_file,
                 "stopped: signal",
                 goal=goal,
-                git=git,
-                workers=workers,
                 last_error="stopped: signal",
             )
             return
@@ -644,30 +602,26 @@ def run_loop(
             from .file_utils import check_sentinel
 
             stop_signal = check_sentinel(sentinel_path)
-            if stop_signal:
-                _log(f"[STOP] Sentinel detected ('{stop_signal}'). Stopping.")
-                _shutdown(
-                    state,
-                    iteration_count,
-                    status_file,
-                    f"stopped: {stop_signal}",
-                    goal=goal,
-                    git=git,
-                    workers=workers,
-                    last_error=f"stopped: {stop_signal}",
-                )
-                return
+            _shutdown(
+                state,
+                iteration_count,
+                status_file,
+                f"stopped: {stop_signal}",
+                goal=goal,
+                last_error=f"stopped: {stop_signal}",
+            )
+            return
 
         if max_iterations > 0 and iteration_count >= max_iterations:
             stop_reason = f"stopped: max_iterations ({max_iterations})"
             _log(f"[STOP] Reached {stop_reason}. Stopping.")
-            _shutdown(state, iteration_count, status_file, stop_reason, goal=goal, git=git, workers=workers)
+            _shutdown(state, iteration_count, status_file, stop_reason, goal=goal)
             return
 
         if max_idle_iterations > 0 and consecutive_idle >= max_idle_iterations:
             stop_reason = f"stopped: idle ({consecutive_idle} iterations without changes)"
             _log(f"[STOP] Idle limit reached ({consecutive_idle} iterations). Stopping.")
-            _shutdown(state, iteration_count, status_file, stop_reason, goal=goal, git=git, workers=workers)
+            _shutdown(state, iteration_count, status_file, stop_reason, goal=goal)
             return
 
         iteration_count += 1
@@ -703,8 +657,6 @@ def run_loop(
                     status_file,
                     "stopped: goals-exhausted",
                     goal=goal,
-                    git=git,
-                    workers=workers,
                 )
         else:
             # Prefer evolved goal if one exists (consumed with pop to avoid stale reuse)
@@ -714,23 +666,19 @@ def run_loop(
             else:
                 goal_text = goal
 
-        # Build context from progressive summaries
-        progressive_context = _build_progressive_context(context, existing_summaries)
-
         git_before = _capture_git_state(workdir, store_diff=store_git_diff) if git else {}
         sys_before = get_system_usage()
 
         # Execute task
         result = _execute_task(
             goal=goal_text,
-            context=progressive_context,
             workdir=workdir,
             session_timeout=session_timeout,
             max_output_chars=max_output_chars,
-            max_turns=max_turns,
             max_retries=max_retries,
             retry_delay=retry_delay,
             prompt_suffix=prompt_suffix,
+            output_schema=output_schema,
         )
 
         total_duration = result["duration_seconds"]
@@ -939,8 +887,6 @@ def run_loop(
                     status_file,
                     stop_reason,
                     goal=goal,
-                    git=git,
-                    workers=workers,
                     last_error=stop_reason,
                 )
                 return

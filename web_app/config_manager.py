@@ -361,8 +361,6 @@ def build_cli_args(config: dict[str, str]) -> list[str]:
         "INFINITE_LOOP_GOALS_FILE": "--goals-file",
         "INFINITE_LOOP_ON_ERROR_CMD": "--on-error-cmd",
         "INFINITE_LOOP_STARTUP_DELAY": "--startup-delay",
-        "INFINITE_LOOP_WATCH_DIR": "--watch-dir",
-        "INFINITE_LOOP_WATCH_POLL": "--watch-poll",
         "INFINITE_LOOP_KEEP_ITERATIONS": "--keep-iterations",
         "INFINITE_LOOP_MAX_IDLE_ITERATIONS": "--max-idle-iterations",
         "INFINITE_LOOP_PROMPT_SUFFIX": "--prompt-suffix",

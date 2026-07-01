@@ -72,12 +72,6 @@ See 'omp-loop --examples' for more usage patterns.
         help="Stop after N iterations with no changes (0 = off)",
     )
     iter_group.add_argument(
-        "--compact-every",
-        type=int,
-        default=10,
-        help="Compact summaries every N iterations",
-    )
-    iter_group.add_argument(
         "--evolve",
         action="store_true",
         help="Auto-evolve the goal after each iteration",
@@ -138,14 +132,12 @@ See 'omp-loop --examples' for more usage patterns.
         default=BASE_TOOLSETS,
         help=f"Comma-separated toolsets (default: {BASE_TOOLSETS})",
     )
-    worker.add_argument("--no-auto-toolsets", action="store_true", help="Disable auto toolset detection")
     worker.add_argument(
         "--prompt-suffix",
         type=str,
         default="",
         help="Suffix appended to every worker prompt",
     )
-    worker.add_argument("--skills", type=str, default="", help="Skills to enable for workers")
     worker.add_argument(
         "--max-output-chars",
         type=int,
@@ -166,11 +158,6 @@ See 'omp-loop --examples' for more usage patterns.
     )
     worker.add_argument("--resume", action="store_true", help="Resume a chained session")
     worker.add_argument(
-        "--continue-session",
-        action="store_true",
-        help="Continue the previous session (--resume alias)",
-    )
-    worker.add_argument(
         "--use-library",
         action="store_true",
         help="Use in-process execution instead of subprocess",
@@ -183,13 +170,6 @@ See 'omp-loop --examples' for more usage patterns.
     git_group.add_argument("--store-git-diff", action="store_true", help="Store full git diff in ledger")
     git_group.add_argument("--worktree", action="store_true", help="Use git worktrees for parallel workers")
     git_group.add_argument("--workdir", type=str, default="", help="Working directory for workers")
-    git_group.add_argument("--watch-dir", type=str, default="", help="Directory to watch for file changes")
-    git_group.add_argument(
-        "--watch-poll",
-        type=float,
-        default=5.0,
-        help="File watch poll interval in seconds",
-    )
 
     # ── Notifications ──────────────────────────────────────
     notif = parser.add_argument_group("Notifications")
@@ -197,11 +177,6 @@ See 'omp-loop --examples' for more usage patterns.
         "--notify-desktop",
         action="store_true",
         help="Send desktop notifications via notify-send",
-    )
-    notif.add_argument(
-        "--notify-on-completion",
-        action="store_true",
-        help="Send notification on daemon completion",
     )
     notif.add_argument(
         "--notify-cmd",
@@ -220,24 +195,6 @@ See 'omp-loop --examples' for more usage patterns.
         action="store_true",
         default=False,
         help="Allow shell metacharacters (; | ` $ & > <) in --on-error-cmd (security risk)",
-    )
-    notif.add_argument(
-        "--notify-pushbullet",
-        type=str,
-        default="",
-        help="PushBullet API token for notifications",
-    )
-    notif.add_argument(
-        "--notify-ntfy",
-        type=str,
-        default="",
-        help="ntfy.sh topic for push notifications",
-    )
-    notif.add_argument(
-        "--notify-ntfy-server",
-        type=str,
-        default="https://ntfy.sh",
-        help="ntfy.sh server URL",
     )
 
     # ── Dashboard & Status ─────────────────────────────────
@@ -269,19 +226,6 @@ See 'omp-loop --examples' for more usage patterns.
         default=0,
         help="Keep only last N iterations in ledger (0=keep all)",
     )
-    archive.add_argument("--archive-dir", type=str, default="", help="Directory for archived iterations")
-    archive.add_argument(
-        "--archive-retention",
-        type=int,
-        default=30,
-        help="Days to keep archived iterations (default: 30)",
-    )
-    archive.add_argument(
-        "--archive-max-size",
-        type=int,
-        default=0,
-        help="Max archive size in MB (0=unlimited)",
-    )
 
     # ── Logging ────────────────────────────────────────────
     log_group = parser.add_argument_group("Logging")
@@ -305,25 +249,11 @@ See 'omp-loop --examples' for more usage patterns.
     # ── Safety & Mode Flags ────────────────────────────────
     safety = parser.add_argument_group("Safety & Mode Flags")
     safety.add_argument(
-        "--safe-mode",
-        action="store_true",
-        help="Disable all customizations and risky features",
-    )
-    safety.add_argument("--yolo", action="store_true", help="Bypass all safety prompts")
-    safety.add_argument("--ignore-rules", action="store_true", help="Skip rules file")
-    safety.add_argument("--ignore-user-config", action="store_true", help="Skip user config")
-    safety.add_argument(
-        "--no-failure-learning",
-        action="store_true",
-        help="Disable failure context injection",
-    )
-    safety.add_argument(
         "--track-goals",
         action="store_true",
         help="Track completed goals to skip on restart",
     )
     safety.add_argument("--reset-goals", action="store_true", help="Reset goals_completed tracking")
-    safety.add_argument("--no-tool-shortcut", action="store_true", help="Disable tool shortcuts")
     safety.add_argument(
         "--heartbeat-timeout",
         type=int,

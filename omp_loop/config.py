@@ -329,7 +329,6 @@ class LoopConfig:
     # ── Iteration Control ───────────────────────────────────
     max_iterations: int = 0
     max_idle_iterations: int = 0
-    compact_every: int = 10
     evolve: bool = False
     convergence_stop: bool = False
     convergence_threshold: float = DEFAULT_CONVERGENCE_THRESHOLD
@@ -353,16 +352,10 @@ class LoopConfig:
     model: str = ""
     provider: str = ""
     prompt_suffix: str = ""
-    no_tool_shortcut: bool = False
-    auto_toolsets: bool = True
-    failure_learning: bool = True
-    skills: str = ""
     use_library: bool = False
     pass_session_id: bool = False
     checkpoints: bool = False
     resume: bool = False
-    resume_session_id: str = ""
-    continue_session: bool = False
     output_schema: dict | None = None
 
     # ── Git & Files ─────────────────────────────────────────
@@ -370,18 +363,12 @@ class LoopConfig:
     git_commit: bool = False
     store_git_diff: bool = False
     worktree: bool = False
-    watch_dir: str = ""
-    watch_poll: float = 5.0
 
     # ── Notifications & Callbacks ───────────────────────────
     notify_cmd: str | None = None
     on_error_cmd: str | None = None
     allow_error_metachars: bool = False
     notify_desktop: bool = False
-    notify_on_completion: bool = False
-    notify_pushbullet: str = ""
-    notify_ntfy: str = ""
-    notify_ntfy_server: str = "https://ntfy.sh"
     http_callback: str = ""
     http_callback_secret: str = ""
 
@@ -392,21 +379,12 @@ class LoopConfig:
 
     # ── Archiving ───────────────────────────────────────────
     keep_iterations: int = 0
-    archive_dir: str = ""
-    archive_retention: int = 30
-    archive_max_size: int = 0
 
     # ── Logging ─────────────────────────────────────────────
     quiet: bool = False
     json_logs: bool = False
 
     # ── Safety ──────────────────────────────────────────────
-    safe_mode: bool = False
-    yolo: bool = False
-    ignore_rules: bool = False
-    ignore_user_config: bool = False
-    accept_hooks: bool = False
-    spawn_source: str = ""
     tag: str = ""
     heartbeat_timeout: int = 0
 

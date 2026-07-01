@@ -1319,7 +1319,6 @@ class TestCliPipeline:
             "--store-git-diff",
             "--evolve",
             "--quiet",
-            "--yolo",
             "--notify-desktop",
             "--track-goals",
             "--reset-goals",
@@ -1333,7 +1332,6 @@ class TestCliPipeline:
         assert ns.store_git_diff is True
         assert ns.evolve is True
         assert ns.quiet is True
-        assert ns.yolo is True
         assert ns.notify_desktop is True
         assert ns.track_goals is True
         assert ns.reset_goals is True
